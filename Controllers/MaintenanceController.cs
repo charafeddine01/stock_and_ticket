@@ -148,6 +148,10 @@ namespace StockPortal.Controllers
             {
                 ModelState.AddModelError("SupplierId", "Please select a valid supplier/vendor.");
             }
+            else if (!supplier.SupportsDepartment(asset.MaintenanceTeam))
+            {
+                ModelState.AddModelError("SupplierId", $"Selected supplier '{supplier.Name}' is not authorized to service equipment for the '{asset.MaintenanceTeam}' department. Please select a qualified vendor.");
+            }
 
             if (string.IsNullOrWhiteSpace(description))
             {
@@ -558,12 +562,13 @@ namespace StockPortal.Controllers
                 ticketsQuery = ticketsQuery.Where(t => t.TargetTeam == myTeam);
             }
 
-            var assets = await assetsQuery
+            var rawAssets = await assetsQuery
                 .OrderBy(a => a.HospitalNo)
-                .Select(a => new
+                .Select(a => new AssetDropdownItem
                 {
-                    a.Id,
-                    Display = $"{a.HospitalNo} - {a.Brand} {a.Type} [Held by: {(a.User != null ? a.User.FullName : "Central Stock")} - Room {(a.Room != null ? a.Room.RoomNo : "N/A")}]"
+                    Id = a.Id,
+                    Display = $"{a.HospitalNo} - {a.Brand} {a.Type} [Held by: {(a.User != null ? a.User.FullName : "Central Stock")} - Room {(a.Room != null ? a.Room.RoomNo : "N/A")}]",
+                    MaintenanceTeam = a.MaintenanceTeam ?? MaintenanceTeams.IT
                 })
                 .ToListAsync();
 
@@ -576,8 +581,36 @@ namespace StockPortal.Controllers
                 })
                 .ToListAsync();
 
-            ViewBag.Assets = new SelectList(assets, "Id", "Display", selectedAssetId);
-            ViewBag.Suppliers = new SelectList(await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync(), "Id", "Name");
+            var allActiveSuppliers = await _context.Suppliers
+                .Where(s => s.IsActive == true)
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            string? targetTeam = null;
+            if (selectedAssetId.HasValue && selectedAssetId.Value > 0)
+            {
+                var selectedAsset = await _context.Assets.FindAsync(selectedAssetId.Value);
+                if (selectedAsset != null)
+                {
+                    targetTeam = selectedAsset.MaintenanceTeam;
+                }
+            }
+            else if (_currentUserService.IsMaintenance())
+            {
+                targetTeam = _currentUserService.GetMaintenanceTeam();
+            }
+
+            var matchingSuppliers = allActiveSuppliers;
+            if (!string.IsNullOrWhiteSpace(targetTeam))
+            {
+                matchingSuppliers = allActiveSuppliers.Where(s => s.SupportsDepartment(targetTeam)).ToList();
+            }
+
+            ViewBag.AssetsList = rawAssets;
+            ViewBag.Assets = new SelectList(rawAssets, "Id", "Display", selectedAssetId);
+            ViewBag.Suppliers = new SelectList(matchingSuppliers, "Id", "Name");
+            ViewBag.AllSuppliers = allActiveSuppliers;
+            ViewBag.TargetTeam = targetTeam;
             ViewBag.Technicians = new SelectList(await _context.Users.Where(u => u.IsActive == true && (u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin)).OrderBy(u => u.FullName).ToListAsync(), "Id", "FullName", _currentUserService.GetUserId());
             ViewBag.Tickets = new SelectList(tickets, "Id", "Display", selectedTicketId);
         }

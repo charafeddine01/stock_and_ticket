@@ -158,12 +158,15 @@ namespace StockPortal.Controllers
                 return Forbid();
             }
 
+            var allSuppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
+            var targetSuppliers = allSuppliers.Where(s => s.SupportsDepartment(ticket.TargetTeam)).ToList();
+
             var vm = new TicketDetailsViewModel
             {
                 Ticket = ticket,
                 Statuses = await _context.TicketStatuses.ToListAsync(),
                 Technicians = await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(),
-                Suppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync(),
+                Suppliers = targetSuppliers,
                 NewStatusId = ticket.StatusId,
                 NewTechUserId = ticket.Handler?.TechUserId
             };

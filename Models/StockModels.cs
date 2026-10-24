@@ -114,6 +114,10 @@ namespace StockPortal.Models
         [Display(Name = "Supplier Type")]
         public int? Type { get; set; } // 1: Items, 2: Maintenance, 3: Both
 
+        [Column("departments")]
+        [Display(Name = "Supported Departments (JSON)")]
+        public string? Departments { get; set; } = "[]";
+
         [NotMapped]
         public string TypeName => Type switch
         {
@@ -122,6 +126,37 @@ namespace StockPortal.Models
             3 => "Full Service (Items & Maintenance)",
             _ => "General Vendor"
         };
+
+        [NotMapped]
+        public List<string> DepartmentList
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Departments)) return new List<string>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<string>>(Departments, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<string>();
+                }
+                catch
+                {
+                    return new List<string>();
+                }
+            }
+            set
+            {
+                Departments = JsonSerializer.Serialize(value ?? new List<string>());
+            }
+        }
+
+        public bool SupportsDepartment(string? department)
+        {
+            if (string.IsNullOrWhiteSpace(department)) return true;
+            var list = DepartmentList;
+            if (!list.Any()) return true; // Common/unrestricted if not configured
+            return list.Any(d => string.Equals(d, department, StringComparison.OrdinalIgnoreCase) || 
+                                 string.Equals(d, "ALL", StringComparison.OrdinalIgnoreCase) || 
+                                 string.Equals(d, "COMMON", StringComparison.OrdinalIgnoreCase));
+        }
 
         public virtual ICollection<Asset> Assets { get; set; } = new List<Asset>();
     }

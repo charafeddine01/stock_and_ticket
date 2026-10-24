@@ -32,14 +32,41 @@
 
                 <form asp-action="SendToSupplier" method="post">
                     @Html.AntiForgeryToken()
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm mb-3">
+                            <h6 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> Cannot Dispatch Equipment:</h6>
+                            <ul class="mb-0 ps-3">
+                                @foreach (var modelError in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                                {
+                                    <li>@modelError.ErrorMessage</li>
+                                }
+                            </ul>
+                        </div>
+                    }
 
                     <div class="row g-3">
                         <!-- 1. Equipment Selection -->
                         <div class="col-md-12">
                             <label class="form-label fw-bold">Target Equipment / Asset <span class="text-danger">*</span></label>
-                            <select name="assetId" id="assetSelect" class="form-select form-select-lg" asp-items="ViewBag.Assets" required>
+                            <select name="assetId" id="assetSelect" class="form-select form-select-lg" required onchange="filterSuppliersByAssetTeam()">
                                 <option value="">-- Select Asset to Send to Maintenance --</option>
+                                @if (ViewBag.AssetsList != null)
+                                {
+                                    foreach (var a in (List<StockPortal.ViewModels.AssetDropdownItem>)ViewBag.AssetsList)
+                                    {
+                                        <option value="@a.Id" data-team="@a.MaintenanceTeam" selected="@(Model.AssetId == a.Id)">
+                                            @a.Display
+                                        </option>
+                                    }
+                                }
+                                else if (ViewBag.Assets != null)
+                                {
+                                    foreach (var item in (SelectList)ViewBag.Assets)
+                                    {
+                                        <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+                                    }
+                                }
                             </select>
                             <div class="form-text small">Only equipment in your authorized maintenance department is listed.</div>
                         </div>
@@ -47,10 +74,29 @@
                         <!-- 2. Supplier & Maintenance Type -->
                         <div class="col-md-6">
                             <label class="form-label fw-bold">External Supplier / Maintenance Vendor <span class="text-danger">*</span></label>
-                            <select name="supplierId" class="form-select" asp-items="ViewBag.Suppliers" required>
+                            <select name="supplierId" id="supplierSelect" class="form-select" required>
                                 <option value="">-- Select Maintenance Contractor / Vendor --</option>
+                                @if (ViewBag.AllSuppliers != null)
+                                {
+                                    foreach (var s in (List<StockPortal.Models.Supplier>)ViewBag.AllSuppliers)
+                                    {
+                                        string depts = string.IsNullOrWhiteSpace(s.Departments) ? "[]" : s.Departments;
+                                        <option value="@s.Id" data-departments='@depts' selected="@(Model.SupplierId == s.Id)">
+                                            @s.Name (@s.TypeName)
+                                        </option>
+                                    }
+                                }
+                                else if (ViewBag.Suppliers != null)
+                                {
+                                    foreach (var item in (SelectList)ViewBag.Suppliers)
+                                    {
+                                        <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+                                    }
+                                }
                             </select>
-                            <div class="form-text small">Asset custody will be officially transferred to this supplier.</div>
+                            <div class="form-text small" id="supplierFilterNote">
+                                <i class="fa-solid fa-filter me-1 text-primary"></i> Only authorized vendors that service this asset's department will be listed.
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -117,3 +163,71 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    function filterSuppliersByAssetTeam() {
+        var assetSelect = document.getElementById('assetSelect');
+        var supplierSelect = document.getElementById('supplierSelect');
+        var noteElement = document.getElementById('supplierFilterNote');
+        if (!assetSelect || !supplierSelect) return;
+
+        var selectedOption = assetSelect.options[assetSelect.selectedIndex];
+        var team = selectedOption && selectedOption.value ? (selectedOption.getAttribute('data-team') || '').toUpperCase() : '';
+
+        var options = supplierSelect.querySelectorAll('option');
+        var visibleCount = 0;
+        var currentValStillValid = false;
+
+        options.forEach(function (opt) {
+            if (!opt.value) {
+                opt.style.display = '';
+                return;
+            }
+
+            var deptsAttr = opt.getAttribute('data-departments') || '[]';
+            var depts = [];
+            try { depts = JSON.parse(deptsAttr); } catch (e) { depts = []; }
+            var upperDepts = depts.map(function (d) { return (d || '').toUpperCase(); });
+
+            var canHelp = false;
+            if (!team) {
+                canHelp = true;
+            } else {
+                canHelp = (upperDepts.length === 0 || 
+                           upperDepts.indexOf(team) >= 0 || 
+                           upperDepts.indexOf('ALL') >= 0 || 
+                           upperDepts.indexOf('COMMON') >= 0);
+            }
+
+            if (canHelp) {
+                opt.style.display = '';
+                opt.disabled = false;
+                visibleCount++;
+                if (opt.value === supplierSelect.value) {
+                    currentValStillValid = true;
+                }
+            } else {
+                opt.style.display = 'none';
+                opt.disabled = true;
+            }
+        });
+
+        if (!currentValStillValid && supplierSelect.value) {
+            supplierSelect.value = '';
+        }
+
+        if (noteElement) {
+            if (team) {
+                noteElement.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Showing <strong>' + visibleCount + '</strong> vendors qualified to service <strong>' + team + '</strong> equipment.';
+            } else {
+                noteElement.innerHTML = '<i class="fa-solid fa-filter me-1 text-primary"></i> Choose an asset above to automatically filter vendors that can help with its department.';
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        filterSuppliersByAssetTeam();
+    });
+</script>
+}

@@ -21,16 +21,26 @@ namespace StockPortal.Controllers
         }
 
         // GET: Directory
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? departmentFilter = null, string? tab = null)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!_currentUserService.CanManageUsers() && !_currentUserService.IsMaintenance()) return Forbid();
 
             ViewBag.Users = await _context.Users.Include(u => u.Department).OrderBy(u => u.FullName).ToListAsync();
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync();
-            ViewBag.Suppliers = await _context.Suppliers.OrderBy(s => s.Name).ToListAsync();
+
+            var suppliersQuery = await _context.Suppliers.OrderBy(s => s.Name).ToListAsync();
+            if (!string.IsNullOrWhiteSpace(departmentFilter) && departmentFilter != "All")
+            {
+                suppliersQuery = suppliersQuery.Where(s => s.SupportsDepartment(departmentFilter)).ToList();
+            }
+            ViewBag.Suppliers = suppliersQuery;
+            ViewBag.DepartmentFilter = departmentFilter ?? "All";
+            ViewBag.ActiveTab = string.IsNullOrWhiteSpace(tab) ? "users" : tab.Trim().ToLowerInvariant();
             ViewBag.Departments = await _context.Departments.Include(d => d.HeadUser).OrderBy(d => d.Name).ToListAsync();
             ViewBag.AvailableRoles = SystemRoles.All;
             ViewBag.AvailableTeams = MaintenanceTeams.All;
+            ViewBag.CanManageUsers = _currentUserService.CanManageUsers();
+            ViewBag.UserTeam = _currentUserService.GetMaintenanceTeam();
 
             return View();
         }
@@ -58,7 +68,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"User {user.FullName} (PC Username: {user.DomainUser}, Role: {user.Role}) registered successfully with Auto-Login enabled.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "users" });
         }
 
         // POST: Directory/UpdateUserRole
@@ -77,7 +87,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"User {user.FullName} role updated to {user.Role} {(user.MaintenanceTeam != null ? $"({user.MaintenanceTeam})" : "")}.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "users" });
         }
 
         // POST: Directory/ToggleUserStatus
@@ -95,7 +105,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"User {user.FullName} status set to {(user.IsActive == true ? "Active" : "Inactive")}.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "users" });
         }
 
         // POST: Directory/CreateRoom
@@ -111,7 +121,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Room {room.RoomNo} (Floor {room.Floor}) created.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "rooms" });
         }
 
         // POST: Directory/DeleteRoom
@@ -135,22 +145,59 @@ namespace StockPortal.Controllers
                     TempData["SuccessMessage"] = $"Room {room.RoomNo} deleted.";
                 }
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "rooms" });
         }
 
         // POST: Directory/CreateSupplier
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateSupplier(Supplier supplier)
+        public async Task<IActionResult> CreateSupplier(Supplier supplier, string[]? selectedDepartments = null)
         {
             if (!_currentUserService.CanManageUsers()) return Forbid();
 
             if (!string.IsNullOrWhiteSpace(supplier.Name))
             {
                 supplier.IsActive = true;
+                supplier.DepartmentList = (selectedDepartments != null && selectedDepartments.Length > 0)
+                    ? selectedDepartments.Distinct().ToList()
+                    : new List<string>();
+
                 _context.Suppliers.Add(supplier);
                 await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"Supplier {supplier.Name} created.";
+                TempData["SuccessMessage"] = $"Supplier {supplier.Name} created successfully with departments: {(supplier.DepartmentList.Any() ? string.Join(", ", supplier.DepartmentList) : "Common to All")}.";
+            }
+            return RedirectToAction(nameof(Index), new { tab = "suppliers" });
+        }
+
+        // POST: Directory/EditSupplier
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditSupplier(int id, string name, int? type, string[]? selectedDepartments, bool? isActive)
+        {
+            if (!_currentUserService.CanManageUsers()) return Forbid();
+
+            var supplier = await _context.Suppliers.FindAsync(id);
+            if (supplier != null)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    supplier.Name = name.Trim();
+                }
+                if (type.HasValue)
+                {
+                    supplier.Type = type.Value;
+                }
+                if (isActive.HasValue)
+                {
+                    supplier.IsActive = isActive.Value;
+                }
+                supplier.DepartmentList = (selectedDepartments != null && selectedDepartments.Length > 0)
+                    ? selectedDepartments.Distinct().ToList()
+                    : new List<string>();
+
+                _context.Update(supplier);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = $"Supplier {supplier.Name} updated successfully with departments: {(supplier.DepartmentList.Any() ? string.Join(", ", supplier.DepartmentList) : "Common to All")}.";
             }
             return RedirectToAction(nameof(Index));
         }
@@ -170,7 +217,25 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Supplier {supplier.Name} set to {(supplier.IsActive == true ? "Active" : "Inactive")}.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "suppliers" });
+        }
+
+        // GET: Directory/GetSuppliersByDepartment
+        [HttpGet]
+        public async Task<IActionResult> GetSuppliersByDepartment(string? department)
+        {
+            var list = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
+            if (!string.IsNullOrWhiteSpace(department))
+            {
+                list = list.Where(s => s.SupportsDepartment(department)).ToList();
+            }
+            return Json(list.Select(s => new {
+                id = s.Id,
+                name = s.Name,
+                type = s.Type,
+                typeName = s.TypeName,
+                departments = s.DepartmentList
+            }));
         }
 
         // POST: Directory/CreateDepartment
@@ -186,7 +251,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Department {department.Name} created.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "depts" });
         }
 
         // POST: Directory/DeleteDepartment
@@ -210,7 +275,7 @@ namespace StockPortal.Controllers
                     TempData["SuccessMessage"] = $"Department {dept.Name} removed.";
                 }
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "depts" });
         }
     }
 }

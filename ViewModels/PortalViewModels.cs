@@ -86,4 +86,11 @@ namespace StockPortal.ViewModels
         public List<Room> AvailableRooms { get; set; } = new();
         public List<User> AvailableUsers { get; set; } = new();
     }
+
+    public class AssetDropdownItem
+    {
+        public int Id { get; set; }
+        public string Display { get; set; } = string.Empty;
+        public string MaintenanceTeam { get; set; } = string.Empty;
+    }
 }

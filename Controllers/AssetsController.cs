@@ -616,7 +616,18 @@ namespace StockPortal.Controllers
         {
             ViewBag.Users = new SelectList(await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(), "Id", "FullName", asset?.UserId);
             ViewBag.Rooms = new SelectList(await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync(), "Id", "DisplayName", asset?.RoomId);
-            ViewBag.Suppliers = new SelectList(await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync(), "Id", "Name", asset?.SupplierId);
+            string? targetTeam = asset?.MaintenanceTeam;
+            if (string.IsNullOrWhiteSpace(targetTeam) && _currentUserService.IsMaintenance())
+            {
+                targetTeam = _currentUserService.GetMaintenanceTeam();
+            }
+
+            var allSuppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
+            var filteredSuppliers = !string.IsNullOrWhiteSpace(targetTeam)
+                ? allSuppliers.Where(s => s.SupportsDepartment(targetTeam)).ToList()
+                : allSuppliers;
+
+            ViewBag.Suppliers = new SelectList(filteredSuppliers, "Id", "Name", asset?.SupplierId);
             ViewBag.CustodyTypes = new SelectList(await _context.CustodyTypes.ToListAsync(), "Id", "Type", asset?.CustodyTypeId);
             ViewBag.MaintenanceTeams = new SelectList(MaintenanceTeams.All, asset?.MaintenanceTeam ?? MaintenanceTeams.IT);
         }

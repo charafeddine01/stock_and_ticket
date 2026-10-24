@@ -4,6 +4,7 @@
     var rooms = ViewBag.Rooms as List<StockPortal.Models.Room> ?? new();
     var suppliers = ViewBag.Suppliers as List<StockPortal.Models.Supplier> ?? new();
     var departments = ViewBag.Departments as List<StockPortal.Models.Department> ?? new();
+    var activeTab = (ViewBag.ActiveTab as string) ?? "users";
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -18,22 +19,22 @@
     <div class="card-header bg-white p-0">
         <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="dirTabs" role="tablist">
             <li class="nav-item">
-                <button class="nav-link active fw-semibold" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                <button class="nav-link @(activeTab == "users" ? "active" : "") fw-semibold" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
                     <i class="fa-solid fa-users me-1"></i> Staff & Users (@users.Count)
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link fw-semibold" id="rooms-tab" data-bs-toggle="tab" data-bs-target="#rooms" type="button" role="tab">
+                <button class="nav-link @(activeTab == "rooms" ? "active" : "") fw-semibold" id="rooms-tab" data-bs-toggle="tab" data-bs-target="#rooms" type="button" role="tab">
                     <i class="fa-solid fa-door-open me-1"></i> Rooms & Locations (@rooms.Count)
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link fw-semibold" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers" type="button" role="tab">
+                <button class="nav-link @(activeTab == "suppliers" ? "active" : "") fw-semibold" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers" type="button" role="tab">
                     <i class="fa-solid fa-truck-field me-1"></i> Suppliers & Vendors (@suppliers.Count)
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link fw-semibold" id="depts-tab" data-bs-toggle="tab" data-bs-target="#depts" type="button" role="tab">
+                <button class="nav-link @(activeTab == "depts" ? "active" : "") fw-semibold" id="depts-tab" data-bs-toggle="tab" data-bs-target="#depts" type="button" role="tab">
                     <i class="fa-solid fa-building me-1"></i> Departments (@departments.Count)
                 </button>
             </li>
@@ -42,7 +43,7 @@
     <div class="card-body p-4">
         <div class="tab-content" id="dirTabsContent">
             <!-- 1. Users Tab -->
-            <div class="tab-pane fade show active" id="users" role="tabpanel">
+            <div class="tab-pane fade @(activeTab == "users" ? "show active" : "")" id="users" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
                         <h6 class="fw-bold mb-0">Hospital Staff & Authorized Users</h6>
@@ -173,7 +174,7 @@
             </div>
 
             <!-- 2. Rooms Tab -->
-            <div class="tab-pane fade" id="rooms" role="tabpanel">
+            <div class="tab-pane fade @(activeTab == "rooms" ? "show active" : "")" id="rooms" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold mb-0">Physical Rooms & Storage Areas</h6>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRoomModal">
@@ -216,20 +217,56 @@
             </div>
 
             <!-- 3. Suppliers Tab -->
-            <div class="tab-pane fade" id="suppliers" role="tabpanel">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold mb-0">Authorized Hardware Suppliers & Maintenance Contractors</h6>
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
-                        <i class="fa-solid fa-plus me-1"></i> Add Supplier
-                    </button>
+            <div class="tab-pane fade @(activeTab == "suppliers" ? "show active" : "")" id="suppliers" role="tabpanel">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <div>
+                        <h6 class="fw-bold mb-0">Authorized Hardware Suppliers & Maintenance Contractors</h6>
+                        <small class="text-muted">Filtered by supported maintenance teams (IT, Biomedical, General) with common multi-department vendors</small>
+                    </div>
+                    @if (ViewBag.CanManageUsers != false)
+                    {
+                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                            <i class="fa-solid fa-plus me-1"></i> Add Vendor / Supplier
+                        </button>
+                    }
                 </div>
+
+                <!-- Department Filter Controls -->
+                <div class="card bg-light border-0 mb-3 shadow-none">
+                    <div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div class="btn-group btn-group-sm" role="group" id="supplierDeptFilterGroup">
+                            <button type="button" class="btn btn-outline-dark active" onclick="filterSuppliersByDept('ALL', this)">
+                                <i class="fa-solid fa-border-all me-1"></i> All Vendors (@suppliers.Count)
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" onclick="filterSuppliersByDept('IT', this)">
+                                <i class="fa-solid fa-laptop me-1"></i> IT Support (@suppliers.Count(s => s.SupportsDepartment("IT")))
+                            </button>
+                            <button type="button" class="btn btn-outline-info" onclick="filterSuppliersByDept('BIOMEDICAL', this)">
+                                <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical (@suppliers.Count(s => s.SupportsDepartment("BIOMEDICAL")))
+                            </button>
+                            <button type="button" class="btn btn-outline-warning text-dark" onclick="filterSuppliersByDept('GENERAL', this)">
+                                <i class="fa-solid fa-wrench me-1"></i> General (@suppliers.Count(s => s.SupportsDepartment("GENERAL")))
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="filterSuppliersByDept('COMMON', this)">
+                                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Common / Shared (@suppliers.Count(s => !s.DepartmentList.Any() || s.DepartmentList.Count > 1))
+                            </button>
+                        </div>
+
+                        <div class="input-group input-group-sm" style="max-width: 250px;">
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                            <input type="text" id="supplierSearchInput" class="form-control" placeholder="Search vendor name..." onkeyup="filterSupplierTableByKeyword()" />
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0" id="suppliersTable">
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
                                 <th>Vendor / Company Name</th>
                                 <th>Service Scope</th>
+                                <th>Authorized Maintenance Departments</th>
                                 <th>Status</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -237,23 +274,79 @@
                         <tbody>
                             @foreach (var s in suppliers)
                             {
-                                <tr>
+                                var depts = s.DepartmentList;
+                                string deptsAttr = string.IsNullOrWhiteSpace(s.Departments) ? "[]" : s.Departments;
+                                <tr class="supplier-row"
+                                    data-supplier-id="@s.Id"
+                                    data-name="@s.Name"
+                                    data-type="@(s.Type ?? 3)"
+                                    data-departments='@deptsAttr'
+                                    data-isactive="@(s.IsActive == true ? "true" : "false")">
                                     <td>@s.Id</td>
-                                    <td class="fw-semibold"><i class="fa-solid fa-truck text-muted me-2"></i> @s.Name</td>
+                                    <td class="fw-semibold">
+                                        <i class="fa-solid fa-truck text-muted me-2"></i>
+                                        <span class="supplier-name-cell">@s.Name</span>
+                                    </td>
                                     <td><span class="badge bg-light text-dark border">@s.TypeName</span></td>
+                                    <td>
+                                        @if (!depts.Any())
+                                        {
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                                <i class="fa-solid fa-globe me-1"></i> Common to All Departments
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            @if (depts.Any(d => string.Equals(d, "IT", StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <span class="badge bg-primary me-1"><i class="fa-solid fa-laptop me-1"></i> IT</span>
+                                            }
+                                            @if (depts.Any(d => string.Equals(d, "BIOMEDICAL", StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <span class="badge bg-info text-dark me-1"><i class="fa-solid fa-heart-pulse me-1"></i> Biomedical</span>
+                                            }
+                                            @if (depts.Any(d => string.Equals(d, "GENERAL", StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <span class="badge bg-warning text-dark me-1"><i class="fa-solid fa-wrench me-1"></i> General</span>
+                                            }
+                                            @foreach (var extra in depts.Where(d => !string.Equals(d, "IT", StringComparison.OrdinalIgnoreCase) && !string.Equals(d, "BIOMEDICAL", StringComparison.OrdinalIgnoreCase) && !string.Equals(d, "GENERAL", StringComparison.OrdinalIgnoreCase)))
+                                            {
+                                                <span class="badge bg-secondary me-1">@extra</span>
+                                            }
+                                        }
+                                    </td>
                                     <td>
                                         <span class="badge @(s.IsActive == true ? "bg-success" : "bg-secondary")">
                                             @(s.IsActive == true ? "Active Vendor" : "Inactive")
                                         </span>
                                     </td>
-                                    <td class="text-end">
-                                        <form asp-action="ToggleSupplierStatus" method="post" class="d-inline">
-                                            @Html.AntiForgeryToken()
-                                            <input type="hidden" name="id" value="@s.Id" />
-                                            <button type="submit" class="btn btn-sm @(s.IsActive == true ? "btn-outline-secondary" : "btn-outline-success")">
-                                                @(s.IsActive == true ? "Deactivate" : "Activate")
+                                    <td class="text-end text-nowrap">
+                                        @if (ViewBag.CanManageUsers != false)
+                                        {
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-primary me-1 btn-edit-supplier" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#editSupplierModal"
+                                                    data-id="@s.Id"
+                                                    data-name="@s.Name"
+                                                    data-type="@(s.Type ?? 3)"
+                                                    data-departments="@deptsAttr"
+                                                    data-isactive="@(s.IsActive == true ? "true" : "false")"
+                                                    title="Edit vendor and department permissions">
+                                                <i class="fa-solid fa-pen-to-square me-1"></i> Edit
                                             </button>
-                                        </form>
+                                            <form asp-action="ToggleSupplierStatus" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@s.Id" />
+                                                <button type="submit" class="btn btn-sm @(s.IsActive == true ? "btn-outline-secondary" : "btn-outline-success")">
+                                                    @(s.IsActive == true ? "Deactivate" : "Activate")
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small"><i class="fa-solid fa-check text-success me-1"></i> Authorized</span>
+                                        }
                                     </td>
                                 </tr>
                             }
@@ -263,7 +356,7 @@
             </div>
 
             <!-- 4. Departments Tab -->
-            <div class="tab-pane fade" id="depts" role="tabpanel">
+            <div class="tab-pane fade @(activeTab == "depts" ? "show active" : "")" id="depts" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold mb-0">Hospital Departments</h6>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addDeptModal">
@@ -400,26 +493,116 @@
             <form asp-action="CreateSupplier" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Add Vendor / Supplier</h5>
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-fast text-primary me-2"></i> Add Vendor / Supplier</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Company / Vendor Name</label>
-                        <input type="text" name="Name" class="form-control" required />
+                        <label class="form-label fw-semibold">Company / Vendor Name <span class="text-danger">*</span></label>
+                        <input type="text" name="Name" class="form-control" placeholder="e.g. Siemens Healthineers, Dell Technologies" required />
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">Service Scope</label>
                         <select name="Type" class="form-select">
-                            <option value="1">Equipment & Items</option>
-                            <option value="2">Maintenance Provider</option>
-                            <option value="3" selected>Full Service (Items & Maintenance)</option>
+                            <option value="1">Equipment & Items Supply Only</option>
+                            <option value="2">Maintenance & Repair Provider Only</option>
+                            <option value="3" selected>Full Service (Hardware Supply & Maintenance Provider)</option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold d-block">Authorized Maintenance Departments</label>
+                        <div class="form-text small text-muted mb-2">Check the teams that can view and dispatch equipment to this vendor:</div>
+                        <div class="d-flex flex-column gap-2 p-3 border rounded bg-light">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="IT" id="addDeptIT" checked>
+                                <label class="form-check-label fw-semibold text-primary" for="addDeptIT">
+                                    <i class="fa-solid fa-laptop me-1"></i> IT Hardware, Laptops, PCs & Servers
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="BIOMEDICAL" id="addDeptBio">
+                                <label class="form-check-label fw-semibold text-info-emphasis" for="addDeptBio">
+                                    <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical & Clinical Hospital Devices
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="GENERAL" id="addDeptGen">
+                                <label class="form-check-label fw-semibold text-warning-emphasis" for="addDeptGen">
+                                    <i class="fa-solid fa-wrench me-1"></i> General Facility Maintenance & Power
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-text small text-muted mt-1"><i class="fa-solid fa-info-circle me-1"></i> Vendors selected for multiple departments will be available as common vendors.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Supplier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Supplier -->
+<div class="modal fade" id="editSupplierModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="EditSupplier" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="editSupplierId" />
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i> Edit Vendor / Supplier</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Company / Vendor Name <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="editSupplierName" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Service Scope</label>
+                        <select name="type" id="editSupplierType" class="form-select">
+                            <option value="1">Equipment & Items Supply Only</option>
+                            <option value="2">Maintenance & Repair Provider Only</option>
+                            <option value="3">Full Service (Hardware Supply & Maintenance Provider)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold d-block">Authorized Maintenance Departments</label>
+                        <div class="form-text small text-muted mb-2">Check the teams that can view and dispatch equipment to this vendor:</div>
+                        <div class="d-flex flex-column gap-2 p-3 border rounded bg-light">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="IT" id="editDeptIT">
+                                <label class="form-check-label fw-semibold text-primary" for="editDeptIT">
+                                    <i class="fa-solid fa-laptop me-1"></i> IT Hardware, Laptops, PCs & Servers
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="BIOMEDICAL" id="editDeptBio">
+                                <label class="form-check-label fw-semibold text-info-emphasis" for="editDeptBio">
+                                    <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical & Clinical Hospital Devices
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="selectedDepartments" value="GENERAL" id="editDeptGen">
+                                <label class="form-check-label fw-semibold text-warning-emphasis" for="editDeptGen">
+                                    <i class="fa-solid fa-wrench me-1"></i> General Facility Maintenance & Power
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Vendor Operational Status</label>
+                        <select name="isActive" id="editSupplierActive" class="form-select">
+                            <option value="true">Active Vendor</option>
+                            <option value="false">Inactive / Suspended</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Vendor Changes</button>
                 </div>
             </form>
         </div>
@@ -468,5 +651,156 @@
             container.style.display = (roleSelect.value === 'MAINTENANCE') ? 'block' : 'none';
         }
     }
+
+    // Modal Edit Supplier form population
+    function populateEditSupplierForm(id, name, type, deptsJson, isActive) {
+        document.getElementById('editSupplierId').value = id;
+        document.getElementById('editSupplierName').value = name || '';
+        document.getElementById('editSupplierType').value = type || '3';
+        document.getElementById('editSupplierActive').value = (isActive === true || isActive === 'true') ? 'true' : 'false';
+
+        // Reset checkboxes
+        document.getElementById('editDeptIT').checked = false;
+        document.getElementById('editDeptBio').checked = false;
+        document.getElementById('editDeptGen').checked = false;
+
+        try {
+            var depts = typeof deptsJson === 'string' ? JSON.parse(deptsJson) : deptsJson;
+            if (Array.isArray(depts)) {
+                depts.forEach(function (d) {
+                    var upper = (d || '').toUpperCase();
+                    if (upper === 'IT') document.getElementById('editDeptIT').checked = true;
+                    if (upper === 'BIOMEDICAL') document.getElementById('editDeptBio').checked = true;
+                    if (upper === 'GENERAL') document.getElementById('editDeptGen').checked = true;
+                });
+            }
+        } catch (e) {
+            console.error('Error parsing supplier departments:', e);
+        }
+    }
+
+    // Direct event listener for Bootstrap modal show
+    var editModalElement = document.getElementById('editSupplierModal');
+    if (editModalElement) {
+        editModalElement.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            if (!button) return;
+
+            var id = button.getAttribute('data-id');
+            var name = button.getAttribute('data-name');
+            var type = button.getAttribute('data-type');
+            var depts = button.getAttribute('data-departments');
+            var isActive = button.getAttribute('data-isactive') === 'true';
+
+            populateEditSupplierForm(id, name, type, depts, isActive);
+        });
+    }
+
+    // Delegated click handler as backup
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-edit-supplier');
+        if (btn) {
+            var id = btn.getAttribute('data-id');
+            var name = btn.getAttribute('data-name');
+            var type = btn.getAttribute('data-type');
+            var depts = btn.getAttribute('data-departments');
+            var isActive = btn.getAttribute('data-isactive') === 'true';
+
+            populateEditSupplierForm(id, name, type, depts, isActive);
+            var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSupplierModal'));
+            modal.show();
+        }
+    });
+
+    // Global function fallback
+    window.openEditSupplierModal = function(id, name, type, deptsJson, isActive) {
+        populateEditSupplierForm(id, name, type, deptsJson, isActive);
+        var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSupplierModal'));
+        modal.show();
+    };
+
+    // Dynamic Filter for Supplier Table
+    var currentSupplierDeptFilter = 'ALL';
+
+    function filterSuppliersByDept(dept, btnElement) {
+        currentSupplierDeptFilter = dept;
+
+        // Toggle active button style
+        if (btnElement) {
+            var group = document.getElementById('supplierDeptFilterGroup');
+            if (group) {
+                var buttons = group.querySelectorAll('button');
+                buttons.forEach(function (btn) { btn.classList.remove('active'); });
+                btnElement.classList.add('active');
+            }
+        }
+
+        applySupplierFilters();
+    }
+
+    function filterSupplierTableByKeyword() {
+        applySupplierFilters();
+    }
+
+    function applySupplierFilters() {
+        var keyword = (document.getElementById('supplierSearchInput')?.value || '').toLowerCase().trim();
+        var rows = document.querySelectorAll('#suppliersTable tbody tr.supplier-row');
+
+        rows.forEach(function (row) {
+            var name = (row.getAttribute('data-name') || '').toLowerCase();
+            var deptsAttr = row.getAttribute('data-departments') || '[]';
+            var depts = [];
+            try { depts = JSON.parse(deptsAttr); } catch (e) { depts = []; }
+            var upperDepts = depts.map(function(d) { return (d || '').toUpperCase(); });
+
+            var matchesDept = false;
+            if (currentSupplierDeptFilter === 'ALL') {
+                matchesDept = true;
+            } else if (currentSupplierDeptFilter === 'COMMON') {
+                matchesDept = (upperDepts.length === 0 || upperDepts.length > 1 || upperDepts.indexOf('COMMON') >= 0 || upperDepts.indexOf('ALL') >= 0);
+            } else {
+                matchesDept = (upperDepts.length === 0 || upperDepts.indexOf(currentSupplierDeptFilter) >= 0 || upperDepts.indexOf('COMMON') >= 0 || upperDepts.indexOf('ALL') >= 0);
+            }
+
+            var matchesKeyword = (!keyword || name.indexOf(keyword) >= 0);
+
+            if (matchesDept && matchesKeyword) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Remember active tab when user clicks tabs
+    document.querySelectorAll('#dirTabs button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
+        tabBtn.addEventListener('shown.bs.tab', function (e) {
+            var target = e.target.getAttribute('data-bs-target');
+            if (target) {
+                var tabName = target.replace('#', '');
+                localStorage.setItem('activeDirectoryTab', tabName);
+                var url = new URL(window.location);
+                url.searchParams.set('tab', tabName);
+                window.history.replaceState({}, '', url);
+            }
+        });
+    });
+
+    // Restore active tab on page load (URL param > hash > localStorage)
+    document.addEventListener('DOMContentLoaded', function () {
+        var urlParams = new URLSearchParams(window.location.search);
+        var tabParam = urlParams.get('tab');
+        var hash = window.location.hash ? window.location.hash.replace('#', '') : null;
+        var savedTab = localStorage.getItem('activeDirectoryTab');
+
+        var targetTab = tabParam || hash || savedTab;
+        if (targetTab) {
+            var tabBtn = document.getElementById(targetTab + '-tab') || document.querySelector('#dirTabs button[data-bs-target="#' + targetTab + '"]');
+            if (tabBtn) {
+                var tabInstance = bootstrap.Tab.getOrCreateInstance(tabBtn);
+                tabInstance.show();
+            }
+        }
+    });
 </script>
 }

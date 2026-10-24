@@ -93,6 +93,21 @@ namespace StockPortal.Data
                 }
             }
 
+            // Ensure departments column in suppliers table
+            try
+            {
+                var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+                if (isSqlite)
+                {
+                    context.Database.ExecuteSqlRaw("ALTER TABLE suppliers ADD COLUMN departments TEXT NULL;");
+                }
+                else
+                {
+                    context.Database.ExecuteSqlRaw("ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS departments LONGTEXT NULL;");
+                }
+            }
+            catch {}
+
             // Seed Departments if empty
             if (!context.Departments.Any())
             {
@@ -128,10 +143,12 @@ namespace StockPortal.Data
             {
                 var suppliers = new[]
                 {
-                    new Supplier { Name = "Dell Technologies", IsActive = true, Type = 3 },
-                    new Supplier { Name = "Philips Healthcare", IsActive = true, Type = 3 },
-                    new Supplier { Name = "HP Enterprise", IsActive = true, Type = 1 },
-                    new Supplier { Name = "Cisco Systems", IsActive = true, Type = 3 }
+                    new Supplier { Name = "Dell Technologies", IsActive = true, Type = 3, Departments = "[\"IT\"]" },
+                    new Supplier { Name = "Philips Healthcare", IsActive = true, Type = 3, Departments = "[\"BIOMEDICAL\"]" },
+                    new Supplier { Name = "HP Enterprise", IsActive = true, Type = 1, Departments = "[\"IT\"]" },
+                    new Supplier { Name = "Cisco Systems", IsActive = true, Type = 3, Departments = "[\"IT\"]" },
+                    new Supplier { Name = "GE Healthcare", IsActive = true, Type = 3, Departments = "[\"BIOMEDICAL\"]" },
+                    new Supplier { Name = "Carrier & Facility Engineering", IsActive = true, Type = 3, Departments = "[\"GENERAL\"]" }
                 };
                 context.Suppliers.AddRange(suppliers);
                 context.SaveChanges();
