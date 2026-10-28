@@ -1,0 +1,1030 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hospital Equipment Maintenance & Custody Workflow</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 8mm 10mm 8mm 10mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #0f172a;
+            margin: 0;
+            padding: 0;
+            font-size: 8.5pt;
+            line-height: 1.35;
+        }
+
+        .page-container {
+            height: 281mm;
+            max-height: 281mm;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            page-break-after: always;
+            break-after: page;
+        }
+
+        .page-container:last-child {
+            page-break-after: avoid;
+            break-after: avoid;
+        }
+
+        /* Header Styles */
+        .header-banner {
+            border-bottom: 2px solid #2563eb;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .header-title-group h1 {
+            color: #1e3a8a;
+            font-size: 15pt;
+            margin: 0 0 2px 0;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        .header-title-group p {
+            color: #475569;
+            font-size: 8.5pt;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .header-meta {
+            text-align: right;
+            font-size: 7.5pt;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        .header-meta strong {
+            color: #0f172a;
+        }
+
+        /* Section Titles */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 8px 0 5px 0;
+            padding-bottom: 3px;
+            border-bottom: 1.5px solid #e2e8f0;
+        }
+
+        .section-header .pill {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-size: 7pt;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-header h2 {
+            font-size: 10.5pt;
+            color: #1e293b;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        /* Flow Cards & Grids */
+        .flow-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .flow-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .flow-grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .card {
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            background: #ffffff;
+            padding: 6px 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+            position: relative;
+        }
+
+        .card.card-blue {
+            border-color: #93c5fd;
+            background: #f0f7ff;
+        }
+
+        .card.card-amber {
+            border-color: #fcd34d;
+            background: #fffbeb;
+        }
+
+        .card.card-green {
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+
+        .card.card-purple {
+            border-color: #c4b5fd;
+            background: #f5f3ff;
+        }
+
+        .card.card-slate {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+        }
+
+        .card-header-sm {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .card-title {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+        }
+
+        .card-desc {
+            font-size: 7.5pt;
+            color: #475569;
+            margin: 0 0 4px 0;
+            line-height: 1.3;
+        }
+
+        .tag {
+            font-size: 6.5pt;
+            font-weight: 700;
+            padding: 1.5px 5px;
+            border-radius: 3px;
+            text-transform: uppercase;
+        }
+
+        .tag-blue { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+        .tag-green { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .tag-amber { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .tag-purple { background: #ede9fe; color: #5b21b6; border: 1px solid #ddd6fe; }
+        .tag-slate { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+
+        /* Step Process Row */
+        .step-row {
+            display: flex;
+            align-items: stretch;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .step-box {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+            padding: 6px 8px;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .step-num {
+            font-size: 7pt;
+            font-weight: 800;
+            color: #2563eb;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .step-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            font-size: 12pt;
+            font-weight: bold;
+        }
+
+        /* SVG Flow Visual */
+        .flowchart-svg-container {
+            width: 100%;
+            margin: 4px 0;
+            text-align: center;
+        }
+
+        .flowchart-svg-container svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Tables */
+        table.doc-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7.5pt;
+            margin: 5px 0 8px 0;
+        }
+
+        table.doc-table th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            text-align: left;
+            padding: 4px 6px;
+            border: 1px solid #cbd5e1;
+            font-weight: 700;
+        }
+
+        table.doc-table td {
+            padding: 4px 6px;
+            border: 1px solid #e2e8f0;
+            vertical-align: middle;
+            color: #334155;
+        }
+
+        table.doc-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+
+        /* JSON Display Box */
+        .code-box {
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-left: 3px solid #2563eb;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+            font-size: 7.2pt;
+            color: #0f172a;
+            line-height: 1.35;
+            margin: 4px 0 6px 0;
+            white-space: pre-wrap;
+        }
+
+        .bullet-list {
+            margin: 2px 0 4px 14px;
+            padding: 0;
+            font-size: 7.5pt;
+            color: #334155;
+        }
+
+        .bullet-list li {
+            margin-bottom: 2px;
+        }
+
+        .footer-note {
+            font-size: 7pt;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 4px;
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ==================== PAGE 1 ==================== -->
+    <div class="page-container">
+        <div>
+            <div class="header-banner">
+                <div class="header-title-group">
+                    <h1>Hospital Equipment Maintenance System</h1>
+                    <p>End-to-End Operational Flowchart & Custody Lifecycle Architecture</p>
+                </div>
+                <div class="header-meta">
+                    <div>Document: <strong>SOP-ENG-001</strong></div>
+                    <div>System: <strong>Stock & Helpdesk Portal</strong></div>
+                    <div>Theme: <strong>Light Medical Theme</strong></div>
+                    <div>Generated: <strong>October 2026</strong></div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <span class="pill">Architecture</span>
+                <h2>1. High-Level Maintenance Ecosystem Overview</h2>
+            </div>
+
+            <div class="flowchart-svg-container">
+                <svg viewBox="0 0 1000 340" style="max-height: 205px; width: 100%;" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="shadowLight" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+                            <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#94a3b8" flood-opacity="0.3" />
+                        </filter>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#2563eb" />
+                        </marker>
+                        <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#16a34a" />
+                        </marker>
+                        <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 9 5 L 0 9 z" fill="#d97706" />
+                        </marker>
+                    </defs>
+
+                    <!-- Background Swimlane -->
+                    <rect x="10" y="10" width="980" height="320" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+                    <text x="30" y="32" font-size="11" font-weight="700" fill="#64748b" letter-spacing="1">HOSPITAL ASSET & WORK ORDER LIFECYCLE (END-TO-END PIPELINE)</text>
+
+                    <!-- Node 1: Entry / Trigger -->
+                    <g filter="url(#shadowLight)">
+                        <rect x="35" y="60" width="180" height="90" rx="8" fill="#eff6ff" stroke="#3b82f6" stroke-width="2" />
+                        <text x="125" y="86" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a8a">1. Asset Failure / PM Due</text>
+                        <text x="125" y="106" text-anchor="middle" font-size="10" fill="#475569">Clinical Staff or Technician</text>
+                        <text x="125" y="122" text-anchor="middle" font-size="9.5" fill="#2563eb">Open Ticket / Work Order</text>
+                        <rect x="55" y="132" width="140" height="13" rx="3" fill="#dbeafe" />
+                        <text x="125" y="142" text-anchor="middle" font-size="8" font-weight="bold" fill="#1d4ed8">STATUS: OPEN / NEW</text>
+                    </g>
+
+                    <!-- Path 1 -> 2 -->
+                    <line x1="215" y1="105" x2="255" y2="105" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow)" />
+
+                    <!-- Node 2: Triage & Assignment -->
+                    <g filter="url(#shadowLight)">
+                        <polygon points="340,55 420,105 340,155 260,105" fill="#fef3c7" stroke="#d97706" stroke-width="2" />
+                        <text x="340" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#78350f">Can Repair</text>
+                        <text x="340" y="117" text-anchor="middle" font-size="11" font-weight="700" fill="#78350f">In-House?</text>
+                    </g>
+
+                    <!-- Branch A: In-House Fix (Down) -->
+                    <line x1="340" y1="155" x2="340" y2="205" stroke="#16a34a" stroke-width="2" marker-end="url(#arrowGreen)" />
+                    <text x="345" y="180" font-size="9.5" font-weight="bold" fill="#16a34a">YES (In-House)</text>
+
+                    <g filter="url(#shadowLight)">
+                        <rect x="250" y="210" width="180" height="90" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="2" />
+                        <text x="340" y="235" text-anchor="middle" font-size="12" font-weight="700" fill="#14532d">Internal Resolution</text>
+                        <text x="340" y="254" text-anchor="middle" font-size="10" fill="#475569">Calibrate / Fix / Test</text>
+                        <text x="340" y="270" text-anchor="middle" font-size="9.5" fill="#15803d">Custody Stays in Hospital</text>
+                        <rect x="270" y="278" width="140" height="14" rx="3" fill="#dcfce7" />
+                        <text x="340" y="289" text-anchor="middle" font-size="8" font-weight="bold" fill="#166534">TICKET CLOSED</text>
+                    </g>
+
+                    <!-- Branch B: Vendor Needed (Right) -->
+                    <line x1="420" y1="105" x2="475" y2="105" stroke="#d97706" stroke-width="2.5" marker-end="url(#arrowAmber)" />
+                    <text x="430" y="98" font-size="9.5" font-weight="bold" fill="#d97706">NO (Vendor)</text>
+
+                    <!-- Node 3: Send to Supplier (Work Order) -->
+                    <g filter="url(#shadowLight)">
+                        <rect x="480" y="60" width="220" height="95" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="2" />
+                        <text x="590" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#92400e">2. Send to Supplier</text>
+                        <text x="590" y="103" text-anchor="middle" font-size="10" fill="#475569">Targeted Vendor Filtering</text>
+                        <text x="590" y="119" text-anchor="middle" font-size="9.5" fill="#b45309">Custody &rarr; Supplier Company</text>
+                        <rect x="500" y="128" width="180" height="20" rx="3" fill="#fde68a" />
+                        <text x="590" y="142" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#78350f">ASSET & TICKET: "MAINTENANCE"</text>
+                    </g>
+
+                    <!-- Path 3 -> 4 -->
+                    <line x1="700" y1="105" x2="745" y2="105" stroke="#2563eb" stroke-width="2.5" marker-end="url(#arrow)" />
+
+                    <!-- Node 4: Return & Replaced Parts -->
+                    <g filter="url(#shadowLight)">
+                        <rect x="750" y="60" width="220" height="95" rx="8" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2" />
+                        <text x="860" y="85" text-anchor="middle" font-size="12" font-weight="700" fill="#4c1d95">3. Return from Supplier</text>
+                        <text x="860" y="103" text-anchor="middle" font-size="10" fill="#475569">Dynamic JSON Parts Form</text>
+                        <text x="860" y="119" text-anchor="middle" font-size="9.5" fill="#6d28d9">Reassign: Stock OR User</text>
+                        <rect x="770" y="128" width="180" height="20" rx="3" fill="#ede9fe" />
+                        <text x="860" y="142" text-anchor="middle" font-size="8.5" font-weight="bold" fill="#5b21b6">STATUS: "IN SERVICE" / "IN STOCK"</text>
+                    </g>
+
+                    <!-- Loopback arrow from Node 4 down and back to Node 1/Hospital Stock -->
+                    <path d="M 860 155 L 860 255 L 440 255" fill="none" stroke="#16a34a" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrowGreen)" />
+                    <text x="650" y="248" font-size="9" font-weight="bold" fill="#15803d">Synchronize Ticket & Audit Trail &rarr; Ready for Use</text>
+                </svg>
+            </div>
+
+            <div class="section-header">
+                <span class="pill">RBAC Policy</span>
+                <h2>2. Role-Based Access Control (RBAC) & Team Specialization</h2>
+            </div>
+
+            <table class="doc-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Team / Role</th>
+                        <th style="width: 25%;">Assigned Equipment Scopes</th>
+                        <th style="width: 35%;">Maintenance & Work Order Privileges</th>
+                        <th style="width: 25%;">Vendor Visibility Filter</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>ADMIN</strong></td>
+                        <td>Universal (All Hospital Assets)</td>
+                        <td>Full CRUD, Work Orders, Custody Overrides, Global Reports</td>
+                        <td>All Vendors (IT, BioMed, General)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MAINTENANCE_IT</strong></td>
+                        <td>Laptops, PCs, Servers, Switches, Printers</td>
+                        <td>IT Work Orders, Specs Form Builder, Dispatch IT Hardware</td>
+                        <td>Vendors with <code>"IT"</code> category</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BIOMEDICAL</strong></td>
+                        <td>Ventilators, Monitors, Defibrillators, Pumps</td>
+                        <td>Medical Device Calibrations, BioMed Repairs, Parts JSON</td>
+                        <td>Vendors with <code>"BIOMEDICAL"</code> category</td>
+                    </tr>
+                    <tr>
+                        <td><strong>GENERAL</strong></td>
+                        <td>HVAC, Generators, Beds, Lighting, Facilities</td>
+                        <td>Facility Work Orders, General Infrastructure Overhauls</td>
+                        <td>Vendors with <code>"GENERAL"</code> category</td>
+                    </tr>
+                    <tr>
+                        <td><strong>END_USER (Clinical)</strong></td>
+                        <td>Custody-assigned equipment only</td>
+                        <td>Open Ticket, Request Inspection, View Ticket Status (Read-Only)</td>
+                        <td>None (Hidden from clinical staff)</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="flow-grid-4">
+                <div class="card card-blue">
+                    <div class="card-header-sm">
+                        <span class="card-title">1. Preventive (PM)</span>
+                        <span class="tag tag-blue">Scheduled</span>
+                    </div>
+                    <p class="card-desc">Time-based inspection to prevent failure. Overhauls, calibration, filter replacements.</p>
+                </div>
+                <div class="card card-amber">
+                    <div class="card-header-sm">
+                        <span class="card-title">2. Corrective (CM)</span>
+                        <span class="tag tag-amber">Breakdown</span>
+                    </div>
+                    <p class="card-desc">Triggered by staff defect reports. Asset immediately flagged for triage and diagnosis.</p>
+                </div>
+                <div class="card card-green">
+                    <div class="card-header-sm">
+                        <span class="card-title">3. In-House Triage</span>
+                        <span class="tag tag-green">Internal</span>
+                    </div>
+                    <p class="card-desc">Repaired by hospital engineers within facility workshop. Custody remains internal.</p>
+                </div>
+                <div class="card card-purple">
+                    <div class="card-header-sm">
+                        <span class="card-title">4. Vendor Repair</span>
+                        <span class="tag tag-purple">External</span>
+                    </div>
+                    <p class="card-desc">Sent out to manufacturer/supplier under official work order. Custody is legally transferred.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>Hospital Maintenance System &bull; Technical Standard Operating Procedure</span>
+            <span>Page 1 of 4 &bull; High-Level Architecture & RBAC Policy</span>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 2 ==================== -->
+    <div class="page-container">
+        <div>
+            <div class="header-banner">
+                <div class="header-title-group">
+                    <h1>Phase 1: Dispatch to Supplier & Custody Handover</h1>
+                    <p>Hardware Triage, Qualified Vendor Filtering & Database State Synchronization</p>
+                </div>
+                <div class="header-meta">
+                    <div>Route: <strong>/Maintenance/SendToSupplier</strong></div>
+                    <div>Status Transition: <strong>In Service / In Stock &rarr; Under Maintenance</strong></div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <span class="pill">Dispatch Workflow</span>
+                <h2>1. Step-by-Step Equipment Dispatch Sequence</h2>
+            </div>
+
+            <div class="step-row">
+                <div class="step-box">
+                    <div class="step-num">Step 01 &bull; Identification</div>
+                    <strong>Select Defective Asset</strong>
+                    <p class="card-desc">Technician opens asset view or defect ticket. Confirms device category, department, and serial number.</p>
+                </div>
+                <div class="step-arrow">&rarr;</div>
+                <div class="step-box">
+                    <div class="step-num">Step 02 &bull; Pre-Send Diagnosis</div>
+                    <strong>Fill Issue Description</strong>
+                    <p class="card-desc">Detailed defect symptom log is written (e.g., "Motherboard failure", "Calibration drift").</p>
+                </div>
+                <div class="step-arrow">&rarr;</div>
+                <div class="step-box">
+                    <div class="step-num">Step 03 &bull; Supplier Filtering</div>
+                    <strong>Choose Qualified Vendor</strong>
+                    <p class="card-desc">Dropdown auto-filters suppliers based on matching asset department (IT, BioMed, General).</p>
+                </div>
+                <div class="step-arrow">&rarr;</div>
+                <div class="step-box">
+                    <div class="step-num">Step 04 &bull; Custody Handover</div>
+                    <strong>Execute Work Order</strong>
+                    <p class="card-desc">Physical unit dispatched. Custody switches to Supplier Company. Ticket status &rarr; Maintenance.</p>
+                </div>
+            </div>
+
+            <div class="flowchart-svg-container">
+                <svg viewBox="0 0 1000 300" style="max-height: 185px; width: 100%;" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="shadowLight2" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+                            <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#94a3b8" flood-opacity="0.3" />
+                        </filter>
+                    </defs>
+
+                    <rect x="10" y="10" width="980" height="280" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+
+                    <!-- Step 1 Box -->
+                    <g filter="url(#shadowLight2)">
+                        <rect x="30" y="45" width="200" height="220" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="30" y="45" width="200" height="30" rx="6" fill="#eff6ff" />
+                        <text x="130" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#1e40af">1. Trigger & Validation</text>
+                        <text x="45" y="100" font-size="9" font-weight="bold" fill="#334155">Source State:</text>
+                        <text x="45" y="118" font-size="8.5" fill="#475569">&bull; In Stock (Inventory)</text>
+                        <text x="45" y="134" font-size="8.5" fill="#475569">&bull; Assigned to User</text>
+                        <text x="45" y="160" font-size="9" font-weight="bold" fill="#334155">Security Pre-Condition:</text>
+                        <text x="45" y="178" font-size="8.5" fill="#475569">&bull; User has maintenance role</text>
+                        <text x="45" y="194" font-size="8.5" fill="#475569">&bull; Asset belongs to team dept</text>
+                        <text x="45" y="210" font-size="8.5" fill="#dc2626">&bull; Reject if already in maint</text>
+                    </g>
+
+                    <line x1="230" y1="155" x2="270" y2="155" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Step 2 Box -->
+                    <g filter="url(#shadowLight2)">
+                        <rect x="275" y="45" width="210" height="220" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="275" y="45" width="210" height="30" rx="6" fill="#fef3c7" />
+                        <text x="380" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">2. Vendor Match Filter</text>
+                        <text x="290" y="100" font-size="9" font-weight="bold" fill="#334155">Query Logic:</text>
+                        <text x="290" y="118" font-size="8" font-family="monospace" fill="#0f172a">SELECT * FROM Suppliers</text>
+                        <text x="290" y="132" font-size="8" font-family="monospace" fill="#0f172a">WHERE IsActive = 1</text>
+                        <text x="290" y="146" font-size="8" font-family="monospace" fill="#0f172a">AND JSON_CONTAINS(</text>
+                        <text x="300" y="160" font-size="8" font-family="monospace" fill="#0f172a">Categories, '["IT"]')</text>
+                        <text x="290" y="186" font-size="8.5" fill="#475569">&bull; Unrelated vendors hidden</text>
+                        <text x="290" y="202" font-size="8.5" fill="#475569">&bull; Common vendors supported</text>
+                        <text x="290" y="222" font-size="8" font-weight="bold" fill="#15803d">&check; Prevents invalid routing</text>
+                    </g>
+
+                    <line x1="485" y1="155" x2="525" y2="155" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Step 3 Box -->
+                    <g filter="url(#shadowLight2)">
+                        <rect x="530" y="45" width="200" height="220" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="530" y="45" width="200" height="30" rx="6" fill="#ede9fe" />
+                        <text x="630" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#5b21b6">3. Handover Transaction</text>
+                        <text x="545" y="100" font-size="9" font-weight="bold" fill="#334155">Payload POSTed:</text>
+                        <text x="545" y="118" font-size="8.5" fill="#475569">&bull; AssetId</text>
+                        <text x="545" y="134" font-size="8.5" fill="#475569">&bull; SupplierId</text>
+                        <text x="545" y="150" font-size="8.5" fill="#475569">&bull; IssueDescription (Text)</text>
+                        <text x="545" y="166" font-size="8.5" fill="#475569">&bull; EstimatedReturnDate</text>
+                        <text x="545" y="182" font-size="8.5" fill="#475569">&bull; HelpdeskTicketId (opt)</text>
+                        <text x="545" y="208" font-size="8.5" font-weight="bold" fill="#b45309">&bull; ItemsReplaced left NULL</text>
+                        <text x="545" y="224" font-size="8" fill="#64748b">(filled later upon receipt)</text>
+                    </g>
+
+                    <line x1="730" y1="155" x2="770" y2="155" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Step 4 Box -->
+                    <g filter="url(#shadowLight2)">
+                        <rect x="775" y="45" width="195" height="220" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="775" y="45" width="195" height="30" rx="6" fill="#dcfce7" />
+                        <text x="872" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#166534">4. Database State</text>
+                        <text x="790" y="100" font-size="9" font-weight="bold" fill="#334155">Mutations Executed:</text>
+                        <text x="790" y="118" font-size="8" font-family="monospace" fill="#0f172a">Assets.Status = 2</text>
+                        <text x="790" y="132" font-size="8" font-family="monospace" fill="#0f172a">Assets.Custody =</text>
+                        <text x="800" y="146" font-size="8" font-family="monospace" fill="#0f172a">Supplier.CompanyName</text>
+                        <text x="790" y="164" font-size="8" font-family="monospace" fill="#0f172a">WorkOrders.Insert()</text>
+                        <text x="790" y="178" font-size="8" font-family="monospace" fill="#0f172a">Tickets.Status = 2</text>
+                        <text x="790" y="205" font-size="8.5" font-weight="bold" fill="#15803d">&check; Live Custody Tracker</text>
+                        <text x="790" y="221" font-size="8" fill="#475569">Visible in Maintenance Tab</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="flow-grid-2">
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Filtering Logic</span>
+                        <h2>2. "Vendors That Can Help" Filtering Logic</h2>
+                    </div>
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Device Scope</th>
+                                <th>Supplier Category</th>
+                                <th>Example Vendors</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>IT Devices</strong></td>
+                                <td><code>["IT"]</code></td>
+                                <td>Dell Enterprise, HP Service, Cisco Pro</td>
+                            </tr>
+                            <tr>
+                                <td><strong>BioMed Devices</strong></td>
+                                <td><code>["BIOMEDICAL"]</code></td>
+                                <td>Siemens Healthineers, Philips Med, GE</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Facilities</strong></td>
+                                <td><code>["GENERAL"]</code></td>
+                                <td>Daikin HVAC, Schindler Elevators, Otis</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Multi-Discipline</strong></td>
+                                <td><code>["IT", "GENERAL"]</code></td>
+                                <td>Schneider Electric, Siemens Infra</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Audit Trail</span>
+                        <h2>3. Database State Mutations on Dispatch (Phase 1)</h2>
+                    </div>
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Table</th>
+                                <th>Column</th>
+                                <th>New Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>Assets</code></td>
+                                <td><code>Status</code></td>
+                                <td><code>Maintenance</code> (Enum = 2)</td>
+                            </tr>
+                            <tr>
+                                <td><code>Assets</code></td>
+                                <td><code>CurrentCustody</code></td>
+                                <td><code>Supplier.CompanyName</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>MaintenanceOrders</code></td>
+                                <td><code>Status</code></td>
+                                <td><code>SentToSupplier</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Tickets</code></td>
+                                <td><code>Status</code></td>
+                                <td><code>Maintenance</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>Hospital Maintenance System &bull; Technical Standard Operating Procedure</span>
+            <span>Page 2 of 4 &bull; Phase 1: Supplier Dispatch & Custody Handover</span>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 3 ==================== -->
+    <div class="page-container">
+        <div>
+            <div class="header-banner">
+                <div class="header-title-group">
+                    <h1>Phase 3: Receiving, Replaced Parts JSON & Custody Reassignment</h1>
+                    <p>Hardware Check-in, Dynamic Form Builder, and Dual Custody Routing</p>
+                </div>
+                <div class="header-meta">
+                    <div>Route: <strong>/Maintenance/ReturnFromSupplier/{id}</strong></div>
+                    <div>Status Transition: <strong>Under Maintenance &rarr; In Service / In Stock</strong></div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <span class="pill">JSON Pipeline</span>
+                <h2>1. Dynamic Replaced Parts JSON Builder Pipeline</h2>
+            </div>
+
+            <div class="flowchart-svg-container">
+                <svg viewBox="0 0 1000 250" style="max-height: 165px; width: 100%;" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="shadowLight3" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+                            <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#94a3b8" flood-opacity="0.3" />
+                        </filter>
+                    </defs>
+
+                    <rect x="10" y="10" width="980" height="230" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+
+                    <!-- Box 1: UI Rows -->
+                    <g filter="url(#shadowLight3)">
+                        <rect x="30" y="35" width="260" height="180" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="30" y="35" width="260" height="26" rx="6" fill="#eff6ff" />
+                        <text x="160" y="52" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1e40af">1. Dynamic UI Repeater Grid</text>
+                        <rect x="45" y="70" width="230" height="30" rx="4" fill="#f8fafc" stroke="#e2e8f0" />
+                        <text x="55" y="88" font-size="8.5" fill="#334155">Part: [ RAM 16GB ] Qty: [ 2 ] Cost: [ 90 ]</text>
+                        <rect x="45" y="108" width="230" height="30" rx="4" fill="#f8fafc" stroke="#e2e8f0" />
+                        <text x="55" y="126" font-size="8.5" fill="#334155">Part: [ NVMe 1TB ] Qty: [ 1 ] Cost: [ 120 ]</text>
+                        <rect x="45" y="146" width="100" height="20" rx="3" fill="#2563eb" />
+                        <text x="95" y="160" text-anchor="middle" font-size="8" font-weight="bold" fill="#ffffff">+ Add Part Row</text>
+                        <text x="45" y="195" font-size="8" fill="#64748b">&bull; Add / Remove rows on-the-fly</text>
+                    </g>
+
+                    <line x1="290" y1="125" x2="340" y2="125" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Box 2: Client Serializer -->
+                    <g filter="url(#shadowLight3)">
+                        <rect x="345" y="35" width="280" height="180" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="345" y="35" width="280" height="26" rx="6" fill="#fef3c7" />
+                        <text x="485" y="52" text-anchor="middle" font-size="10.5" font-weight="700" fill="#92400e">2. Client Serializer (Form &rarr; JSON)</text>
+                        <text x="360" y="80" font-size="8" font-family="monospace" fill="#0f172a">// Form submit event intercepted:</text>
+                        <text x="360" y="96" font-size="8" font-family="monospace" fill="#2563eb">const items = [];</text>
+                        <text x="360" y="112" font-size="8" font-family="monospace" fill="#334155">row.forEach(r => items.push({</text>
+                        <text x="375" y="128" font-size="8" font-family="monospace" fill="#047857">part_name: r.name,</text>
+                        <text x="375" y="144" font-size="8" font-family="monospace" fill="#047857">quantity: r.qty,</text>
+                        <text x="375" y="160" font-size="8" font-family="monospace" fill="#047857">cost: r.cost</text>
+                        <text x="360" y="176" font-size="8" font-family="monospace" fill="#334155">}));</text>
+                        <text x="360" y="194" font-size="8" font-family="monospace" fill="#b45309">hiddenField.value = JSON.stringify(items);</text>
+                    </g>
+
+                    <line x1="625" y1="125" x2="675" y2="125" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Box 3: Database Storage -->
+                    <g filter="url(#shadowLight3)">
+                        <rect x="680" y="35" width="290" height="180" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="680" y="35" width="290" height="26" rx="6" fill="#dcfce7" />
+                        <text x="825" y="52" text-anchor="middle" font-size="10.5" font-weight="700" fill="#166534">3. MySQL JSON Column Storage</text>
+                        <text x="695" y="80" font-size="8" font-family="monospace" fill="#047857">[</text>
+                        <text x="705" y="96" font-size="8" font-family="monospace" fill="#0f172a">  { "part": "RAM 16GB", "qty": 2, "cost": 90 },</text>
+                        <text x="705" y="112" font-size="8" font-family="monospace" fill="#0f172a">  { "part": "NVMe 1TB", "qty": 1, "cost": 120 }</text>
+                        <text x="695" y="128" font-size="8" font-family="monospace" fill="#047857">]</text>
+                        <text x="695" y="155" font-size="8.5" font-weight="bold" fill="#334155">Saved in WorkOrders.ReplacedPartsJson</text>
+                        <text x="695" y="175" font-size="8" fill="#475569">&bull; Parsed safely back to C# List&lt;ReplacedPart&gt;</text>
+                        <text x="695" y="195" font-size="8" fill="#475569">&bull; Full cost analytics & historical tracking</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="flow-grid-2">
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Routing Logic</span>
+                        <h2>2. Custody Reassignment Decision Tree (Central Stock vs User)</h2>
+                    </div>
+
+                    <div class="card card-slate">
+                        <p class="card-desc">When equipment is received from the supplier, custody MUST NOT stay with the vendor. The receiving officer chooses the target destination:</p>
+
+                        <div style="display: flex; gap: 8px; margin-top: 6px;">
+                            <div style="flex: 1; border: 1px solid #93c5fd; background: #eff6ff; padding: 6px; border-radius: 4px;">
+                                <div style="font-weight: 700; color: #1e40af; font-size: 8pt; margin-bottom: 2px;">Option A: Return to Stock</div>
+                                <ul class="bullet-list">
+                                    <li><code>Asset.CurrentCustody = "Stock"</code></li>
+                                    <li><code>Asset.AssignedUserId = NULL</code></li>
+                                    <li><code>Asset.Status = InStock</code></li>
+                                    <li>Ready for future redeployment</li>
+                                </ul>
+                            </div>
+
+                            <div style="flex: 1; border: 1px solid #86efac; background: #f0fdf4; padding: 6px; border-radius: 4px;">
+                                <div style="font-weight: 700; color: #166534; font-size: 8pt; margin-bottom: 2px;">Option B: Return to User</div>
+                                <ul class="bullet-list">
+                                    <li><code>Asset.CurrentCustody = User.FullName</code></li>
+                                    <li><code>Asset.AssignedUserId = SelectedUserId</code></li>
+                                    <li><code>Asset.Status = InService</code></li>
+                                    <li>Directly handed back to department</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Ticket Sync</span>
+                        <h2>3. Helpdesk Ticket Synchronization on Return</h2>
+                    </div>
+
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Entity</th>
+                                <th>Attribute</th>
+                                <th>Value on Return</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>MaintenanceOrder</code></td>
+                                <td><code>ActualReturnDate</code></td>
+                                <td><code>DateTime.UtcNow</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>MaintenanceOrder</code></td>
+                                <td><code>ItemsReplaced</code></td>
+                                <td>Structured JSON String</td>
+                            </tr>
+                            <tr>
+                                <td><code>MaintenanceOrder</code></td>
+                                <td><code>Status</code></td>
+                                <td><code>Completed</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Ticket</code> (Linked)</td>
+                                <td><code>Status</code></td>
+                                <td><code>Resolved</code> / <code>Closed</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>TicketComment</code></td>
+                                <td><code>Body</code></td>
+                                <td>Auto-logged return note + part list</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>Hospital Maintenance System &bull; Technical Standard Operating Procedure</span>
+            <span>Page 3 of 4 &bull; Phase 3: Hardware Receiving & Dynamic JSON Builder</span>
+        </div>
+    </div>
+
+    <!-- ==================== PAGE 4 ==================== -->
+    <div class="page-container">
+        <div>
+            <div class="header-banner">
+                <div class="header-title-group">
+                    <h1>Preventive Maintenance (PM) & Technical Audit Trail</h1>
+                    <p>Inspection Intervals, Recurring Overhauls, and Historical Compliance</p>
+                </div>
+                <div class="header-meta">
+                    <div>Module: <strong>Preventive Maintenance Engine</strong></div>
+                    <div>Compliance: <strong>Medical Equipment Safety Overhaul</strong></div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <span class="pill">Inspection Engine</span>
+                <h2>1. Preventive Maintenance (PM) Interval Scheduling Flowchart</h2>
+            </div>
+
+            <div class="flowchart-svg-container">
+                <svg viewBox="0 0 1000 240" style="max-height: 165px; width: 100%;" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="shadowLight4" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+                            <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#94a3b8" flood-opacity="0.3" />
+                        </filter>
+                    </defs>
+
+                    <rect x="10" y="10" width="980" height="220" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5" />
+
+                    <!-- Step 1: Cron / Daily Check -->
+                    <g filter="url(#shadowLight4)">
+                        <rect x="30" y="40" width="200" height="160" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="30" y="40" width="200" height="26" rx="6" fill="#eff6ff" />
+                        <text x="130" y="58" text-anchor="middle" font-size="10.5" font-weight="700" fill="#1e40af">1. Daily PM Engine</text>
+                        <text x="45" y="85" font-size="8.5" font-weight="bold" fill="#334155">Inspection Query:</text>
+                        <text x="45" y="102" font-size="8" fill="#475569">Calculates days remaining:</text>
+                        <text x="45" y="118" font-size="8" font-family="monospace" fill="#0f172a">NextPM - Today</text>
+                        <text x="45" y="140" font-size="8" fill="#475569">&bull; Runs for active devices</text>
+                        <text x="45" y="156" font-size="8" fill="#475569">&bull; Categorized by department</text>
+                    </g>
+
+                    <line x1="230" y1="120" x2="270" y2="120" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Step 2: Categorization into Tiers -->
+                    <g filter="url(#shadowLight4)">
+                        <rect x="275" y="40" width="270" height="160" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="275" y="40" width="270" height="26" rx="6" fill="#fef3c7" />
+                        <text x="410" y="58" text-anchor="middle" font-size="10.5" font-weight="700" fill="#92400e">2. Dynamic Status Badging</text>
+
+                        <rect x="290" y="75" width="240" height="30" rx="4" fill="#fee2e2" stroke="#fca5a5" />
+                        <text x="300" y="93" font-size="8" font-weight="bold" fill="#991b1b">OVERDUE (&lt; 0 days): Red Badge &bull; Critical</text>
+
+                        <rect x="290" y="112" width="240" height="30" rx="4" fill="#fef3c7" stroke="#fde68a" />
+                        <text x="300" y="130" font-size="8" font-weight="bold" fill="#92400e">DUE SOON (&le; 14 days): Amber Badge</text>
+
+                        <rect x="290" y="149" width="240" height="30" rx="4" fill="#dcfce7" stroke="#86efac" />
+                        <text x="300" y="167" font-size="8" font-weight="bold" fill="#166534">UP-TO-DATE (&gt; 14 days): Green Badge</text>
+                    </g>
+
+                    <line x1="545" y1="120" x2="585" y2="120" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)" />
+
+                    <!-- Step 3: Action Trigger -->
+                    <g filter="url(#shadowLight4)">
+                        <rect x="590" y="40" width="380" height="160" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        <rect x="590" y="40" width="380" height="26" rx="6" fill="#f5f3ff" />
+                        <text x="780" y="58" text-anchor="middle" font-size="10.5" font-weight="700" fill="#5b21b6">3. Automated Notification & Dispatch</text>
+
+                        <text x="605" y="85" font-size="8.5" font-weight="bold" fill="#334155">Automatic Actions on Overdue Asset:</text>
+                        <text x="605" y="103" font-size="8" fill="#475569">1. Notification badge pinned to Maintenance Dashboard</text>
+                        <text x="605" y="119" font-size="8" fill="#475569">2. One-click Work Order generation: <code>/Maintenance/SendToSupplier</code></text>
+                        <text x="605" y="135" font-size="8" fill="#475569">3. Auto-computes Next PM Date on Return: <code>NextPM = Today + IntervalDays</code></text>
+                        <text x="605" y="155" font-size="8" font-weight="bold" fill="#166534">&check; Fully closes the recurring audit loop</text>
+                    </g>
+                </svg>
+            </div>
+
+            <div class="flow-grid-2">
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Routing Pathways</span>
+                        <h2>2. Routine In-House Checkup vs External Overhaul Pathway</h2>
+                    </div>
+
+                    <table class="doc-table">
+                        <thead>
+                            <tr>
+                                <th>Criteria</th>
+                                <th>Pathway A: In-House</th>
+                                <th>Pathway B: Supplier Overhaul</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Scope</strong></td>
+                                <td>Filter swap, sensor zeroing, battery test</td>
+                                <td>Internal motor rebuild, recalibration cert</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Custody</strong></td>
+                                <td>Remains with Hospital / User</td>
+                                <td>Transferred to Supplier Company</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Status</strong></td>
+                                <td>Stays "In Service"</td>
+                                <td>Switches to "Under Maintenance"</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Parts Used</strong></td>
+                                <td>Hospital internal stock</td>
+                                <td>Supplier items &rarr; ReplacedPartsJson</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Certification</strong></td>
+                                <td>Signed by in-house engineer</td>
+                                <td>Vendor certificate attached to Order</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div>
+                    <div class="section-header">
+                        <span class="pill">Audit Trail</span>
+                        <h2>3. Work Order Details View & Historical Compliance Log</h2>
+                    </div>
+
+                    <div class="card card-blue">
+                        <div class="card-header-sm">
+                            <span class="card-title">Auditing & Safety Standard Compliance</span>
+                            <span class="tag tag-green">Compliant</span>
+                        </div>
+                        <p class="card-desc">Every maintenance operation creates an immutable historical event accessible via <code>/Maintenance/Details/{id}</code> and <code>/Assets/Details/{id}</code>:</p>
+                        <ul class="bullet-list">
+                            <li><strong>Pre-Send Snapshot:</strong> Date dispatched, technician user, defect log, targeted supplier.</li>
+                            <li><strong>Custody Chain:</strong> Timestamped record of who possessed device at any historical date.</li>
+                            <li><strong>Replaced Parts Breakdown:</strong> Granular inventory cost, part serials, and quantities.</li>
+                            <li><strong>Final Disposition:</strong> Destination (Stock vs Clinical User) and ticket closure link.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-note">
+            <span>Hospital Maintenance System &bull; Technical Standard Operating Procedure</span>
+            <span>Page 4 of 4 &bull; Preventive Maintenance (PM) & Historical Audit Trail</span>
+        </div>
+    </div>
+
+</body>
+</html>

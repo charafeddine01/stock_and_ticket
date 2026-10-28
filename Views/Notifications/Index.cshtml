@@ -1,4 +1,4 @@
-﻿@model IEnumerable<StockPortal.Models.Notification>
+@model IEnumerable<StockPortal.Models.Notification>
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
     ViewData["Title"] = "System & Department Notifications";
@@ -6,7 +6,7 @@
     int unreadCount = ViewBag.UnreadCount as int? ?? 0;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
         <h4 class="fw-bold mb-0">
             <i class="fa-solid fa-bell text-primary me-2"></i> Department & Ticket Updates
@@ -17,15 +17,20 @@
         </h4>
         <small class="text-muted">Live activity stream for your department tickets, discussions, and system updates</small>
     </div>
-    @if (unreadCount > 0)
-    {
-        <form asp-action="MarkAllAsRead" method="post" class="m-0">
-            @Html.AntiForgeryToken()
-            <button type="submit" class="btn btn-outline-primary btn-sm">
-                <i class="fa-solid fa-check-double me-1"></i> Mark All as Read
-            </button>
-        </form>
-    }
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-outline-info btn-sm" onclick="if(window.showTestNotification) window.showTestNotification();" title="Preview modern top notification popup">
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i> Preview Top Popup
+        </button>
+        @if (unreadCount > 0)
+        {
+            <form asp-action="MarkAllAsRead" method="post" class="m-0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-primary btn-sm">
+                    <i class="fa-solid fa-check-double me-1"></i> Mark All as Read
+                </button>
+            </form>
+        }
+    </div>
 </div>
 
 <!-- Filter Tabs -->

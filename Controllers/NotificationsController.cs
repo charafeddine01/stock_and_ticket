@@ -70,6 +70,19 @@ namespace StockPortal.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // POST: /Notifications/Dismiss/5 (AJAX endpoint for top notification dismissal)
+        [HttpPost]
+        public async Task<IActionResult> Dismiss(int id)
+        {
+            int currentUserId = _currentUserService.GetUserId();
+            if (currentUserId > 0)
+            {
+                await _notificationService.MarkAsReadAsync(id, currentUserId);
+                return Json(new { success = true });
+            }
+            return Json(new { success = false, message = "User not authenticated" });
+        }
+
         // POST: /Notifications/MarkAllAsRead
         [HttpPost]
         [ValidateAntiForgeryToken]
