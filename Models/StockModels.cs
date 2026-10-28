@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StockPortal.Services;
 
 namespace StockPortal.Models
 {
@@ -36,6 +38,13 @@ namespace StockPortal.Models
         [StringLength(255)]
         public string? Type { get; set; }
 
+        [Column("type_ar")]
+        [StringLength(255)]
+        public string? TypeAr { get; set; }
+
+        [NotMapped]
+        public string DisplayType => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(TypeAr)) ? TypeAr : (Type ?? "");
+
         public virtual ICollection<Asset> Assets { get; set; } = new List<Asset>();
     }
 
@@ -49,6 +58,13 @@ namespace StockPortal.Models
         [Column("status")]
         [StringLength(255)]
         public string? Status { get; set; }
+
+        [Column("status_ar")]
+        [StringLength(255)]
+        public string? StatusAr { get; set; }
+
+        [NotMapped]
+        public string DisplayStatus => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(StatusAr)) ? StatusAr : (Status ?? "");
 
         public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
     }
@@ -64,6 +80,14 @@ namespace StockPortal.Models
         [StringLength(255)]
         [Display(Name = "Department Name")]
         public string? Name { get; set; }
+
+        [Column("name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Department Name (Arabic)")]
+        public string? NameAr { get; set; }
+
+        [NotMapped]
+        public string DisplayName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(NameAr)) ? NameAr : (Name ?? "");
 
         [Column("headUserID")]
         public int? HeadUserId { get; set; }
@@ -89,8 +113,24 @@ namespace StockPortal.Models
         [Display(Name = "Floor")]
         public int? Floor { get; set; }
 
+        [Column("room_name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Room Name (Arabic)")]
+        public string? RoomNameAr { get; set; }
+
         [NotMapped]
-        public string DisplayName => $"Room {RoomNo ?? 0} (Floor {Floor ?? 0})";
+        public string DisplayName
+        {
+            get
+            {
+                if (CultureInfo.CurrentUICulture.Name.StartsWith("ar"))
+                {
+                    var prefix = !string.IsNullOrWhiteSpace(RoomNameAr) ? $"{RoomNameAr} - " : "";
+                    return $"{prefix}غرفة {RoomNo ?? 0} (الطابق {Floor ?? 0})";
+                }
+                return $"Room {RoomNo ?? 0} (Floor {Floor ?? 0})";
+            }
+        }
 
         public virtual ICollection<Asset> Assets { get; set; } = new List<Asset>();
     }
@@ -106,6 +146,14 @@ namespace StockPortal.Models
         [StringLength(255)]
         [Display(Name = "Supplier Name")]
         public string? Name { get; set; }
+
+        [Column("name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Supplier Name (Arabic)")]
+        public string? NameAr { get; set; }
+
+        [NotMapped]
+        public string DisplayName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(NameAr)) ? NameAr : (Name ?? "");
 
         [Column("isActive")]
         public bool? IsActive { get; set; } = true;
@@ -126,6 +174,17 @@ namespace StockPortal.Models
             3 => "Full Service (Items & Maintenance)",
             _ => "General Vendor"
         };
+
+        [NotMapped]
+        public string DisplayTypeName => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? Type switch
+            {
+                1 => "الأجهزة والمعدات",
+                2 => "مزود خدمات صيانة",
+                3 => "خدمة متكاملة (أجهزة وصيانة)",
+                _ => "مورد عام"
+            }
+            : TypeName;
 
         [NotMapped]
         public List<string> DepartmentList
@@ -173,6 +232,14 @@ namespace StockPortal.Models
         [Display(Name = "Full Name")]
         public string? FullName { get; set; }
 
+        [Column("full_name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Full Name (Arabic)")]
+        public string? FullNameAr { get; set; }
+
+        [NotMapped]
+        public string DisplayFullName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(FullNameAr)) ? FullNameAr : (FullName ?? "");
+
         [Column("departmentID")]
         public int? DepartmentId { get; set; }
 
@@ -189,6 +256,11 @@ namespace StockPortal.Models
         [Display(Name = "Role / Title")]
         public string? Role { get; set; } = SystemRoles.EndUser;
 
+        [Column("role_ar")]
+        [StringLength(255)]
+        [Display(Name = "Role / Title (Arabic)")]
+        public string? RoleAr { get; set; }
+
         [Column("maintenance_team")]
         [StringLength(50)]
         [Display(Name = "Maintenance Team")]
@@ -202,15 +274,23 @@ namespace StockPortal.Models
         {
             get
             {
+                bool isAr = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
+                if (isAr && !string.IsNullOrWhiteSpace(RoleAr))
+                {
+                    return RoleAr;
+                }
                 if (string.Equals(Role, SystemRoles.Maintenance, StringComparison.OrdinalIgnoreCase) ||
                     (Role != null && Role.IndexOf("MAINTENANCE", StringComparison.OrdinalIgnoreCase) >= 0))
                 {
                     var team = !string.IsNullOrWhiteSpace(MaintenanceTeam) ? MaintenanceTeam.ToUpperInvariant() : "GENERAL";
-                    return $"MAINTENANCE ({team})";
+                    return isAr ? $"صيانة ({team})" : $"MAINTENANCE ({team})";
                 }
                 return Role ?? SystemRoles.EndUser;
             }
         }
+
+        [NotMapped]
+        public string DisplayRole => RoleDisplay;
 
         public virtual ICollection<Asset> CustodyAssets { get; set; } = new List<Asset>();
         public virtual ICollection<Ticket> OpenedTickets { get; set; } = new List<Ticket>();
@@ -258,6 +338,15 @@ namespace StockPortal.Models
         [Display(Name = "Operational Status")]
         public string? Status { get; set; } = "In Service";
 
+        [Column("status_ar")]
+        [StringLength(255)]
+        public string? StatusAr { get; set; }
+
+        [NotMapped]
+        public string DisplayStatus => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(StatusAr))
+            ? StatusAr
+            : (CultureInfo.CurrentUICulture.Name.StartsWith("ar") ? LocHelper.TranslateStatus(Status) : (Status ?? "In Service"));
+
         [Column("userID")]
         public int? UserId { get; set; }
 
@@ -301,6 +390,15 @@ namespace StockPortal.Models
         [StringLength(255)]
         [Display(Name = "Equipment Type")]
         public string? Type { get; set; } // Laptop, Monitor, Medical Device, Server, Printer, etc.
+
+        [Column("equipment_type_ar")]
+        [StringLength(255)]
+        public string? EquipmentTypeAr { get; set; }
+
+        [NotMapped]
+        public string DisplayType => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(EquipmentTypeAr))
+            ? EquipmentTypeAr
+            : (CultureInfo.CurrentUICulture.Name.StartsWith("ar") ? LocHelper.TranslateType(Type) : (Type ?? ""));
 
         [Column("warrantyTill", TypeName = "date")]
         [Display(Name = "Warranty Expiration")]
@@ -442,6 +540,10 @@ namespace StockPortal.Models
         [Display(Name = "Resolution Details")]
         public string? ResolutionDetails { get; set; }
 
+        [Column("title_ar")]
+        [StringLength(255)]
+        public string? TitleAr { get; set; }
+
         [NotMapped]
         public int? CreatedBy => OpenedBy;
 
@@ -458,6 +560,21 @@ namespace StockPortal.Models
             4 => "Urgent",
             _ => "Medium"
         };
+
+        [NotMapped]
+        public string DisplayPriority => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? Priority switch { 1 => "منخفضة", 2 => "متوسطة", 3 => "مرتفعة", 4 => "طارئة جداً", _ => "متوسطة" }
+            : PriorityName;
+
+        [NotMapped]
+        public string DisplayType => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? LocHelper.TranslateTicketType(Type)
+            : (Type ?? "Hardware");
+
+        [NotMapped]
+        public string DisplayTargetTeam => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? LocHelper.TranslateTargetTeam(TargetTeam)
+            : (TargetTeam ?? "IT");
     }
 
     [Table("ticket_handler")]
@@ -595,6 +712,17 @@ namespace StockPortal.Models
             4 => "External Overhaul / Calibration",
             _ => "Breakdown / Repair"
         };
+
+        [NotMapped]
+        public string DisplayTypeName => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? MaintenanceType switch
+            {
+                2 => "صيانة وقائية / دورية",
+                3 => "إصلاح تحت ضمان المورد",
+                4 => "معايرة وفحص خارجي",
+                _ => "إصلاح أعطال طارئة"
+            }
+            : TypeName;
 
         [NotMapped]
         public bool IsUnderMaintenance => string.Equals(WorkOrderStatus, "Under Maintenance", StringComparison.OrdinalIgnoreCase);

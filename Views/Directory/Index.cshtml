@@ -1,5 +1,5 @@
 @{
-    ViewData["Title"] = "Master Directory & Administration";
+    ViewData["Title"] = Loc["Master Directory & Administration"];
     var users = ViewBag.Users as List<StockPortal.Models.User> ?? new();
     var rooms = ViewBag.Rooms as List<StockPortal.Models.Room> ?? new();
     var suppliers = ViewBag.Suppliers as List<StockPortal.Models.Supplier> ?? new();
@@ -9,8 +9,8 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="fw-bold mb-0">Master Directory & Configuration</h4>
-        <small class="text-muted">Manage hospital departments, staff users, physical room locations, and authorized vendors</small>
+        <h4 class="fw-bold mb-0">@Loc["Master Directory & Configuration"]</h4>
+        <small class="text-muted">@Loc["Manage hospital departments, staff users, physical room locations, and authorized vendors"]</small>
     </div>
 </div>
 
@@ -20,22 +20,22 @@
         <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="dirTabs" role="tablist">
             <li class="nav-item">
                 <button class="nav-link @(activeTab == "users" ? "active" : "") fw-semibold" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
-                    <i class="fa-solid fa-users me-1"></i> Staff & Users (@users.Count)
+                    <i class="fa-solid fa-users me-1"></i> @Loc["Staff & Users"] (@users.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link @(activeTab == "rooms" ? "active" : "") fw-semibold" id="rooms-tab" data-bs-toggle="tab" data-bs-target="#rooms" type="button" role="tab">
-                    <i class="fa-solid fa-door-open me-1"></i> Rooms & Locations (@rooms.Count)
+                    <i class="fa-solid fa-door-open me-1"></i> @Loc["Rooms & Locations"] (@rooms.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link @(activeTab == "suppliers" ? "active" : "") fw-semibold" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers" type="button" role="tab">
-                    <i class="fa-solid fa-truck-field me-1"></i> Suppliers & Vendors (@suppliers.Count)
+                    <i class="fa-solid fa-truck-field me-1"></i> @Loc["Suppliers & Vendors"] (@suppliers.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link @(activeTab == "depts" ? "active" : "") fw-semibold" id="depts-tab" data-bs-toggle="tab" data-bs-target="#depts" type="button" role="tab">
-                    <i class="fa-solid fa-building me-1"></i> Departments (@departments.Count)
+                    <i class="fa-solid fa-building me-1"></i> @Loc["Departments"] (@departments.Count)
                 </button>
             </li>
         </ul>
@@ -46,11 +46,11 @@
             <div class="tab-pane fade @(activeTab == "users" ? "show active" : "")" id="users" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
-                        <h6 class="fw-bold mb-0">Hospital Staff & Authorized Users</h6>
-                        <small class="text-muted">Users with <strong>Active</strong> status are automatically authenticated via their PC username. Inactive users are rejected.</small>
+                        <h6 class="fw-bold mb-0">@Loc["Hospital Staff & Users"]</h6>
+                        <small class="text-muted">@(Loc.IsArabic ? "المستخدمون النشطون يتم التحقق من هويتهم تلقائياً عبر اسم مستخدم حاسوبهم. المستخدمون المعطلون يتم رفضهم." : "Users with Active status are automatically authenticated via their PC username. Inactive users are rejected.")</small>
                     </div>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                        <i class="fa-solid fa-plus me-1"></i> Add User
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Add User"]
                     </button>
                 </div>
                 <div class="table-responsive">
@@ -58,13 +58,13 @@
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Full Name</th>
-                                <th>PC / Windows Username</th>
-                                <th>Department</th>
-                                <th>System Role</th>
-                                <th>Maintenance Team</th>
-                                <th>Auto-Login Status</th>
-                                <th class="text-end">Actions</th>
+                                <th>@Loc["Full Name"]</th>
+                                <th>@Loc["PC / Windows Username"]</th>
+                                <th>@Loc["Department Name"]</th>
+                                <th>@Loc["System Role"]</th>
+                                <th>@Loc["Maintenance Team"]</th>
+                                <th>@Loc["Auto-Login Status"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -72,20 +72,20 @@
                             {
                                 <tr>
                                     <td>@u.Id</td>
-                                    <td class="fw-semibold">@u.FullName</td>
+                                    <td class="fw-semibold">@u.DisplayFullName</td>
                                     <td><code class="text-primary fw-bold bg-light px-2 py-1 rounded">@(u.DomainUser ?? "-")</code></td>
-                                    <td>@(u.Department?.Name ?? "Unassigned")</td>
+                                    <td>@(u.Department?.DisplayName ?? Loc["Unassigned"])</td>
                                     <td>
                                         @switch (u.Role?.ToUpperInvariant())
                                         {
                                             case "ADMIN":
-                                                <span class="badge bg-danger"><i class="fa-solid fa-shield-halved me-1"></i> ADMIN</span>
+                                                <span class="badge bg-danger"><i class="fa-solid fa-shield-halved me-1"></i> @(Loc.IsArabic ? "مدير النظام (ADMIN)" : "ADMIN")</span>
                                                 break;
                                             case "MAINTENANCE":
-                                                <span class="badge bg-primary"><i class="fa-solid fa-wrench me-1"></i> MAINTENANCE (@(u.MaintenanceTeam ?? "GENERAL"))</span>
+                                                <span class="badge bg-primary"><i class="fa-solid fa-wrench me-1"></i> @(Loc.IsArabic ? "صيانة" : "MAINTENANCE") (@Loc.TargetTeam(u.MaintenanceTeam ?? "GENERAL"))</span>
                                                 break;
                                             default:
-                                                <span class="badge bg-secondary"><i class="fa-solid fa-user me-1"></i> END_USER</span>
+                                                <span class="badge bg-secondary"><i class="fa-solid fa-user me-1"></i> @(Loc.IsArabic ? "مستخدم قياسي" : "END_USER")</span>
                                                 break;
                                         }
                                     </td>
@@ -93,7 +93,7 @@
                                         @if (u.Role?.ToUpperInvariant() == "MAINTENANCE")
                                         {
                                             <span class="badge @(u.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : u.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-dark")">
-                                                @(u.MaintenanceTeam ?? "IT")
+                                                @Loc.TargetTeam(u.MaintenanceTeam ?? "IT")
                                             </span>
                                         }
                                         else
@@ -105,25 +105,25 @@
                                         @if (u.IsActive == true)
                                         {
                                             <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                                <i class="fa-solid fa-circle-check me-1"></i> Active (Auto-Login)
+                                                <i class="fa-solid fa-circle-check me-1"></i> @Loc["Active (Auto-Login)"]
                                             </span>
                                         }
                                         else
                                         {
                                             <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
-                                                <i class="fa-solid fa-ban me-1"></i> Inactive (Rejected)
+                                                <i class="fa-solid fa-ban me-1"></i> @Loc["Inactive (Rejected)"]
                                             </span>
                                         }
                                     </td>
                                     <td class="text-end">
-                                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editRoleModal-@u.Id" title="Edit Role & Maintenance Team">
-                                            <i class="fa-solid fa-user-gear"></i> Role
+                                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editRoleModal-@u.Id" title="@Loc["Manage Role & Team"]">
+                                            <i class="fa-solid fa-user-gear"></i> @Loc["Manage Role & Team"]
                                         </button>
                                         <form asp-action="ToggleUserStatus" method="post" class="d-inline">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@u.Id" />
-                                            <button type="submit" class="btn btn-sm @(u.IsActive == true ? "btn-outline-danger" : "btn-outline-success")" title="Toggle active/inactive status">
-                                                @(u.IsActive == true ? "Deactivate" : "Activate")
+                                            <button type="submit" class="btn btn-sm @(u.IsActive == true ? "btn-outline-danger" : "btn-outline-success")" title="@Loc["Active Status"]">
+                                                @(u.IsActive == true ? Loc["Deactivate"] : Loc["Activate"])
                                             </button>
                                         </form>
 
@@ -135,31 +135,31 @@
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="id" value="@u.Id" />
                                                         <div class="modal-header">
-                                                            <h5 class="modal-title fw-bold">Manage Role & Team: @u.FullName</h5>
+                                                            <h5 class="modal-title fw-bold">@Loc["Manage Role & Team"]: @u.DisplayFullName</h5>
                                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                         </div>
                                                         <div class="modal-body">
                                                             <div class="mb-3">
-                                                                <label class="form-label fw-semibold">System RBAC Role</label>
+                                                                <label class="form-label fw-semibold">@Loc["System Role"]</label>
                                                                 <select name="role" id="role-select-@u.Id" class="form-select" onchange="toggleTeamSelect(@u.Id)">
-                                                                    <option value="ADMIN" selected="@(u.Role?.ToUpperInvariant() == "ADMIN")">ADMIN (Full System Access)</option>
-                                                                    <option value="MAINTENANCE" selected="@(u.Role?.ToUpperInvariant() == "MAINTENANCE")">MAINTENANCE (Assigned Maintenance Team)</option>
-                                                                    <option value="END_USER" selected="@(u.Role?.ToUpperInvariant() == "END_USER" || string.IsNullOrWhiteSpace(u.Role))">END_USER (Standard Staff)</option>
+                                                                    <option value="ADMIN" selected="@(u.Role?.ToUpperInvariant() == "ADMIN")">@(Loc.IsArabic ? "مدير النظام (صلاحيات كاملة)" : "ADMIN (Full System Access)")</option>
+                                                                    <option value="MAINTENANCE" selected="@(u.Role?.ToUpperInvariant() == "MAINTENANCE")">@(Loc.IsArabic ? "مهندس / فني صيانة (فريق محدد)" : "MAINTENANCE (Assigned Maintenance Team)")</option>
+                                                                    <option value="END_USER" selected="@(u.Role?.ToUpperInvariant() == "END_USER" || string.IsNullOrWhiteSpace(u.Role))">@(Loc.IsArabic ? "مستخدم عادي (كادر المستشفى)" : "END_USER (Standard Staff)")</option>
                                                                 </select>
                                                             </div>
                                                             <div class="mb-3" id="team-container-@u.Id" style="@(u.Role?.ToUpperInvariant() == "MAINTENANCE" ? "" : "display:none;")">
-                                                                <label class="form-label fw-semibold">Assigned Maintenance Team</label>
+                                                                <label class="form-label fw-semibold">@Loc["Target Maintenance Team"]</label>
                                                                 <select name="maintenanceTeam" class="form-select">
-                                                                    <option value="IT" selected="@(u.MaintenanceTeam == "IT" || string.IsNullOrWhiteSpace(u.MaintenanceTeam))">IT</option>
-                                                                    <option value="BIOMEDICAL" selected="@(u.MaintenanceTeam == "BIOMEDICAL")">BIOMEDICAL</option>
-                                                                    <option value="GENERAL" selected="@(u.MaintenanceTeam == "GENERAL")">GENERAL</option>
+                                                                    <option value="IT" selected="@(u.MaintenanceTeam == "IT" || string.IsNullOrWhiteSpace(u.MaintenanceTeam))">@Loc.TargetTeam("IT")</option>
+                                                                    <option value="BIOMEDICAL" selected="@(u.MaintenanceTeam == "BIOMEDICAL")">@Loc.TargetTeam("BIOMEDICAL")</option>
+                                                                    <option value="GENERAL" selected="@(u.MaintenanceTeam == "GENERAL")">@Loc.TargetTeam("GENERAL")</option>
                                                                 </select>
-                                                                <div class="form-text small">Maintenance users can view and handle tickets directed to their team only.</div>
+                                                                <div class="form-text small">@(Loc.IsArabic ? "مستخدمو الصيانة يمكنهم معالجة تذاكر فريقهم فقط." : "Maintenance users can view and handle tickets directed to their team only.")</div>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
-                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="submit" class="btn btn-primary">Save Role & Team</button>
+                                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                                                            <button type="submit" class="btn btn-primary">@Loc["Save Role & Team"]</button>
                                                         </div>
                                                     </form>
                                                 </div>
@@ -176,9 +176,9 @@
             <!-- 2. Rooms Tab -->
             <div class="tab-pane fade @(activeTab == "rooms" ? "show active" : "")" id="rooms" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold mb-0">Physical Rooms & Storage Areas</h6>
+                    <h6 class="fw-bold mb-0">@Loc["Hospital Rooms & Floors"]</h6>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addRoomModal">
-                        <i class="fa-solid fa-plus me-1"></i> Add Room
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Add Room"]
                     </button>
                 </div>
                 <div class="table-responsive">
@@ -186,10 +186,10 @@
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Room Number</th>
-                                <th>Floor</th>
-                                <th>Display Reference</th>
-                                <th class="text-end">Action</th>
+                                <th>@Loc["Room Number"]</th>
+                                <th>@Loc["Floor"]</th>
+                                <th>@Loc["Display Reference"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -197,15 +197,15 @@
                             {
                                 <tr>
                                     <td>@r.Id</td>
-                                    <td class="fw-semibold"><i class="fa-solid fa-door-closed text-muted me-2"></i> Room @r.RoomNo</td>
-                                    <td>Floor @r.Floor</td>
+                                    <td class="fw-semibold"><i class="fa-solid fa-door-closed text-muted me-2"></i> @Loc["Room Number"] @r.RoomNo</td>
+                                    <td>@Loc["Floor"] @r.Floor</td>
                                     <td><span class="badge bg-light text-dark border">@r.DisplayName</span></td>
                                     <td class="text-end">
-                                        <form asp-action="DeleteRoom" method="post" class="d-inline" onsubmit="return confirm('Delete Room @r.RoomNo?');">
+                                        <form asp-action="DeleteRoom" method="post" class="d-inline" onsubmit="return confirm('@(Loc.IsArabic ? $"هل أنت متأكد من حذف الغرفة {r.RoomNo}؟" : $"Delete Room {r.RoomNo}?")');">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@r.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="fa-solid fa-trash me-1"></i> Delete
+                                                <i class="fa-solid fa-trash me-1"></i> @Loc["Delete"]
                                             </button>
                                         </form>
                                     </td>
@@ -220,13 +220,13 @@
             <div class="tab-pane fade @(activeTab == "suppliers" ? "show active" : "")" id="suppliers" role="tabpanel">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <div>
-                        <h6 class="fw-bold mb-0">Authorized Hardware Suppliers & Maintenance Contractors</h6>
-                        <small class="text-muted">Filtered by supported maintenance teams (IT, Biomedical, General) with common multi-department vendors</small>
+                        <h6 class="fw-bold mb-0">@Loc["Approved Suppliers & Vendors"]</h6>
+                        <small class="text-muted">@(Loc.IsArabic ? "مفروزين حسب تخصصات الصيانة المدعومة (تقنية المعلومات، الأجهزة الطبية، الصيانة العامة)" : "Filtered by supported maintenance teams (IT, Biomedical, General) with common multi-department vendors")</small>
                     </div>
                     @if (ViewBag.CanManageUsers != false)
                     {
                         <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
-                            <i class="fa-solid fa-plus me-1"></i> Add Vendor / Supplier
+                            <i class="fa-solid fa-plus me-1"></i> @Loc["Add Vendor / Supplier"]
                         </button>
                     }
                 </div>
@@ -236,25 +236,25 @@
                     <div class="card-body p-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
                         <div class="btn-group btn-group-sm" role="group" id="supplierDeptFilterGroup">
                             <button type="button" class="btn btn-outline-dark active" onclick="filterSuppliersByDept('ALL', this)">
-                                <i class="fa-solid fa-border-all me-1"></i> All Vendors (@suppliers.Count)
+                                <i class="fa-solid fa-border-all me-1"></i> @Loc["All Vendors"] (@suppliers.Count)
                             </button>
                             <button type="button" class="btn btn-outline-primary" onclick="filterSuppliersByDept('IT', this)">
-                                <i class="fa-solid fa-laptop me-1"></i> IT Support (@suppliers.Count(s => s.SupportsDepartment("IT")))
+                                <i class="fa-solid fa-laptop me-1"></i> @Loc["IT Support"] (@suppliers.Count(s => s.SupportsDepartment("IT")))
                             </button>
                             <button type="button" class="btn btn-outline-info" onclick="filterSuppliersByDept('BIOMEDICAL', this)">
-                                <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical (@suppliers.Count(s => s.SupportsDepartment("BIOMEDICAL")))
+                                <i class="fa-solid fa-heart-pulse me-1"></i> @Loc["Biomedical"] (@suppliers.Count(s => s.SupportsDepartment("BIOMEDICAL")))
                             </button>
                             <button type="button" class="btn btn-outline-warning text-dark" onclick="filterSuppliersByDept('GENERAL', this)">
-                                <i class="fa-solid fa-wrench me-1"></i> General (@suppliers.Count(s => s.SupportsDepartment("GENERAL")))
+                                <i class="fa-solid fa-wrench me-1"></i> @Loc["General"] (@suppliers.Count(s => s.SupportsDepartment("GENERAL")))
                             </button>
                             <button type="button" class="btn btn-outline-success" onclick="filterSuppliersByDept('COMMON', this)">
-                                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Common / Shared (@suppliers.Count(s => !s.DepartmentList.Any() || s.DepartmentList.Count > 1))
+                                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Common / Shared"] (@suppliers.Count(s => !s.DepartmentList.Any() || s.DepartmentList.Count > 1))
                             </button>
                         </div>
 
                         <div class="input-group input-group-sm" style="max-width: 250px;">
                             <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                            <input type="text" id="supplierSearchInput" class="form-control" placeholder="Search vendor name..." onkeyup="filterSupplierTableByKeyword()" />
+                            <input type="text" id="supplierSearchInput" class="form-control" placeholder="@Loc["Search vendor name..."]" onkeyup="filterSupplierTableByKeyword()" />
                         </div>
                     </div>
                 </div>
@@ -264,11 +264,11 @@
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Vendor / Company Name</th>
-                                <th>Service Scope</th>
-                                <th>Authorized Maintenance Departments</th>
-                                <th>Status</th>
-                                <th class="text-end">Action</th>
+                                <th>@Loc["Vendor / Company Name"]</th>
+                                <th>@Loc["Service Scope"]</th>
+                                <th>@Loc["Authorized Maintenance Departments"]</th>
+                                <th>@Loc["Status"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -285,29 +285,29 @@
                                     <td>@s.Id</td>
                                     <td class="fw-semibold">
                                         <i class="fa-solid fa-truck text-muted me-2"></i>
-                                        <span class="supplier-name-cell">@s.Name</span>
+                                        <span class="supplier-name-cell">@s.DisplayName</span>
                                     </td>
-                                    <td><span class="badge bg-light text-dark border">@s.TypeName</span></td>
+                                    <td><span class="badge bg-light text-dark border">@s.DisplayTypeName</span></td>
                                     <td>
                                         @if (!depts.Any())
                                         {
                                             <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                                <i class="fa-solid fa-globe me-1"></i> Common to All Departments
+                                                <i class="fa-solid fa-globe me-1"></i> @Loc["Common to All Departments"]
                                             </span>
                                         }
                                         else
                                         {
                                             @if (depts.Any(d => string.Equals(d, "IT", StringComparison.OrdinalIgnoreCase)))
                                             {
-                                                <span class="badge bg-primary me-1"><i class="fa-solid fa-laptop me-1"></i> IT</span>
+                                                <span class="badge bg-primary me-1"><i class="fa-solid fa-laptop me-1"></i> @Loc["IT"]</span>
                                             }
                                             @if (depts.Any(d => string.Equals(d, "BIOMEDICAL", StringComparison.OrdinalIgnoreCase)))
                                             {
-                                                <span class="badge bg-info text-dark me-1"><i class="fa-solid fa-heart-pulse me-1"></i> Biomedical</span>
+                                                <span class="badge bg-info text-dark me-1"><i class="fa-solid fa-heart-pulse me-1"></i> @Loc["BIOMEDICAL"]</span>
                                             }
                                             @if (depts.Any(d => string.Equals(d, "GENERAL", StringComparison.OrdinalIgnoreCase)))
                                             {
-                                                <span class="badge bg-warning text-dark me-1"><i class="fa-solid fa-wrench me-1"></i> General</span>
+                                                <span class="badge bg-warning text-dark me-1"><i class="fa-solid fa-wrench me-1"></i> @Loc["GENERAL"]</span>
                                             }
                                             @foreach (var extra in depts.Where(d => !string.Equals(d, "IT", StringComparison.OrdinalIgnoreCase) && !string.Equals(d, "BIOMEDICAL", StringComparison.OrdinalIgnoreCase) && !string.Equals(d, "GENERAL", StringComparison.OrdinalIgnoreCase)))
                                             {
@@ -317,7 +317,7 @@
                                     </td>
                                     <td>
                                         <span class="badge @(s.IsActive == true ? "bg-success" : "bg-secondary")">
-                                            @(s.IsActive == true ? "Active Vendor" : "Inactive")
+                                            @(s.IsActive == true ? Loc["Active Vendor"] : Loc["Inactive"])
                                         </span>
                                     </td>
                                     <td class="text-end text-nowrap">
@@ -332,20 +332,20 @@
                                                     data-type="@(s.Type ?? 3)"
                                                     data-departments="@deptsAttr"
                                                     data-isactive="@(s.IsActive == true ? "true" : "false")"
-                                                    title="Edit vendor and department permissions">
-                                                <i class="fa-solid fa-pen-to-square me-1"></i> Edit
+                                                    title="@Loc["Edit"]">
+                                                <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
                                             </button>
                                             <form asp-action="ToggleSupplierStatus" method="post" class="d-inline">
                                                 @Html.AntiForgeryToken()
                                                 <input type="hidden" name="id" value="@s.Id" />
                                                 <button type="submit" class="btn btn-sm @(s.IsActive == true ? "btn-outline-secondary" : "btn-outline-success")">
-                                                    @(s.IsActive == true ? "Deactivate" : "Activate")
+                                                    @(s.IsActive == true ? Loc["Deactivate"] : Loc["Activate"])
                                                 </button>
                                             </form>
                                         }
                                         else
                                         {
-                                            <span class="text-muted small"><i class="fa-solid fa-check text-success me-1"></i> Authorized</span>
+                                            <span class="text-muted small"><i class="fa-solid fa-check text-success me-1"></i> @(Loc.IsArabic ? "مصرح" : "Authorized")</span>
                                         }
                                     </td>
                                 </tr>
@@ -358,9 +358,9 @@
             <!-- 4. Departments Tab -->
             <div class="tab-pane fade @(activeTab == "depts" ? "show active" : "")" id="depts" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="fw-bold mb-0">Hospital Departments</h6>
+                    <h6 class="fw-bold mb-0">@Loc["Hospital Departments"]</h6>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addDeptModal">
-                        <i class="fa-solid fa-plus me-1"></i> Add Department
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Add Department"]
                     </button>
                 </div>
                 <div class="table-responsive">
@@ -368,9 +368,9 @@
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Department Name</th>
-                                <th>Department Head</th>
-                                <th class="text-end">Action</th>
+                                <th>@Loc["Department Name"]</th>
+                                <th>@Loc["Department Head"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -378,14 +378,14 @@
                             {
                                 <tr>
                                     <td>@d.Id</td>
-                                    <td class="fw-semibold">@d.Name</td>
-                                    <td>@(d.HeadUser?.FullName ?? "None assigned")</td>
+                                    <td class="fw-semibold">@d.DisplayName</td>
+                                    <td>@(d.HeadUser?.DisplayFullName ?? Loc["None assigned"])</td>
                                     <td class="text-end">
-                                        <form asp-action="DeleteDepartment" method="post" class="d-inline" onsubmit="return confirm('Remove department @d.Name?');">
+                                        <form asp-action="DeleteDepartment" method="post" class="d-inline" onsubmit="return confirm('@(Loc.IsArabic ? $"هل أنت متأكد من حذف القسم {d.DisplayName}؟" : $"Remove department {d.Name}?")');">
                                             @Html.AntiForgeryToken()
                                             <input type="hidden" name="id" value="@d.Id" />
                                             <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                <i class="fa-solid fa-trash me-1"></i> Remove
+                                                <i class="fa-solid fa-trash me-1"></i> @Loc["Remove"]
                                             </button>
                                         </form>
                                     </td>
@@ -406,51 +406,51 @@
             <form asp-action="CreateUser" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Add Staff / User</h5>
+                    <h5 class="modal-title fw-bold">@Loc["Add User"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
-                        <input type="text" name="FullName" class="form-control" placeholder="e.g. John Doe" required />
+                        <label class="form-label fw-semibold">@Loc["Full Name"] <span class="text-danger">*</span></label>
+                        <input type="text" name="FullName" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: د. محمد أحمد" : "e.g. John Doe")" required />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">PC / Windows Username (for Auto-Login) <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">@Loc["PC / Windows Username"] <span class="text-danger">*</span></label>
                         <input type="text" name="DomainUser" class="form-control font-monospace" placeholder="e.g. @Environment.UserName" required />
                         <div class="form-text small text-muted">
-                            <i class="fa-solid fa-circle-info me-1"></i> Must match the user's computer account name. Auto-login grants instant access when they open the site from their PC.
+                            <i class="fa-solid fa-circle-info me-1"></i> @(Loc.IsArabic ? "يجب أن يتطابق مع اسم حساب ويندوز للكمبيوتر لتسجيل الدخول التلقائي." : "Must match the user's computer account name. Auto-login grants instant access when they open the site from their PC.")
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">System RBAC Role <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">@Loc["System Role"] <span class="text-danger">*</span></label>
                         <select name="Role" id="newRoleSelect" class="form-select" onchange="toggleNewUserTeam()">
-                            <option value="END_USER" selected>END_USER (Standard Staff)</option>
-                            <option value="MAINTENANCE">MAINTENANCE (Assigned Maintenance Team)</option>
-                            <option value="ADMIN">ADMIN (Full System Access)</option>
+                            <option value="END_USER" selected>@(Loc.IsArabic ? "مستخدم عادي (كادر المستشفى)" : "END_USER (Standard Staff)")</option>
+                            <option value="MAINTENANCE">@(Loc.IsArabic ? "مهندس / فني صيانة" : "MAINTENANCE (Assigned Maintenance Team)")</option>
+                            <option value="ADMIN">@(Loc.IsArabic ? "مدير النظام (صلاحيات كاملة)" : "ADMIN (Full System Access)")</option>
                         </select>
                     </div>
                     <div class="mb-3" id="newUserTeamContainer" style="display: none;">
-                        <label class="form-label fw-semibold">Assigned Maintenance Team</label>
+                        <label class="form-label fw-semibold">@Loc["Target Maintenance Team"]</label>
                         <select name="MaintenanceTeam" class="form-select">
-                            <option value="IT" selected>IT</option>
-                            <option value="BIOMEDICAL">BIOMEDICAL</option>
-                            <option value="GENERAL">GENERAL</option>
+                            <option value="IT" selected>@Loc.TargetTeam("IT")</option>
+                            <option value="BIOMEDICAL">@Loc.TargetTeam("BIOMEDICAL")</option>
+                            <option value="GENERAL">@Loc.TargetTeam("GENERAL")</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Department</label>
+                        <label class="form-label fw-semibold">@Loc["Department Name"]</label>
                         <select name="DepartmentId" class="form-select">
-                            <option value="">-- None --</option>
+                            <option value="">-- @(Loc.IsArabic ? "بدون قسم" : "None") --</option>
                             @foreach (var d in departments)
                             {
-                                <option value="@d.Id">@d.Name</option>
+                                <option value="@d.Id">@d.DisplayName</option>
                             }
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save User</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save User"]</button>
                 </div>
             </form>
         </div>
@@ -464,22 +464,22 @@
             <form asp-action="CreateRoom" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Add Room Location</h5>
+                    <h5 class="modal-title fw-bold">@Loc["Add Room"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Room Number</label>
+                        <label class="form-label fw-semibold">@Loc["Room Number"]</label>
                         <input type="number" name="RoomNo" class="form-control" placeholder="e.g. 104" required />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Floor</label>
+                        <label class="form-label fw-semibold">@Loc["Floor"]</label>
                         <input type="number" name="Floor" class="form-control" placeholder="e.g. 1" required />
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Room</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save Room"]</button>
                 </div>
             </form>
         </div>
@@ -493,51 +493,50 @@
             <form asp-action="CreateSupplier" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-fast text-primary me-2"></i> Add Vendor / Supplier</h5>
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-fast text-primary me-2"></i> @Loc["Add Vendor / Supplier"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Company / Vendor Name <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">@Loc["Vendor / Company Name"] <span class="text-danger">*</span></label>
                         <input type="text" name="Name" class="form-control" placeholder="e.g. Siemens Healthineers, Dell Technologies" required />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Service Scope</label>
+                        <label class="form-label fw-semibold">@Loc["Service Scope"]</label>
                         <select name="Type" class="form-select">
-                            <option value="1">Equipment & Items Supply Only</option>
-                            <option value="2">Maintenance & Repair Provider Only</option>
-                            <option value="3" selected>Full Service (Hardware Supply & Maintenance Provider)</option>
+                            <option value="1">@(Loc.IsArabic ? "توريد أجهزة ومعدات فقط" : "Equipment & Items Supply Only")</option>
+                            <option value="2">@(Loc.IsArabic ? "صيانة وإصلاحات فقط" : "Maintenance & Repair Provider Only")</option>
+                            <option value="3" selected>@(Loc.IsArabic ? "خدمات متكاملة (توريد وصيانة)" : "Full Service (Hardware Supply & Maintenance Provider)")</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold d-block">Authorized Maintenance Departments</label>
-                        <div class="form-text small text-muted mb-2">Check the teams that can view and dispatch equipment to this vendor:</div>
+                        <label class="form-label fw-semibold d-block">@Loc["Authorized Maintenance Departments"]</label>
+                        <div class="form-text small text-muted mb-2">@(Loc.IsArabic ? "حدد الأقسام التي يمكنها إرسال الأجهزة لهذا المورد:" : "Check the teams that can view and dispatch equipment to this vendor:")</div>
                         <div class="d-flex flex-column gap-2 p-3 border rounded bg-light">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="IT" id="addDeptIT" checked>
                                 <label class="form-check-label fw-semibold text-primary" for="addDeptIT">
-                                    <i class="fa-solid fa-laptop me-1"></i> IT Hardware, Laptops, PCs & Servers
+                                    <i class="fa-solid fa-laptop me-1"></i> @Loc["IT Support"]
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="BIOMEDICAL" id="addDeptBio">
                                 <label class="form-check-label fw-semibold text-info-emphasis" for="addDeptBio">
-                                    <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical & Clinical Hospital Devices
+                                    <i class="fa-solid fa-heart-pulse me-1"></i> @Loc["Biomedical"]
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="GENERAL" id="addDeptGen">
                                 <label class="form-check-label fw-semibold text-warning-emphasis" for="addDeptGen">
-                                    <i class="fa-solid fa-wrench me-1"></i> General Facility Maintenance & Power
+                                    <i class="fa-solid fa-wrench me-1"></i> @Loc["General"]
                                 </label>
                             </div>
                         </div>
-                        <div class="form-text small text-muted mt-1"><i class="fa-solid fa-info-circle me-1"></i> Vendors selected for multiple departments will be available as common vendors.</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Supplier</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save Supplier"]</button>
                 </div>
             </form>
         </div>
@@ -552,57 +551,56 @@
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="id" id="editSupplierId" />
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i> Edit Vendor / Supplier</h5>
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i> @Loc["Edit Vendor / Supplier"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Company / Vendor Name <span class="text-danger">*</span></label>
+                        <label class="form-label fw-semibold">@Loc["Vendor / Company Name"] <span class="text-danger">*</span></label>
                         <input type="text" name="name" id="editSupplierName" class="form-control" required />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Service Scope</label>
+                        <label class="form-label fw-semibold">@Loc["Service Scope"]</label>
                         <select name="type" id="editSupplierType" class="form-select">
-                            <option value="1">Equipment & Items Supply Only</option>
-                            <option value="2">Maintenance & Repair Provider Only</option>
-                            <option value="3">Full Service (Hardware Supply & Maintenance Provider)</option>
+                            <option value="1">@(Loc.IsArabic ? "توريد أجهزة ومعدات فقط" : "Equipment & Items Supply Only")</option>
+                            <option value="2">@(Loc.IsArabic ? "صيانة وإصلاحات فقط" : "Maintenance & Repair Provider Only")</option>
+                            <option value="3">@(Loc.IsArabic ? "خدمات متكاملة (توريد وصيانة)" : "Full Service (Hardware Supply & Maintenance Provider)")</option>
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold d-block">Authorized Maintenance Departments</label>
-                        <div class="form-text small text-muted mb-2">Check the teams that can view and dispatch equipment to this vendor:</div>
+                        <label class="form-label fw-semibold d-block">@Loc["Authorized Maintenance Departments"]</label>
                         <div class="d-flex flex-column gap-2 p-3 border rounded bg-light">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="IT" id="editDeptIT">
                                 <label class="form-check-label fw-semibold text-primary" for="editDeptIT">
-                                    <i class="fa-solid fa-laptop me-1"></i> IT Hardware, Laptops, PCs & Servers
+                                    <i class="fa-solid fa-laptop me-1"></i> @Loc["IT Support"]
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="BIOMEDICAL" id="editDeptBio">
                                 <label class="form-check-label fw-semibold text-info-emphasis" for="editDeptBio">
-                                    <i class="fa-solid fa-heart-pulse me-1"></i> Biomedical & Clinical Hospital Devices
+                                    <i class="fa-solid fa-heart-pulse me-1"></i> @Loc["Biomedical"]
                                 </label>
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="selectedDepartments" value="GENERAL" id="editDeptGen">
                                 <label class="form-check-label fw-semibold text-warning-emphasis" for="editDeptGen">
-                                    <i class="fa-solid fa-wrench me-1"></i> General Facility Maintenance & Power
+                                    <i class="fa-solid fa-wrench me-1"></i> @Loc["General"]
                                 </label>
                             </div>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Vendor Operational Status</label>
+                        <label class="form-label fw-semibold">@Loc["Active Status"]</label>
                         <select name="isActive" id="editSupplierActive" class="form-select">
-                            <option value="true">Active Vendor</option>
-                            <option value="false">Inactive / Suspended</option>
+                            <option value="true">@Loc["Active Vendor"]</option>
+                            <option value="false">@Loc["Inactive"]</option>
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Vendor Changes</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save Vendor Changes"]</button>
                 </div>
             </form>
         </div>
@@ -616,18 +614,18 @@
             <form asp-action="CreateDepartment" method="post">
                 @Html.AntiForgeryToken()
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">Add Department</h5>
+                    <h5 class="modal-title fw-bold">@Loc["Add Department"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">Department Name</label>
+                        <label class="form-label fw-semibold">@Loc["Department Name"]</label>
                         <input type="text" name="Name" class="form-control" placeholder="e.g. Neurology & Stroke Unit" required />
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Department</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save Department"]</button>
                 </div>
             </form>
         </div>
@@ -679,7 +677,6 @@
         }
     }
 
-    // Direct event listener for Bootstrap modal show
     var editModalElement = document.getElementById('editSupplierModal');
     if (editModalElement) {
         editModalElement.addEventListener('show.bs.modal', function (event) {
@@ -696,7 +693,6 @@
         });
     }
 
-    // Delegated click handler as backup
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-edit-supplier');
         if (btn) {
@@ -712,20 +708,16 @@
         }
     });
 
-    // Global function fallback
     window.openEditSupplierModal = function(id, name, type, deptsJson, isActive) {
         populateEditSupplierForm(id, name, type, deptsJson, isActive);
         var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSupplierModal'));
         modal.show();
     };
 
-    // Dynamic Filter for Supplier Table
     var currentSupplierDeptFilter = 'ALL';
 
     function filterSuppliersByDept(dept, btnElement) {
         currentSupplierDeptFilter = dept;
-
-        // Toggle active button style
         if (btnElement) {
             var group = document.getElementById('supplierDeptFilterGroup');
             if (group) {
@@ -734,7 +726,6 @@
                 btnElement.classList.add('active');
             }
         }
-
         applySupplierFilters();
     }
 
@@ -772,7 +763,6 @@
         });
     }
 
-    // Remember active tab when user clicks tabs
     document.querySelectorAll('#dirTabs button[data-bs-toggle="tab"]').forEach(function (tabBtn) {
         tabBtn.addEventListener('shown.bs.tab', function (e) {
             var target = e.target.getAttribute('data-bs-target');
@@ -786,7 +776,6 @@
         });
     });
 
-    // Restore active tab on page load (URL param > hash > localStorage)
     document.addEventListener('DOMContentLoaded', function () {
         var urlParams = new URLSearchParams(window.location.search);
         var tabParam = urlParams.get('tab');

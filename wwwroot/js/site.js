@@ -1,10 +1,13 @@
 /**
  * STOCK & HELPDESK MANAGEMENT PORTAL
  * Interactive Scripts: Modern Top Notifications, Page Transitions & Responsive Autohide Sidebar
+ * Fully localized for English & Arabic (RTL support)
  */
 
 (function () {
     "use strict";
+
+    const isArabic = document.documentElement.dir === "rtl" || document.documentElement.lang === "ar";
 
     /* ==========================================================================
        1. SIDEBAR & AUTOHIDE CONTROLLER (TASK 3)
@@ -129,10 +132,10 @@
             if (icon) {
                 if (collapsed) {
                     icon.className = "fa-solid fa-bars-staggered";
-                    toggleBtn.setAttribute("title", "Pin Sidebar (Ctrl+B)");
+                    toggleBtn.setAttribute("title", isArabic ? "تثبيت الشريط الجانبي (Ctrl+B)" : "Pin Sidebar (Ctrl+B)");
                 } else {
                     icon.className = "fa-solid fa-bars";
-                    toggleBtn.setAttribute("title", "Auto-hide Sidebar (Ctrl+B)");
+                    toggleBtn.setAttribute("title", isArabic ? "إخفاء تلقائي للشريط الجانبي (Ctrl+B)" : "Auto-hide Sidebar (Ctrl+B)");
                 }
             }
         }
@@ -268,27 +271,27 @@
         const notifId = "modern_notif_" + item.id;
         if (document.getElementById(notifId)) return;
 
-        // Classify notification type & styles
+        // Classify notification type & styles with localization
         let cardTypeClass = "type-ticket";
-        let tagText = "Ticket Alert";
+        let tagText = isArabic ? "تنبيه تذكرة" : "Ticket Alert";
         let iconHtml = '<i class="fa-solid fa-ticket"></i>';
 
         const typeLower = (item.type || "").toLowerCase();
         if (typeLower.includes("message") || typeLower.includes("comment")) {
             cardTypeClass = "type-message";
-            tagText = "New Message";
+            tagText = isArabic ? "رسالة جديدة" : "New Message";
             iconHtml = '<i class="fa-solid fa-comments"></i>';
         } else if (typeLower.includes("status")) {
             cardTypeClass = "type-status";
-            tagText = "Status Update";
+            tagText = isArabic ? "تحديث الحالة" : "Status Update";
             iconHtml = '<i class="fa-solid fa-arrows-rotate"></i>';
         } else if (typeLower.includes("urgent") || typeLower.includes("critical")) {
             cardTypeClass = "type-urgent";
-            tagText = "Urgent Notice";
+            tagText = isArabic ? "إشعار عاجل" : "Urgent Notice";
             iconHtml = '<i class="fa-solid fa-triangle-exclamation"></i>';
         } else if (typeLower.includes("success") || typeLower.includes("resolved") || typeLower.includes("closed")) {
             cardTypeClass = "type-success";
-            tagText = "Resolved";
+            tagText = isArabic ? "تم الحل بنجاح" : "Resolved";
             iconHtml = '<i class="fa-solid fa-circle-check"></i>';
         }
 
@@ -298,6 +301,9 @@
         card.setAttribute("role", "alert");
 
         const targetUrl = item.linkUrl || "/Notifications";
+        const openText = isArabic ? "عرض التفاصيل" : "Open Details";
+        const dismissText = isArabic ? "إغلاق" : "Dismiss";
+        const timeAgoText = item.timeAgo || (isArabic ? "الآن" : "Just now");
 
         card.innerHTML = `
             <div class="modern-notif-accent"></div>
@@ -309,19 +315,19 @@
                 <div class="modern-notif-main">
                     <div class="modern-notif-header">
                         <span class="modern-notif-tag">${tagText}</span>
-                        <span class="modern-notif-time"><i class="fa-regular fa-clock me-1"></i>${item.timeAgo || "Just now"}</span>
+                        <span class="modern-notif-time"><i class="fa-regular fa-clock me-1"></i>${timeAgoText}</span>
                     </div>
-                    <div class="modern-notif-title">${item.title || "Notification"}</div>
+                    <div class="modern-notif-title">${item.title || (isArabic ? "إشعار" : "Notification")}</div>
                     <div class="modern-notif-desc">${item.message || ""}</div>
                     <div class="modern-notif-actions">
                         <a href="${targetUrl}" class="modern-notif-btn-open">
-                            <span>Open Details</span>
+                            <span>${openText}</span>
                             <i class="fa-solid fa-arrow-right"></i>
                         </a>
-                        <button type="button" class="modern-notif-btn-dismiss">Dismiss</button>
+                        <button type="button" class="modern-notif-btn-dismiss">${dismissText}</button>
                     </div>
                 </div>
-                <button type="button" class="modern-notif-close-icon" aria-label="Close" title="Dismiss">
+                <button type="button" class="modern-notif-close-icon" aria-label="Close" title="${dismissText}">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -330,7 +336,7 @@
             </div>
         `;
 
-        // Prepend so the newest notification appears on top
+        // Prepend so newest notification appears on top
         if (container.firstChild) {
             container.insertBefore(card, container.firstChild);
         } else {
@@ -374,7 +380,6 @@
 
         if (btnOpen) {
             btnOpen.addEventListener("click", function () {
-                // Mark as read in background when opening
                 markNotificationReadOnServer(item.id);
             });
         }
@@ -461,11 +466,11 @@
     window.showTestNotification = function (customTitle, customMessage, customType) {
         const testItem = {
             id: Date.now(),
-            title: customTitle || "New Service Ticket Assigned",
-            message: customMessage || "Ticket #204 - Emergency CT Scanner Network Port issue has been dispatched to your queue.",
+            title: customTitle || (isArabic ? "تم تعيين تذكرة خدمة جديدة" : "New Service Ticket Assigned"),
+            message: customMessage || (isArabic ? "تم توجيه تذكرة عاجلة لفحص شبكة قسم الأشعة المقطعية إلى فريقك." : "Ticket #204 - Emergency CT Scanner Network Port issue has been dispatched to your queue."),
             type: customType || "TicketStatus",
             linkUrl: "/Tickets",
-            timeAgo: "Just now"
+            timeAgo: isArabic ? "الآن" : "Just now"
         };
         playNotificationChime();
         showModernNotification(testItem);

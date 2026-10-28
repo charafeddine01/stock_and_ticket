@@ -1,23 +1,39 @@
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @inject StockPortal.Data.StockDbContext DbContext
 @inject StockPortal.Services.INotificationService NotificationService
+@inject StockPortal.Services.ILocalizationService Loc
+@{
+    var isArabic = Loc.IsArabic;
+    var currentCulture = Loc.CurrentCulture;
+    var dir = Loc.Direction;
+    var rawTitle = ViewData["Title"]?.ToString() ?? "IT Stock & Helpdesk";
+    var localizedTitle = Loc[rawTitle];
+    var userObj = CurrentUser.GetCurrentUser();
+}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="@currentCulture" dir="@dir">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - IT Stock & Helpdesk Portal</title>
+    <title>@localizedTitle - @Loc["IT Stock & Helpdesk Portal"]</title>
     
-    <!-- Google Fonts: Inter -->
+    <!-- Google Fonts: Inter & Cairo (for Arabic) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Bootstrap 5 & FontAwesome 6 CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap 5 CDN (RTL when Arabic, LTR when English) & FontAwesome 6 -->
+    @if (isArabic)
+    {
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    }
+    else
+    {
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    }
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     
-    <!-- Custom Site Styles, Animations & Autohide Layout -->
+    <!-- Custom Site Styles, Animations, RTL & Autohide Layout -->
     <link rel="stylesheet" href="~/css/site.css" />
     @await RenderSectionAsync("Styles", required: false)
 </head>
@@ -26,7 +42,7 @@
     <div id="pageLoadingBar" class="page-loading-bar"></div>
 
     <!-- Edge Peek Trigger Zone for Desktop Autohide Sidebar -->
-    <div id="sidebarAutohideTrigger" class="sidebar-autohide-trigger" title="Hover to peek sidebar"></div>
+    <div id="sidebarAutohideTrigger" class="sidebar-autohide-trigger" title="@Loc["Auto-hide Sidebar"]"></div>
 
     <!-- Mobile Drawer Backdrop -->
     <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
@@ -37,15 +53,15 @@
             <a href="@Url.Action("Index", "Home")" class="d-flex align-items-center gap-2 text-decoration-none text-white flex-grow-1 overflow-hidden">
                 <i class="fa-solid fa-server"></i>
                 <div class="text-truncate">
-                    <div>Stock & Helpdesk</div>
-                    <div style="font-size: 0.68rem; color: #94a3b8; font-weight: normal;">IT Asset & Service Portal</div>
+                    <div>@Loc["Stock & Helpdesk"]</div>
+                    <div style="font-size: 0.68rem; color: #94a3b8; font-weight: normal;">@Loc["IT Asset & Service Portal"]</div>
                 </div>
             </a>
-            <span class="autohide-indicator">Auto-hide</span>
-            <button id="sidebarPinBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-none d-lg-inline-flex" title="Pin / Auto-hide Sidebar (Ctrl+B)">
-                <i class="fa-solid fa-angles-left"></i>
+            <span class="autohide-indicator">@Loc["Auto-hide"]</span>
+            <button id="sidebarPinBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-none d-lg-inline-flex" title="@Loc["Pin Sidebar"]">
+                <i class="fa-solid @(isArabic ? "fa-angles-right" : "fa-angles-left")"></i>
             </button>
-            <button id="sidebarCloseBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-lg-none" title="Close Sidebar">
+            <button id="sidebarCloseBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-lg-none" title="@Loc["Close Sidebar"]">
                 <i class="fa-solid fa-xmark fs-5"></i>
             </button>
         </div>
@@ -69,10 +85,10 @@
                 }
                 else if (CurrentUser.IsEndUser())
                 {
-                    var userObj = CurrentUser.GetCurrentUser();
-                    if (userObj?.DepartmentId != null)
+                    var uObj = CurrentUser.GetCurrentUser();
+                    if (uObj?.DepartmentId != null)
                     {
-                        ticketsQuery = ticketsQuery.Where(t => t.OpenedByUser != null && t.OpenedByUser.DepartmentId == userObj.DepartmentId);
+                        ticketsQuery = ticketsQuery.Where(t => t.OpenedByUser != null && t.OpenedByUser.DepartmentId == uObj.DepartmentId);
                     }
                     else
                     {
@@ -104,17 +120,17 @@
         <ul class="sidebar-nav">
             @if (CurrentUser.IsAdmin())
             {
-                <li class="nav-category">Operations</li>
+                <li class="nav-category">@Loc["Operations"]</li>
                 <li>
                     <a href="@Url.Action("Index", "Home")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Home" ? "active" : "")">
                         <i class="fa-solid fa-chart-pie"></i>
-                        <span>Dashboard</span>
+                        <span>@Loc["Dashboard"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell"></i>
-                        <span class="flex-grow-1">Notifications</span>
+                        <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
                         {
                             <span class="badge bg-danger rounded-pill badge-pulse" style="font-size: 0.7rem;">@unreadNotifsCount</span>
@@ -124,13 +140,13 @@
                 <li>
                     <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
-                        <span>Stock & Assets</span>
+                        <span>@Loc["Stock & Assets"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-ticket"></i>
-                        <span class="flex-grow-1">Tickets & Helpdesk</span>
+                        <span class="flex-grow-1">@Loc["Tickets & Helpdesk"]</span>
                         @if (openTicketsCount > 0)
                         {
                             <span class="badge bg-danger rounded-pill badge-pulse" style="font-size: 0.7rem;">@openTicketsCount</span>
@@ -140,7 +156,7 @@
                 <li>
                     <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Maintenance" ? "active" : "")">
                         <i class="fa-solid fa-screwdriver-wrench"></i>
-                        <span class="flex-grow-1">Maintenance</span>
+                        <span class="flex-grow-1">@Loc["Maintenance"]</span>
                         @if (overdueMaintCount > 0)
                         {
                             <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;">@overdueMaintCount</span>
@@ -148,33 +164,33 @@
                     </a>
                 </li>
 
-                <li class="nav-category mt-3">Administration</li>
+                <li class="nav-category mt-3">@Loc["Administration"]</li>
                 <li>
                     <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "DeviceForms" ? "active" : "")">
                         <i class="fa-solid fa-shapes"></i>
-                        <span>Device Forms & Templates</span>
+                        <span>@Loc["Device Forms & Templates"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Index", "Directory")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Directory" ? "active" : "")">
                         <i class="fa-solid fa-sitemap"></i>
-                        <span>Master Directory & RBAC</span>
+                        <span>@Loc["Master Directory & RBAC"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
                         <i class="fa-solid fa-user-circle"></i>
-                        <span>My Domain Profile</span>
+                        <span>@Loc["My Domain Profile"]</span>
                     </a>
                 </li>
             }
             else if (CurrentUser.IsMaintenance())
             {
-                <li class="nav-category">Engineering Queue</li>
+                <li class="nav-category">@Loc["Engineering Queue"]</li>
                 <li>
                     <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell text-warning"></i>
-                        <span class="flex-grow-1">Notifications</span>
+                        <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
                         {
                             <span class="badge bg-danger rounded-pill badge-pulse" style="font-size: 0.7rem;">@unreadNotifsCount</span>
@@ -184,7 +200,7 @@
                 <li>
                     <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-users-gear text-info"></i>
-                        <span class="flex-grow-1">@CurrentUser.GetMaintenanceTeam() Queue</span>
+                        <span class="flex-grow-1">@(isArabic ? $"قائمة {Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}" : $"{CurrentUser.GetMaintenanceTeam()} Queue")</span>
                         @if (openTicketsCount > 0)
                         {
                             <span class="badge bg-danger rounded-pill badge-pulse" style="font-size: 0.7rem;">@openTicketsCount</span>
@@ -194,13 +210,13 @@
                 <li>
                     <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
-                        <span>Hospital Assets</span>
+                        <span>@Loc["Hospital Assets"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Maintenance" ? "active" : "")">
                         <i class="fa-solid fa-screwdriver-wrench"></i>
-                        <span class="flex-grow-1">Maintenance Logs</span>
+                        <span class="flex-grow-1">@Loc["Maintenance Logs"]</span>
                         @if (overdueMaintCount > 0)
                         {
                             <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;">@overdueMaintCount</span>
@@ -210,25 +226,25 @@
                 <li>
                     <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "DeviceForms" ? "active" : "")">
                         <i class="fa-solid fa-shapes text-warning"></i>
-                        <span>Device Forms & Specs</span>
+                        <span>@Loc["Device Forms & Specs"]</span>
                     </a>
                 </li>
 
-                <li class="nav-category mt-3">Account</li>
+                <li class="nav-category mt-3">@Loc["Account"]</li>
                 <li>
                     <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
                         <i class="fa-solid fa-user-circle"></i>
-                        <span>My Domain Profile</span>
+                        <span>@Loc["My Domain Profile"]</span>
                     </a>
                 </li>
             }
             else
             {
-                <li class="nav-category">My Workspace</li>
+                <li class="nav-category">@Loc["My Workspace"]</li>
                 <li>
                     <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell text-warning"></i>
-                        <span class="flex-grow-1">Notifications</span>
+                        <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
                         {
                             <span class="badge bg-danger rounded-pill badge-pulse" style="font-size: 0.7rem;">@unreadNotifsCount</span>
@@ -238,27 +254,27 @@
                 <li>
                     <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-laptop text-primary"></i>
-                        <span>My Equipment</span>
+                        <span>@Loc["My Equipment"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-ticket text-info"></i>
-                        <span>My Service Tickets</span>
+                        <span>@Loc["My Service Tickets"]</span>
                     </a>
                 </li>
                 <li>
                     <a href="@Url.Action("Create", "Tickets")" class="nav-link">
                         <i class="fa-solid fa-plus-circle text-success"></i>
-                        <span>Open New Ticket</span>
+                        <span>@Loc["Open New Ticket"]</span>
                     </a>
                 </li>
 
-                <li class="nav-category mt-3">Account</li>
+                <li class="nav-category mt-3">@Loc["Account"]</li>
                 <li>
                     <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
                         <i class="fa-solid fa-user-circle"></i>
-                        <span>My Domain Profile</span>
+                        <span>@Loc["My Domain Profile"]</span>
                     </a>
                 </li>
             }
@@ -268,13 +284,13 @@
         <a href="@Url.Action("Profile", "Account")" class="sidebar-user-badge text-decoration-none">
             <div class="d-flex align-items-center gap-2">
                 <div style="width: 36px; height: 36px; background: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #ffffff; font-size: 0.9rem; flex-shrink: 0;">
-                    @(CurrentUser.GetFullName().Substring(0, 1))
+                    @((userObj?.DisplayFullName ?? CurrentUser.GetFullName()).Substring(0, 1))
                 </div>
                 <div class="overflow-hidden">
-                    <div class="text-white text-truncate fw-semibold" style="font-size: 0.85rem;">@CurrentUser.GetFullName()</div>
+                    <div class="text-white text-truncate fw-semibold" style="font-size: 0.85rem;">@(userObj?.DisplayFullName ?? CurrentUser.GetFullName())</div>
                     <div class="text-info text-truncate d-flex align-items-center gap-1" style="font-size: 0.72rem;">
                         <i class="fa-solid fa-shield-halved" style="font-size: 0.65rem;"></i>
-                        <span>@(CurrentUser.IsMaintenance() ? $"MAINTENANCE ({CurrentUser.GetMaintenanceTeam() ?? "GENERAL"})" : CurrentUser.GetRole())</span>
+                        <span>@(userObj?.DisplayRole ?? (CurrentUser.IsMaintenance() ? $"MAINTENANCE ({CurrentUser.GetMaintenanceTeam() ?? "GENERAL"})" : CurrentUser.GetRole()))</span>
                     </div>
                 </div>
             </div>
@@ -287,15 +303,35 @@
         <header class="top-navbar">
             <div class="d-flex align-items-center gap-2 overflow-hidden">
                 <!-- Sidebar Toggle / Autohide Button -->
-                <button id="sidebarToggleBtn" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" type="button" title="Auto-hide / Toggle Sidebar (Ctrl+B)" aria-label="Toggle navigation">
+                <button id="sidebarToggleBtn" class="btn btn-sm btn-light border d-flex align-items-center justify-content-center" type="button" title="@Loc["Auto-hide Sidebar"] (Ctrl+B)" aria-label="Toggle navigation">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <h5 class="mb-0 fw-bold page-header-title text-truncate">@ViewData["Title"]</h5>
+                <h5 class="mb-0 fw-bold page-header-title text-truncate">@localizedTitle</h5>
             </div>
             
             <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <!-- Language Switcher Toggle Button -->
+                @if (isArabic)
+                {
+                    <a href="@Url.Action("SetLanguage", "Language", new { culture = "en", returnUrl = Context.Request.Path + Context.Request.QueryString })" 
+                       class="btn btn-sm language-toggle-btn d-flex align-items-center gap-1 shadow-sm rounded-pill px-2 py-1" 
+                       title="Switch language to English">
+                        <i class="fa-solid fa-globe text-primary"></i>
+                        <span>English</span>
+                    </a>
+                }
+                else
+                {
+                    <a href="@Url.Action("SetLanguage", "Language", new { culture = "ar", returnUrl = Context.Request.Path + Context.Request.QueryString })" 
+                       class="btn btn-sm language-toggle-btn d-flex align-items-center gap-1 shadow-sm rounded-pill px-2 py-1" 
+                       title="التحويل إلى اللغة العربية">
+                        <i class="fa-solid fa-globe text-success"></i>
+                        <span>العربية</span>
+                    </a>
+                }
+
                 <!-- Notifications Bell Icon -->
-                <a href="@Url.Action("Index", "Notifications")" id="navNotificationsLink" class="btn btn-sm btn-light border position-relative" title="Notifications">
+                <a href="@Url.Action("Index", "Notifications")" id="navNotificationsLink" class="btn btn-sm btn-light border position-relative" title="@Loc["Notifications"]">
                     <i class="fa-solid fa-bell text-secondary"></i>
                     @if (unreadNotifsCount > 0)
                     {
@@ -309,37 +345,37 @@
                 <div class="dropdown">
                     <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                         <span class="badge bg-success rounded-circle p-1" style="width: 8px; height: 8px;"></span>
-                        <span class="fw-semibold text-truncate d-none d-sm-inline" style="max-width: 140px;">@CurrentUser.GetFullName()</span>
+                        <span class="fw-semibold text-truncate d-none d-sm-inline" style="max-width: 140px;">@(userObj?.DisplayFullName ?? CurrentUser.GetFullName())</span>
                         <span class="text-muted small d-none d-md-inline">(@CurrentUser.GetDomainUser())</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                        <li><h6 class="dropdown-header">Windows Domain SSO</h6></li>
+                        <li><h6 class="dropdown-header">@Loc["Windows Domain SSO"]</h6></li>
                         <li>
                             <div class="px-3 py-1 text-muted small">
-                                <div>Domain: <strong>@Environment.UserDomainName</strong></div>
-                                <div>User: <strong>@CurrentUser.GetDomainUser()</strong></div>
-                                <div>Role: <strong>@(CurrentUser.IsMaintenance() ? $"MAINTENANCE ({CurrentUser.GetMaintenanceTeam() ?? "GENERAL"})" : CurrentUser.GetRole())</strong></div>
+                                <div>@Loc["Host"]: <strong>@Environment.UserDomainName</strong></div>
+                                <div>@Loc["Username / Domain"]: <strong>@CurrentUser.GetDomainUser()</strong></div>
+                                <div>@Loc["Role / Title"]: <strong>@(userObj?.DisplayRole ?? CurrentUser.GetRole())</strong></div>
                                 @if (CurrentUser.IsMaintenance())
                                 {
-                                    <div>Team: <strong>@(CurrentUser.GetMaintenanceTeam() ?? "GENERAL")</strong></div>
+                                    <div>@Loc["Target Maintenance Team"]: <strong>@Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())</strong></div>
                                 }
                             </div>
                         </li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-user me-2 text-primary"></i> My Profile & Equipment</a></li>
-                        <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-users me-2 text-warning"></i> Switch User (Testing)</a></li>
+                        <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-user me-2 text-primary"></i> @Loc["My Profile & Equipment"]</a></li>
+                        <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-users me-2 text-warning"></i> @Loc["Switch User (Testing)"]</a></li>
                     </ul>
                 </div>
 
-                <a href="@Url.Action("Create", "Tickets")" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1" title="Open New Ticket">
+                <a href="@Url.Action("Create", "Tickets")" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1" title="@Loc["New Ticket"]">
                     <i class="fa-solid fa-plus"></i>
-                    <span class="top-navbar-btn-text d-none d-sm-inline">New Ticket</span>
+                    <span class="top-navbar-btn-text d-none d-sm-inline">@Loc["New Ticket"]</span>
                 </a>
                 @if (CurrentUser.CanManageAssets())
                 {
-                    <a href="@Url.Action("Create", "Assets")" class="btn btn-primary btn-sm d-flex align-items-center gap-1" title="Register New Asset">
+                    <a href="@Url.Action("Create", "Assets")" class="btn btn-primary btn-sm d-flex align-items-center gap-1" title="@Loc["Add Asset"]">
                         <i class="fa-solid fa-plus"></i>
-                        <span class="top-navbar-btn-text d-none d-sm-inline">Add Asset</span>
+                        <span class="top-navbar-btn-text d-none d-sm-inline">@Loc["Add Asset"]</span>
                     </a>
                 }
             </div>
@@ -351,7 +387,7 @@
             {
                 <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 mb-3 shadow-sm border-0" role="alert">
                     <i class="fa-solid fa-circle-check fs-5 text-success"></i>
-                    <div>@TempData["SuccessMessage"]</div>
+                    <div>@Loc[TempData["SuccessMessage"]?.ToString() ?? ""]</div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             }
@@ -359,7 +395,7 @@
             {
                 <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 mb-3 shadow-sm border-0" role="alert">
                     <i class="fa-solid fa-circle-exclamation fs-5 text-danger"></i>
-                    <div>@TempData["ErrorMessage"]</div>
+                    <div>@Loc[TempData["ErrorMessage"]?.ToString() ?? ""]</div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             }
@@ -373,10 +409,10 @@
         <!-- Footer -->
         <footer class="portal-footer d-flex justify-content-between align-items-center">
             <div>
-                &copy; 2026 <strong>Stock & Helpdesk Management System</strong> &bull; MariaDB Database: <code>stock</code>
+                &copy; 2026 <strong>@Loc["Stock & Helpdesk Management System"]</strong> &bull; MariaDB Database: <code>stock</code>
             </div>
             <div class="text-muted small">
-                Windows Domain Authentication Active &bull; Host: <code>@Environment.MachineName</code>
+                @Loc["Windows Domain Authentication Active"] &bull; @Loc["Host"]: <code>@Environment.MachineName</code>
             </div>
         </footer>
     </div>

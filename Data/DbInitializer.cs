@@ -11,6 +11,9 @@ namespace StockPortal.Data
         {
             context.Database.EnsureCreated();
 
+            // Ensure Arabic columns exist before any LINQ queries on entities execute
+            EnsureArabicSchema(context);
+
             // Ensure notifications table exists
             try
             {
@@ -643,6 +646,188 @@ namespace StockPortal.Data
                 context.DeviceForms.AddRange(templates);
                 context.SaveChanges();
             }
+
+            // Seed Arabic localization values in database
+            EnsureArabicSeedData(context);
+        }
+
+        private static void EnsureArabicSchema(StockDbContext context)
+        {
+            var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+            try
+            {
+                if (isSqlite)
+                {
+                    TryExecuteSql(context, "ALTER TABLE departments ADD COLUMN name_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE ticket_status ADD COLUMN status_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE custody_type ADD COLUMN type_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN name_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN full_name_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN role_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE rooms ADD COLUMN room_name_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN equipment_type_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN status_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN title_ar TEXT NULL;");
+                }
+                else
+                {
+                    TryExecuteSql(context, "ALTER TABLE `departments` ADD COLUMN IF NOT EXISTS `name_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `ticket_status` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `custody_type` ADD COLUMN IF NOT EXISTS `type_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `name_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `full_name_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `role_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `rooms` ADD COLUMN IF NOT EXISTS `room_name_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `equipment_type_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `title_ar` varchar(255) NULL;");
+                }
+            }
+            catch {}
+        }
+
+        private static void EnsureArabicSeedData(StockDbContext context)
+        {
+
+            // Populate Arabic names for ticket_status
+            try
+            {
+                var tsMap = new System.Collections.Generic.Dictionary<int, string>
+                {
+                    [1] = "مفتوحة",
+                    [2] = "قيد الإجراء",
+                    [3] = "مؤجلة",
+                    [4] = "ملغاة",
+                    [5] = "مغلقة",
+                    [6] = "في الصيانة"
+                };
+                foreach (var ts in context.TicketStatuses.ToList())
+                {
+                    if (string.IsNullOrEmpty(ts.StatusAr) && tsMap.ContainsKey(ts.Id))
+                    {
+                        ts.StatusAr = tsMap[ts.Id];
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+
+            // Populate Arabic names for custody_type
+            try
+            {
+                var ctMap = new System.Collections.Generic.Dictionary<int, string>
+                {
+                    [1] = "عهدة شخصية",
+                    [2] = "عهدة مشتركة",
+                    [3] = "صيانة خارجية / المورد"
+                };
+                foreach (var ct in context.CustodyTypes.ToList())
+                {
+                    if (string.IsNullOrEmpty(ct.TypeAr) && ctMap.ContainsKey(ct.Id))
+                    {
+                        ct.TypeAr = ctMap[ct.Id];
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+
+            // Populate Arabic names for departments
+            try
+            {
+                var deptMap = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Information Technology"] = "تقنية المعلومات",
+                    ["Radiology & Imaging"] = "الأشعة والتصوير الطبي",
+                    ["Cardiology"] = "أمراض وجراحة القلب",
+                    ["Biomedical Engineering"] = "الهندسة الطبية الحيوية",
+                    ["Hospital Administration"] = "إدارة المستشفى العامة"
+                };
+                foreach (var d in context.Departments.ToList())
+                {
+                    if (string.IsNullOrEmpty(d.NameAr) && d.Name != null && deptMap.ContainsKey(d.Name))
+                    {
+                        d.NameAr = deptMap[d.Name];
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+
+            // Populate Arabic names for suppliers
+            try
+            {
+                var suppMap = new System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Dell Technologies"] = "ديل للتقنية (Dell)",
+                    ["Philips Healthcare"] = "فيليبس للرعاية الصحية (Philips)",
+                    ["HP Enterprise"] = "إتش بي إنتربرايز (HPE)",
+                    ["Cisco Systems"] = "سيسكو سيستمز (Cisco)",
+                    ["GE Healthcare"] = "جنرال إلكتريك للرعاية الصحية (GE)",
+                    ["Carrier & Facility Engineering"] = "كارير لهندسة المرافق والتبريد"
+                };
+                foreach (var s in context.Suppliers.ToList())
+                {
+                    if (string.IsNullOrEmpty(s.NameAr) && s.Name != null && suppMap.ContainsKey(s.Name))
+                    {
+                        s.NameAr = suppMap[s.Name];
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+
+            // Populate Arabic names for rooms
+            try
+            {
+                var roomMap = new System.Collections.Generic.Dictionary<int, string>
+                {
+                    [101] = "عيادة الاستقبال الفحص 1",
+                    [102] = "عيادة الفحص العام 2",
+                    [105] = "غرفة الخوادم الرئيسية (Data Center)",
+                    [201] = "وحدة العناية المركزة (ICU)",
+                    [301] = "مختبر الأشعة المقطعية (CT Scan)"
+                };
+                foreach (var r in context.Rooms.ToList())
+                {
+                    if (string.IsNullOrEmpty(r.RoomNameAr) && r.RoomNo.HasValue && roomMap.ContainsKey(r.RoomNo.Value))
+                    {
+                        r.RoomNameAr = roomMap[r.RoomNo.Value];
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+
+            // Populate Arabic names for users
+            try
+            {
+                var userMap = new System.Collections.Generic.Dictionary<string, (string NameAr, string RoleAr)>(System.StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Abbas Al-Amiri"] = ("عباس العامري", "مدير تقنية المعلومات ومسؤول النظم الرئيسي"),
+                    ["Ahmed Mansour"] = ("أحمد منصور", "فني دعم ميداني وصيانة"),
+                    ["Dr. Sarah Jenkins"] = ("د. سارة جنكينز", "استشاري أول أمراض القلب"),
+                    ["Dr. Elena Rostova"] = ("د. إيلينا روستوفا", "استشاري الأشعة والتصوير الطبي"),
+                    ["Tariq Ziad"] = ("طارق زياد", "مهندس أجهزة طبية حيوية"),
+                    ["Former Staff"] = ("موظف سابق", "حساب معطل")
+                };
+                foreach (var u in context.Users.ToList())
+                {
+                    if (u.FullName != null && userMap.ContainsKey(u.FullName))
+                    {
+                        var info = userMap[u.FullName];
+                        if (string.IsNullOrEmpty(u.FullNameAr)) u.FullNameAr = info.NameAr;
+                        if (string.IsNullOrEmpty(u.RoleAr)) u.RoleAr = info.RoleAr;
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+        }
+
+        private static void TryExecuteSql(StockDbContext context, string sql)
+        {
+            try { context.Database.ExecuteSqlRaw(sql); } catch {}
         }
     }
 }

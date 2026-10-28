@@ -807,3 +807,108 @@ body {
         scroll-behavior: auto !important;
     }
 }
+
+
+/* ==========================================================================
+   5. RTL (RIGHT-TO-LEFT) & ARABIC TYPOGRAPHY SUPPORT
+   ========================================================================== */
+[dir="rtl"] body {
+    font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    text-align: right;
+}
+
+[dir="rtl"] .sidebar {
+    left: auto;
+    right: 0;
+    box-shadow: -2px 0 12px rgba(0, 0, 0, 0.08);
+}
+
+[dir="rtl"] .main-wrapper {
+    margin-left: 0 !important;
+    margin-right: var(--sidebar-width);
+    transition: margin-right 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[dir="rtl"] .sidebar-autohide-trigger {
+    left: auto;
+    right: 0;
+}
+
+[dir="rtl"] .sidebar-nav .nav-link {
+    gap: 0.85rem;
+}
+
+[dir="rtl"] .sidebar-nav .nav-link:hover {
+    transform: translateX(-3px);
+}
+
+/* RTL Desktop Autohide */
+@media (min-width: 992px) {
+    [dir="rtl"] body.sidebar-collapsed .sidebar {
+        transform: translateX(100%);
+    }
+
+    [dir="rtl"] body.sidebar-collapsed .sidebar.sidebar-peeking,
+    [dir="rtl"] body.sidebar-collapsed .sidebar:hover {
+        transform: translateX(0);
+        box-shadow: -8px 0 32px rgba(15, 23, 42, 0.35);
+    }
+
+    [dir="rtl"] body.sidebar-collapsed .main-wrapper {
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
+/* RTL Mobile Drawer */
+@media (max-width: 991.98px) {
+    [dir="rtl"] .sidebar {
+        transform: translateX(100%);
+    }
+
+    [dir="rtl"] body.sidebar-mobile-show .sidebar {
+        transform: translateX(0);
+        box-shadow: -4px 0 35px rgba(0, 0, 0, 0.4);
+    }
+}
+
+/* RTL Modern Top Notifications */
+[dir="rtl"] .modern-notif-card {
+    text-align: right;
+}
+
+[dir="rtl"] .modern-notif-body {
+    flex-direction: row;
+}
+
+[dir="rtl"] .modern-notif-ping {
+    right: auto;
+    left: -2px;
+}
+
+[dir="rtl"] .modern-notif-btn-open i {
+    transform: rotate(180deg);
+}
+
+[dir="rtl"] .dropdown-menu {
+    text-align: right;
+}
+
+/* Language Toggle Button */
+.language-toggle-btn {
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    border-color: #cbd5e1 !important;
+    background-color: #ffffff;
+    color: #1e293b;
+    text-decoration: none;
+}
+
+.language-toggle-btn:hover {
+    background-color: #f1f5f9;
+    color: #0284c7;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}

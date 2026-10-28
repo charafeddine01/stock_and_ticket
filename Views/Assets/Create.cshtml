@@ -1,7 +1,7 @@
 @model StockPortal.Models.Asset
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
-    ViewData["Title"] = "Register New Equipment";
+    ViewData["Title"] = Loc["Register New Asset"];
     var availableForms = ViewBag.AvailableDeviceForms as List<StockPortal.Models.DeviceForm> ?? new();
     var selectedForm = ViewBag.SelectedDeviceForm as StockPortal.Models.DeviceForm;
 }
@@ -10,7 +10,7 @@
     <div class="col-lg-10">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-box-open text-primary me-2"></i> Register Hospital Equipment Asset</h5>
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-box-open text-primary me-2"></i> @Loc["Register Hospital Equipment Asset"]</h5>
             </div>
             <div class="card-body p-4">
                 <form asp-action="Create" method="post" id="assetCreateForm">
@@ -21,16 +21,16 @@
                     <div class="card bg-light border-primary border-opacity-25 mb-4">
                         <div class="card-body p-3">
                             <label class="form-label fw-bold fs-6 text-dark d-flex justify-content-between align-items-center">
-                                <span><i class="fa-solid fa-shapes text-primary me-2"></i> Select Universal Device Template <span class="text-danger">*</span></span>
+                                <span><i class="fa-solid fa-shapes text-primary me-2"></i> @Loc["Select Universal Device Template"] <span class="text-danger">*</span></span>
                                 @if (CurrentUser.CanManageDeviceForms())
                                 {
                                     <a href="@Url.Action("Index", "DeviceForms")" class="btn btn-sm btn-link text-decoration-none p-0" target="_blank">
-                                        <i class="fa-solid fa-gear me-1"></i> Manage Device Forms
+                                        <i class="fa-solid fa-gear me-1"></i> @Loc["Manage Device Forms"]
                                     </a>
                                 }
                             </label>
                             <select name="deviceFormId" id="deviceFormSelector" class="form-select form-select-lg fw-semibold border-primary" required>
-                                <option value="">-- Choose Equipment Type to Generate Specifications Form --</option>
+                                <option value="">@Loc["Choose Equipment Type to Generate Specifications Form"]</option>
                                 @foreach (var form in availableForms)
                                 {
                                     <option value="@form.Id" 
@@ -38,13 +38,13 @@
                                             data-department="@form.Department" 
                                             data-schema="@form.Form"
                                             selected="@(selectedForm?.Id == form.Id)">
-                                        @form.Name &bull; (@form.Department Maintenance)
+                                        @form.Name &bull; (@Loc.TargetTeam(form.Department))
                                     </option>
                                 }
                             </select>
                             <div class="form-text small mt-1">
                                 <i class="fa-solid fa-circle-info text-primary me-1"></i>
-                                Selecting a device template dynamically builds the technical specifications form and locks maintenance routing.
+                                @(Loc.IsArabic ? "اختيار نموذج الجهاز يبني تلقائياً حقول المواصفات الفنية ويحدد قسم الصيانة المسؤول." : "Selecting a device template dynamically builds the technical specifications form and locks maintenance routing.")
                             </div>
                         </div>
                     </div>
@@ -57,97 +57,97 @@
                         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                             <h6 class="fw-bold mb-0 text-dark">
                                 <i class="fa-solid fa-microchip text-primary me-2"></i> 
-                                <span id="specsHeaderTitle">Technical Specifications Form</span>
+                                <span id="specsHeaderTitle">@Loc["Technical Specifications Form"]</span>
                             </h6>
                             <span class="badge bg-primary text-white" id="specsTeamBadge">
-                                @(selectedForm != null ? $"{selectedForm.Department} Engineering" : "Device Specs")
+                                @(selectedForm != null ? $"{Loc.TargetTeam(selectedForm.Department)}" : Loc["Technical Specifications"])
                             </span>
                         </div>
                         <div class="card-body p-4">
                             <div class="row g-3" id="dynamicFieldsRow">
                                 <div class="col-12 text-center text-muted py-3" id="noTemplateAlert">
-                                    <i class="fa-solid fa-arrow-up text-primary me-1"></i> Please choose a device template above to load its specification fields.
+                                    <i class="fa-solid fa-arrow-up text-primary me-1"></i> @(Loc.IsArabic ? "يرجى اختيار نموذج الجهاز أعلاه لتحميل حقول المواصفات." : "Please choose a device template above to load its specification fields.")
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 3. Hardware Asset Identification -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">3. Identification & Serial Numbers</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Identification & Serial Numbers"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="HospitalNo" class="form-label fw-semibold">Hospital Asset Tag / Tag No <span class="text-danger">*</span></label>
+                            <label asp-for="HospitalNo" class="form-label fw-semibold">@Loc["Hospital Asset Tag / Tag No"] <span class="text-danger">*</span></label>
                             <input asp-for="HospitalNo" class="form-control" placeholder="e.g. HOSP-LAP-025, HOSP-BIO-010" required />
                             <span asp-validation-for="HospitalNo" class="text-danger small"></span>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="SerialNo" class="form-label fw-semibold">Serial Number <span class="text-danger">*</span></label>
+                            <label asp-for="SerialNo" class="form-label fw-semibold">@Loc["Serial Number"] <span class="text-danger">*</span></label>
                             <input asp-for="SerialNo" class="form-control font-monospace" placeholder="e.g. SN-882910-HP" required />
                             <span asp-validation-for="SerialNo" class="text-danger small"></span>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="Brand" class="form-label fw-semibold">Brand / Manufacturer <span class="text-danger">*</span></label>
+                            <label asp-for="Brand" class="form-label fw-semibold">@Loc["Brand / Manufacturer"] <span class="text-danger">*</span></label>
                             <input asp-for="Brand" class="form-control" placeholder="e.g. Dell, HP, Philips, GE, Carrier" required />
                             <span asp-validation-for="Brand" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label asp-for="ModelNo" class="form-label fw-semibold">Model / Version Number</label>
+                            <label asp-for="ModelNo" class="form-label fw-semibold">@Loc["Model / Version"]</label>
                             <input asp-for="ModelNo" class="form-control" placeholder="e.g. 850 or 750" />
                         </div>
                         <div class="col-md-6">
-                            <label asp-for="SupplierId" class="form-label fw-semibold">Vendor / Supplier</label>
+                            <label asp-for="SupplierId" class="form-label fw-semibold">@Loc["Approved Suppliers & Vendors"]</label>
                             <select asp-for="SupplierId" class="form-select" asp-items="ViewBag.Suppliers">
-                                <option value="">-- Select Vendor / Supplier --</option>
+                                <option value="">@(Loc.IsArabic ? "-- اختر المورد / الشركة --" : "-- Select Vendor / Supplier --")</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- 4. Location & Custody -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">4. Initial Custody & Placement</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Initial Custody & Placement"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="UserId" class="form-label fw-semibold">Assigned Staff / Custodian</label>
+                            <label asp-for="UserId" class="form-label fw-semibold">@Loc["Assigned Staff / Custodian"]</label>
                             <select asp-for="UserId" class="form-select" asp-items="ViewBag.Users">
-                                <option value="">-- Central Department Stock (Unassigned) --</option>
+                                <option value="">@(Loc.IsArabic ? "-- المخزن المركزي للقسم (بدون موظف) --" : "-- Central Department Stock (Unassigned) --")</option>
                             </select>
-                            <div class="form-text small">Staff member responsible for custody.</div>
+                            <div class="form-text small">@(Loc.IsArabic ? "الموظف المسؤول عن العهدة." : "Staff member responsible for custody.")</div>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="RoomId" class="form-label fw-semibold">Location / Room <span class="text-danger">*</span></label>
+                            <label asp-for="RoomId" class="form-label fw-semibold">@Loc["Location / Room"] <span class="text-danger">*</span></label>
                             <select asp-for="RoomId" class="form-select" asp-items="ViewBag.Rooms" required>
-                                <option value="">-- Select Room Location --</option>
+                                <option value="">@(Loc.IsArabic ? "-- اختر موقع الغرفة --" : "-- Select Room Location --")</option>
                             </select>
-                            <div class="form-text small">Room or clinical station.</div>
+                            <div class="form-text small">@(Loc.IsArabic ? "الغرفة أو القسم السريري." : "Room or clinical station.")</div>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="CustodyTypeId" class="form-label fw-semibold">Custody Type</label>
+                            <label asp-for="CustodyTypeId" class="form-label fw-semibold">@Loc["Custody Type"]</label>
                             <select asp-for="CustodyTypeId" class="form-select" asp-items="ViewBag.CustodyTypes"></select>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="Status" class="form-label fw-semibold">Operational Status</label>
+                            <label asp-for="Status" class="form-label fw-semibold">@Loc["Operational Status"]</label>
                             <select asp-for="Status" class="form-select">
-                                <option value="In Service" selected>In Service</option>
-                                <option value="In Stock">In Stock (Spare)</option>
-                                <option value="Under Maintenance">Under Maintenance</option>
-                                <option value="Retired">Retired / Scrapped</option>
+                                <option value="In Service" selected>@Loc.Status("In Service")</option>
+                                <option value="In Stock">@Loc.Status("In Stock")</option>
+                                <option value="Under Maintenance">@Loc.Status("Under Maintenance")</option>
+                                <option value="Retired">@Loc.Status("Retired")</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- 5. Commercial, Warranty & Periodic Maintenance -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">5. Purchase, Warranty & Periodic Inspection</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Purchase, Warranty & Periodic Inspection"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="Price" class="form-label fw-semibold">Purchase Price ($)</label>
+                            <label asp-for="Price" class="form-label fw-semibold">@Loc["Purchase Price"] ($)</label>
                             <input asp-for="Price" class="form-control" type="number" step="0.01" placeholder="0.00" />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="BuyingDate" class="form-label fw-semibold">Purchase Date</label>
+                            <label asp-for="BuyingDate" class="form-label fw-semibold">@Loc["Purchase Date"]</label>
                             <input asp-for="BuyingDate" class="form-control" type="date" />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="WarrantyTill" class="form-label fw-semibold">Warranty Expiration</label>
+                            <label asp-for="WarrantyTill" class="form-label fw-semibold">@Loc["Warranty Expiration"]</label>
                             <input asp-for="WarrantyTill" class="form-control" type="date" />
                         </div>
 
@@ -155,20 +155,20 @@
                             <div class="form-check mt-3">
                                 <input type="checkbox" name="NeedsPeriodic" value="true" class="form-check-input" id="chkNeedsPeriodic" @(Model?.NeedsPeriodic == true ? "checked" : "") />
                                 <label class="form-check-label fw-semibold text-dark" for="chkNeedsPeriodic">
-                                    Requires Scheduled Periodic Maintenance (PM)
+                                    @Loc["Requires Periodic Maintenance"]
                                 </label>
                             </div>
                         </div>
                         <div class="col-md-6" id="periodicIntervalContainer" style="display: none;">
-                            <label asp-for="PeriodicInterval" class="form-label fw-semibold">Maintenance Interval (Days)</label>
+                            <label asp-for="PeriodicInterval" class="form-label fw-semibold">@Loc["Interval (Days)"]</label>
                             <input asp-for="PeriodicInterval" class="form-control" type="number" placeholder="e.g. 90 or 180" />
                         </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
                         <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="fa-solid fa-paper-plane me-1"></i> Register Asset
+                            <i class="fa-solid fa-paper-plane me-1"></i> @Loc["Register New Asset"]
                         </button>
                     </div>
                 </form>
@@ -180,6 +180,7 @@
 @section Scripts {
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const isAr = document.documentElement.dir === 'rtl' || document.documentElement.lang.startsWith('ar');
         const selector = document.getElementById("deviceFormSelector");
         const hiddenType = document.getElementById("hiddenAssetType");
         const hiddenTeam = document.getElementById("hiddenMaintenanceTeam");
@@ -202,10 +203,10 @@
         function renderDynamicFields() {
             if (!selector.value) {
                 dynamicRow.innerHTML = `<div class="col-12 text-center text-muted py-3">
-                    <i class="fa-solid fa-arrow-up text-primary me-1"></i> Please choose a device template above to load its specification fields.
+                    <i class="fa-solid fa-arrow-up text-primary me-1"></i> ${isAr ? 'يرجى اختيار نموذج الجهاز أعلاه لتحميل حقول المواصفات.' : 'Please choose a device template above to load its specification fields.'}
                 </div>`;
-                headerTitle.textContent = "Technical Specifications Form";
-                teamBadge.textContent = "Select Device";
+                headerTitle.textContent = isAr ? "نموذج المواصفات الفنية" : "Technical Specifications Form";
+                teamBadge.textContent = isAr ? "اختر الجهاز" : "Select Device";
                 return;
             }
 
@@ -216,8 +217,8 @@
 
             hiddenType.value = name;
             hiddenTeam.value = dept;
-            headerTitle.textContent = `${name} Technical Specifications`;
-            teamBadge.textContent = `${dept} Maintenance`;
+            headerTitle.textContent = isAr ? `المواصفات الفنية لـ ${name}` : `${name} Technical Specifications`;
+            teamBadge.textContent = `${dept}`;
 
             let fields = [];
             try {
@@ -229,7 +230,7 @@
             dynamicRow.innerHTML = "";
 
             if (fields.length === 0) {
-                dynamicRow.innerHTML = `<div class="col-12 text-muted fst-italic">No custom fields defined in this template.</div>`;
+                dynamicRow.innerHTML = `<div class="col-12 text-muted fst-italic">${isAr ? 'لا توجد حقول مخصصة محددة في هذا القالب.' : 'No custom fields defined in this template.'}</div>`;
                 return;
             }
 
@@ -251,7 +252,7 @@
 
                     const placeholderOpt = document.createElement("option");
                     placeholderOpt.value = "";
-                    placeholderOpt.textContent = `-- Select ${f.label || f.name} --`;
+                    placeholderOpt.textContent = isAr ? `-- اختر ${f.label || f.name} --` : `-- Select ${f.label || f.name} --`;
                     inputEl.appendChild(placeholderOpt);
 
                     (f.options || []).forEach(optVal => {
@@ -283,7 +284,6 @@
 
         selector.addEventListener("change", renderDynamicFields);
 
-        // Run on initial page load if pre-selected
         if (selector.value) {
             renderDynamicFields();
         }

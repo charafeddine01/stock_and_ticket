@@ -1,6 +1,6 @@
 @model StockPortal.Models.AssetMaintenance
 @{
-    ViewData["Title"] = "Send Asset to Maintenance";
+    ViewData["Title"] = Loc["Send Asset to Maintenance (Work Order)"];
 }
 
 <div class="row justify-content-center">
@@ -10,12 +10,12 @@
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <h5 class="mb-0 fw-bold text-dark">
-                            <i class="fa-solid fa-truck-ramp-box text-warning me-2"></i> Send Asset to Maintenance (Work Order)
+                            <i class="fa-solid fa-truck-ramp-box text-warning me-2"></i> @Loc["Send Asset to Maintenance (Work Order)"]
                         </h5>
-                        <small class="text-muted">Dispatch hardware to an external vendor / contractor and transfer custody to the supplier</small>
+                        <small class="text-muted">@(Loc.IsArabic ? "إرسال الأصل إلى مورد أو متعهد خارجي ونقل العهدة إليه مؤقتاً" : "Dispatch hardware to an external vendor / contractor and transfer custody to the supplier")</small>
                     </div>
                     <span class="badge bg-warning text-dark px-3 py-2">
-                        <i class="fa-solid fa-shield-halved me-1"></i> Phase 1: Dispatch
+                        <i class="fa-solid fa-shield-halved me-1"></i> @Loc["Phase 1: Dispatch"]
                     </span>
                 </div>
             </div>
@@ -24,9 +24,8 @@
                 <div class="alert alert-info border-0 shadow-sm d-flex gap-2 align-items-center mb-4">
                     <i class="fa-solid fa-circle-info fs-4 text-info"></i>
                     <div>
-                        <strong>Maintenance Custody Lifecycle:</strong>
-                        Sending an asset to a supplier changes its operational status to <strong>Under Maintenance</strong> and transfers custody to the supplier.
-                        You will describe the issue now; after the asset returns from the supplier, you will record replaced parts in dynamic JSON format and reassign custody back to Central Stock or directly to a user.
+                        <strong>@(Loc.IsArabic ? "دورة عهدة الصيانة:" : "Maintenance Custody Lifecycle:")</strong>
+                        @(Loc.IsArabic ? "إرسال الأصل إلى المورد يغير حالته التشغيلية إلى 'قيد الصيانة' وينقل العهدة إلى المورد. قم بوصف العطل الآن، وعند عودة الجهاز، ستسجل قطع الغيار المستبدلة بصيغة JSON وتعيد إسناد العهدة." : "Sending an asset to a supplier changes its operational status to Under Maintenance and transfers custody to the supplier. You will describe the issue now; after the asset returns from the supplier, you will record replaced parts in dynamic JSON format and reassign custody back to Central Stock or directly to a user.")
                     </div>
                 </div>
 
@@ -35,7 +34,7 @@
                     @if (!ViewData.ModelState.IsValid)
                     {
                         <div class="alert alert-danger border-0 shadow-sm mb-3">
-                            <h6 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> Cannot Dispatch Equipment:</h6>
+                            <h6 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation me-1"></i> @(Loc.IsArabic ? "تعذر إرسال الجهاز:" : "Cannot Dispatch Equipment:")</h6>
                             <ul class="mb-0 ps-3">
                                 @foreach (var modelError in ViewData.ModelState.Values.SelectMany(v => v.Errors))
                                 {
@@ -48,9 +47,9 @@
                     <div class="row g-3">
                         <!-- 1. Equipment Selection -->
                         <div class="col-md-12">
-                            <label class="form-label fw-bold">Target Equipment / Asset <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">@Loc["Target Hardware Asset"] <span class="text-danger">*</span></label>
                             <select name="assetId" id="assetSelect" class="form-select form-select-lg" required onchange="filterSuppliersByAssetTeam()">
-                                <option value="">-- Select Asset to Send to Maintenance --</option>
+                                <option value="">@(Loc.IsArabic ? "-- اختر الأصل لإرساله إلى الصيانة --" : "-- Select Asset to Send to Maintenance --")</option>
                                 @if (ViewBag.AssetsList != null)
                                 {
                                     foreach (var a in (List<StockPortal.ViewModels.AssetDropdownItem>)ViewBag.AssetsList)
@@ -68,21 +67,21 @@
                                     }
                                 }
                             </select>
-                            <div class="form-text small">Only equipment in your authorized maintenance department is listed.</div>
+                            <div class="form-text small">@(Loc.IsArabic ? "يتم عرض الأجهزة التابعة لقسم الصيانة المصرح لك به فقط." : "Only equipment in your authorized maintenance department is listed.")</div>
                         </div>
 
                         <!-- 2. Supplier & Maintenance Type -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">External Supplier / Maintenance Vendor <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">@Loc["Approved Suppliers & Vendors"] <span class="text-danger">*</span></label>
                             <select name="supplierId" id="supplierSelect" class="form-select" required>
-                                <option value="">-- Select Maintenance Contractor / Vendor --</option>
+                                <option value="">@(Loc.IsArabic ? "-- اختر المورد / شركة الصيانة --" : "-- Select Maintenance Contractor / Vendor --")</option>
                                 @if (ViewBag.AllSuppliers != null)
                                 {
                                     foreach (var s in (List<StockPortal.Models.Supplier>)ViewBag.AllSuppliers)
                                     {
                                         string depts = string.IsNullOrWhiteSpace(s.Departments) ? "[]" : s.Departments;
                                         <option value="@s.Id" data-departments='@depts' selected="@(Model.SupplierId == s.Id)">
-                                            @s.Name (@s.TypeName)
+                                            @s.DisplayName (@s.DisplayTypeName)
                                         </option>
                                     }
                                 }
@@ -95,49 +94,49 @@
                                 }
                             </select>
                             <div class="form-text small" id="supplierFilterNote">
-                                <i class="fa-solid fa-filter me-1 text-primary"></i> Only authorized vendors that service this asset's department will be listed.
+                                <i class="fa-solid fa-filter me-1 text-primary"></i> @(Loc.IsArabic ? "سيتم عرض الموردين المعتمدين لخدمة هذا القسم فقط." : "Only authorized vendors that service this asset's department will be listed.")
                             </div>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Maintenance Classification</label>
+                            <label class="form-label fw-bold">@Loc["Service Scope"]</label>
                             <select name="maintenanceType" class="form-select">
-                                <option value="1" selected>Breakdown / Corrective Repair</option>
-                                <option value="3">Supplier Warranty Service</option>
-                                <option value="2">Scheduled Periodic Overhaul / Calibration</option>
-                                <option value="4">External Certification & Safety Check</option>
+                                <option value="1" selected>@(Loc.IsArabic ? "إصلاح عطل طارئ / علاجي" : "Breakdown / Corrective Repair")</option>
+                                <option value="3">@(Loc.IsArabic ? "صيانة تحت ضمان المورد" : "Supplier Warranty Service")</option>
+                                <option value="2">@(Loc.IsArabic ? "عمرة دورية / معايرة شاملة" : "Scheduled Periodic Overhaul / Calibration")</option>
+                                <option value="4">@(Loc.IsArabic ? "فحص سلامة وشهادة اعتماد خارجية" : "External Certification & Safety Check")</option>
                             </select>
                         </div>
 
                         <!-- 3. Sent Date & Responsible Technician -->
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Dispatch / Sent Date <span class="text-danger">*</span></label>
+                            <label class="form-label fw-bold">@Loc["Sent to Maintenance Date"] <span class="text-danger">*</span></label>
                             <input type="datetime-local" name="sentDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Responsible Hospital Technician</label>
+                            <label class="form-label fw-bold">@Loc["Assigned Technician"]</label>
                             <select name="technicianId" class="form-select" asp-items="ViewBag.Technicians">
                             </select>
                         </div>
 
                         <!-- 4. Linked Helpdesk Ticket -->
                         <div class="col-md-12">
-                            <label class="form-label fw-bold">Link to Helpdesk Ticket (Optional)</label>
+                            <label class="form-label fw-bold">@(Loc.IsArabic ? "ربط بتذكرة دعم فني (اختياري)" : "Link to Helpdesk Ticket (Optional)")</label>
                             <select name="ticketId" class="form-select" asp-items="ViewBag.Tickets">
-                                <option value="">-- No Linked Ticket (Standalone Maintenance) --</option>
+                                <option value="">@(Loc.IsArabic ? "-- بدون تذكرة مرتبطة (صيانة مستقلة) --" : "-- No Linked Ticket (Standalone Maintenance) --")</option>
                             </select>
                             <div class="form-text small">
-                                <i class="fa-solid fa-link text-primary me-1"></i> Linking a ticket will automatically update its status to <strong>Under Maintenance</strong> and log a telemetry event in the ticket thread.
+                                <i class="fa-solid fa-link text-primary me-1"></i> @(Loc.IsArabic ? "ربط التذكرة سيحدث حالتها تلقائياً إلى 'قيد الصيانة' ويسجل حركة في محادثة التذكرة." : "Linking a ticket will automatically update its status to Under Maintenance and log a telemetry event in the ticket thread.")
                             </div>
                         </div>
 
                         <!-- 5. Issue Description -->
                         <div class="col-md-12">
-                            <label class="form-label fw-bold">Issue Description & Failure Diagnostics (Before Sending) <span class="text-danger">*</span></label>
-                            <textarea name="description" class="form-control" rows="4" placeholder="Detail hardware fault symptoms, error codes, failed diagnostic tests, or vendor scope of work required..." required></textarea>
+                            <label class="form-label fw-bold">@Loc["Issue Description & Symptoms"] <span class="text-danger">*</span></label>
+                            <textarea name="description" class="form-control" rows="4" placeholder="@(Loc.IsArabic ? "اشرح أعراض العطل، رموز الخطأ، الفحوصات الفاشلة، أو نطاق عمل المورد المطلوب..." : "Detail hardware fault symptoms, error codes, failed diagnostic tests, or vendor scope of work required...")" required></textarea>
                             <div class="form-text small">
-                                State clearly why the item is being sent out. Replaced parts and work resolutions will be documented upon return.
+                                @(Loc.IsArabic ? "وضح سبب إرسال الأصل. سيتم توثيق قطع الغيار المستبدلة والحل عند عودة الجهاز." : "State clearly why the item is being sent out. Replaced parts and work resolutions will be documented upon return.")
                             </div>
                         </div>
                     </div>
@@ -145,17 +144,17 @@
                     <div class="card bg-light border p-3 mt-4">
                         <div class="d-flex align-items-center gap-2 text-warning-emphasis fw-semibold">
                             <i class="fa-solid fa-arrow-right-arrow-left"></i>
-                            <span>Custody Impact:</span>
+                            <span>@(Loc.IsArabic ? "تأثير حركة العهدة:" : "Custody Impact:")</span>
                         </div>
                         <div class="small text-muted mt-1">
-                            Current user/stock custody will be marked as returned, and an active custody record will be opened for the chosen Supplier.
+                            @(Loc.IsArabic ? "سيتم إغلاق عهدة المستخدم / المخزن الحالية، وفتح سجل عهدة نشط باسم المورد المختار." : "Current user/stock custody will be marked as returned, and an active custody record will be opened for the chosen Supplier.")
                         </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-4 mt-4">
-                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary px-4">Cancel</a>
+                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary px-4">@Loc["Cancel"]</a>
                         <button type="submit" class="btn btn-warning text-dark fw-bold px-4">
-                            <i class="fa-solid fa-paper-plane me-1"></i> Dispatch & Transfer Custody to Supplier
+                            <i class="fa-solid fa-paper-plane me-1"></i> @(Loc.IsArabic ? "إرسال الأصل ونقل العهدة للمورد" : "Dispatch & Transfer Custody to Supplier")
                         </button>
                     </div>
                 </form>
@@ -167,6 +166,7 @@
 @section Scripts {
 <script>
     function filterSuppliersByAssetTeam() {
+        var isAr = document.documentElement.dir === 'rtl' || document.documentElement.lang.startsWith('ar');
         var assetSelect = document.getElementById('assetSelect');
         var supplierSelect = document.getElementById('supplierSelect');
         var noteElement = document.getElementById('supplierFilterNote');
@@ -219,9 +219,9 @@
 
         if (noteElement) {
             if (team) {
-                noteElement.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Showing <strong>' + visibleCount + '</strong> vendors qualified to service <strong>' + team + '</strong> equipment.';
+                noteElement.innerHTML = `<i class="fa-solid fa-circle-check text-success me-1"></i> ${isAr ? `عرض <strong>${visibleCount}</strong> موردين مؤهلين لخدمة أجهزة <strong>${team}</strong>.` : `Showing <strong>${visibleCount}</strong> vendors qualified to service <strong>${team}</strong> equipment.`}`;
             } else {
-                noteElement.innerHTML = '<i class="fa-solid fa-filter me-1 text-primary"></i> Choose an asset above to automatically filter vendors that can help with its department.';
+                noteElement.innerHTML = `<i class="fa-solid fa-filter me-1 text-primary"></i> ${isAr ? 'اختر أصلاً أعلاه لتصفية الموردين المؤهلين لخدمة قسمه تلقائياً.' : 'Choose an asset above to automatically filter vendors that can help with its department.'}`;
             }
         }
     }

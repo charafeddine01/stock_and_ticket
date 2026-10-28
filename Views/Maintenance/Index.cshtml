@@ -1,19 +1,20 @@
 @model StockPortal.ViewModels.MaintenanceScheduleViewModel
 @{
-    ViewData["Title"] = "Maintenance Schedule & Vendor Work Orders";
+    ViewData["Title"] = "Scheduled & Preventive Maintenance";
+    var isArabic = Loc.IsArabic;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
-        <h4 class="fw-bold mb-0">Maintenance Schedule & Vendor Work Orders</h4>
-        <small class="text-muted">Monitor equipment sent to suppliers, track custody transfers, and record recurring preventive inspections</small>
+        <h4 class="fw-bold mb-0">@Loc["Scheduled & Preventive Maintenance"]</h4>
+        <small class="text-muted">@(isArabic ? "متابعة الأجهزة المرسلة للصيانة الخارجية، وتتبع حركة العهد، وجدولة الفحوصات الوقائية الدورية" : "Monitor equipment sent to suppliers, track custody transfers, and record recurring preventive inspections")</small>
     </div>
     <div class="d-flex gap-2">
         <a href="@Url.Action("ExportCsv")" class="btn btn-outline-success">
-            <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+            <i class="fa-solid fa-file-csv me-1"></i> @Loc["Export CSV"]
         </a>
         <a href="@Url.Action("SendToSupplier")" class="btn btn-warning text-dark fw-bold">
-            <i class="fa-solid fa-truck-ramp-box me-1"></i> Send Asset to Maintenance
+            <i class="fa-solid fa-truck-ramp-box me-1"></i> @Loc["Send to Maintenance"]
         </a>
     </div>
 </div>
@@ -24,7 +25,7 @@
         <div class="card border-0 shadow-sm p-3" style="background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="text-muted small text-uppercase fw-bold">At Supplier (Maint.)</div>
+                    <div class="text-muted small text-uppercase fw-bold">@(isArabic ? "لدى المورد (صيانة)" : "At Supplier (Maint.)")</div>
                     <div class="h3 fw-bold text-warning mb-0">@Model.ActiveWorkOrders.Count</div>
                 </div>
                 <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-truck-ramp-box"></i></div>
@@ -35,7 +36,7 @@
         <div class="card border-0 shadow-sm p-3" style="background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="text-muted small text-uppercase fw-bold">Overdue Checkups</div>
+                    <div class="text-muted small text-uppercase fw-bold">@Loc["Overdue Inspections"]</div>
                     <div class="h3 fw-bold text-danger mb-0">@Model.OverdueAssets.Count</div>
                 </div>
                 <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -46,7 +47,7 @@
         <div class="card border-0 shadow-sm p-3" style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="text-muted small text-uppercase fw-bold">Due within 30 Days</div>
+                    <div class="text-muted small text-uppercase fw-bold">@Loc["Expiring in 30 Days"]</div>
                     <div class="h3 fw-bold text-warning-emphasis mb-0">@Model.DueWithin30DaysAssets.Count</div>
                 </div>
                 <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-clock"></i></div>
@@ -57,7 +58,7 @@
         <div class="card border-0 shadow-sm p-3" style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <div class="text-muted small text-uppercase fw-bold">Up to Date Assets</div>
+                    <div class="text-muted small text-uppercase fw-bold">@Loc["Scheduled Maintenance Up-to-date"]</div>
                     <div class="h3 fw-bold text-success mb-0">@Model.UpToDateAssets.Count</div>
                 </div>
                 <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="fa-solid fa-check-circle"></i></div>
@@ -72,27 +73,27 @@
         <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="maintTabs" role="tablist">
             <li class="nav-item">
                 <button class="nav-link active fw-bold text-warning-emphasis" id="active-wo-tab" data-bs-toggle="tab" data-bs-target="#active-wo" type="button" role="tab">
-                    <i class="fa-solid fa-truck-ramp-box me-1 text-warning"></i> Active Work Orders / At Supplier (@Model.ActiveWorkOrders.Count)
+                    <i class="fa-solid fa-truck-ramp-box me-1 text-warning"></i> @Loc["Maintenance Work Orders"] (@Model.ActiveWorkOrders.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold text-danger" id="overdue-tab" data-bs-toggle="tab" data-bs-target="#overdue" type="button" role="tab">
-                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Overdue Inspections (@Model.OverdueAssets.Count)
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> @Loc["Overdue Inspections"] (@Model.OverdueAssets.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold text-warning" id="upcoming-tab" data-bs-toggle="tab" data-bs-target="#upcoming" type="button" role="tab">
-                    <i class="fa-solid fa-clock me-1"></i> Due Within 30 Days (@Model.DueWithin30DaysAssets.Count)
+                    <i class="fa-solid fa-clock me-1"></i> @Loc["Expiring in 30 Days"] (@Model.DueWithin30DaysAssets.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold text-success" id="uptodate-tab" data-bs-toggle="tab" data-bs-target="#uptodate" type="button" role="tab">
-                    <i class="fa-solid fa-circle-check me-1"></i> Up to Date (@Model.UpToDateAssets.Count)
+                    <i class="fa-solid fa-circle-check me-1"></i> @Loc["All Inspections Current"] (@Model.UpToDateAssets.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold text-dark" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">
-                    <i class="fa-solid fa-file-lines me-1"></i> Completed Work Logs (@Model.RecentLogs.Count)
+                    <i class="fa-solid fa-file-lines me-1"></i> @Loc["Maintenance Logs"] (@Model.RecentLogs.Count)
                 </button>
             </li>
         </ul>
@@ -105,10 +106,10 @@
                 {
                     <div class="text-center text-muted py-5">
                         <i class="fa-solid fa-circle-check fa-3x mb-3 text-success"></i>
-                        <h5>No Assets Currently at External Maintenance</h5>
-                        <p class="text-muted mb-3">All equipment is currently on-site in hospital custody.</p>
+                        <h5>@(isArabic ? "لا توجد أجهزة حالياً قيد الصيانة الخارجية" : "No Assets Currently at External Maintenance")</h5>
+                        <p class="text-muted mb-3">@(isArabic ? "جميع المعدات موجودة حالياً داخل المستشفى وتحت العهدة." : "All equipment is currently on-site in hospital custody.")</p>
                         <a href="@Url.Action("SendToSupplier")" class="btn btn-warning text-dark fw-semibold">
-                            <i class="fa-solid fa-truck-ramp-box me-1"></i> Dispatch Asset to Maintenance
+                            <i class="fa-solid fa-truck-ramp-box me-1"></i> @Loc["Send to Maintenance"]
                         </a>
                     </div>
                 }
@@ -118,13 +119,13 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Order #</th>
-                                    <th>Asset Tag & Equipment</th>
-                                    <th>External Supplier / Vendor</th>
-                                    <th>Sent Date & Duration</th>
-                                    <th>Reported Issue (Pre-Dispatch)</th>
-                                    <th>Linked Ticket</th>
-                                    <th class="text-end">Actions</th>
+                                    <th>#</th>
+                                    <th>@Loc["Asset Tag / Hospital No"]</th>
+                                    <th>@Loc["Supplier"]</th>
+                                    <th>@Loc["Sent to Maintenance Date"]</th>
+                                    <th>@Loc["Issue Category"]</th>
+                                    <th>@Loc["Tickets & Helpdesk"]</th>
+                                    <th class="text-end">@Loc["Actions"]</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -142,8 +143,8 @@
                                                 <a href="@Url.Action("Details", "Assets", new { id = wo.Asset.Id })" class="fw-bold text-decoration-none">
                                                     @wo.Asset.HospitalNo
                                                 </a>
-                                                <div class="small text-muted">@wo.Asset.Brand @wo.Asset.Type</div>
-                                                <span class="badge bg-primary" style="font-size: 0.68rem;">@wo.Asset.MaintenanceTeam</span>
+                                                <div class="small text-muted">@wo.Asset.Brand @wo.Asset.DisplayType</div>
+                                                <span class="badge bg-primary" style="font-size: 0.68rem;">@Loc.TargetTeam(wo.Asset.MaintenanceTeam)</span>
                                             }
                                             else
                                             {
@@ -151,46 +152,31 @@
                                             }
                                         </td>
                                         <td>
-                                            <div class="fw-semibold text-dark">
-                                                <i class="fa-solid fa-building text-secondary me-1"></i> @(wo.Supplier?.Name ?? "Supplier")
-                                            </div>
-                                            <span class="badge bg-warning text-dark border border-warning" style="font-size: 0.68rem;">
-                                                Custody: Supplier
-                                            </span>
+                                            <div class="fw-semibold"><i class="fa-solid fa-building text-secondary me-1"></i> @(wo.Supplier?.DisplayName ?? Loc["Maintenance Provider"])</div>
                                         </td>
                                         <td>
-                                            <div>@(wo.SentDate?.ToString("MMM dd, yyyy") ?? wo.TimStamp?.ToString("MMM dd, yyyy"))</div>
-                                            <span class="badge bg-light text-dark border" style="font-size: 0.72rem;">
-                                                <i class="fa-solid fa-clock me-1 text-warning"></i> @wo.DaysInMaintenance day(s) away
-                                            </span>
+                                            <div>@wo.SentDate?.ToString("MMM dd, yyyy")</div>
+                                            <span class="badge bg-warning text-dark">@wo.DaysInMaintenance @(isArabic ? "يوم" : "days")</span>
                                         </td>
-                                        <td>
-                                            <div class="text-truncate" style="max-width: 250px;" title="@wo.Description">
-                                                @(string.IsNullOrWhiteSpace(wo.Description) ? "No description recorded" : wo.Description)
-                                            </div>
+                                        <td class="small text-muted" style="max-width: 250px;">
+                                            <div class="text-truncate">@wo.Description</div>
                                         </td>
                                         <td>
                                             @if (wo.TicketId.HasValue)
                                             {
-                                                <a href="@Url.Action("Details", "Tickets", new { id = wo.TicketId.Value })" class="fw-bold text-decoration-none">
-                                                    Ticket #@wo.TicketId.Value
+                                                <a href="@Url.Action("Details", "Tickets", new { id = wo.TicketId.Value })" class="btn btn-sm btn-light border py-0">
+                                                    #@wo.TicketId
                                                 </a>
-                                                <div><span class="badge bg-warning text-dark" style="font-size: 0.68rem;">Under Maintenance</span></div>
                                             }
                                             else
                                             {
-                                                <span class="text-muted small">Direct</span>
+                                                <span class="text-muted small">-</span>
                                             }
                                         </td>
                                         <td class="text-end">
-                                            <div class="btn-group">
-                                                <a href="@Url.Action("ReturnFromSupplier", new { id = wo.Id })" class="btn btn-sm btn-success fw-bold" title="Receive asset and complete order">
-                                                    <i class="fa-solid fa-box-open me-1"></i> Return & Complete
-                                                </a>
-                                                <a href="@Url.Action("WorkOrderDetails", new { id = wo.Id })" class="btn btn-sm btn-outline-secondary" title="View Work Order details">
-                                                    <i class="fa-solid fa-eye"></i>
-                                                </a>
-                                            </div>
+                                            <a href="@Url.Action("ReturnFromSupplier", new { workOrderId = wo.Id })" class="btn btn-sm btn-success">
+                                                <i class="fa-solid fa-box-open me-1"></i> @Loc["Return from Maintenance"]
+                                            </a>
                                         </td>
                                     </tr>
                                 }
@@ -200,159 +186,41 @@
                 }
             </div>
 
-            <!-- 2. Overdue Tab -->
+            <!-- 2. Overdue Inspections Tab -->
             <div class="tab-pane fade" id="overdue" role="tabpanel">
-                @if (!Model.OverdueAssets.Any())
-                {
-                    <div class="text-center text-success py-4">
-                        <i class="fa-solid fa-circle-check fa-3x mb-2 text-success"></i>
-                        <h5>No Overdue Maintenance!</h5>
-                        <p class="text-muted">All periodic medical and IT equipment checkups are currently up to date.</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Asset Tag / Equipment</th>
-                                    <th>Location</th>
-                                    <th>Custodian</th>
-                                    <th>Interval</th>
-                                    <th>Last Inspected</th>
-                                    <th>Due Date</th>
-                                    <th class="text-end">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var a in Model.OverdueAssets)
-                                {
-                                    <tr>
-                                        <td>
-                                            <a href="@Url.Action("Details", "Assets", new { id = a.Id })" class="fw-bold text-decoration-none text-danger">
-                                                @a.HospitalNo &bull; @a.Brand (@a.Type)
-                                            </a>
-                                        </td>
-                                        <td>@(a.Room?.DisplayName ?? "Unassigned")</td>
-                                        <td>@(a.User?.FullName ?? "Central Stock")</td>
-                                        <td>Every @a.PeriodicInterval days</td>
-                                        <td>@(a.LastPeriodic?.ToString("MMM dd, yyyy") ?? "Never")</td>
-                                        <td>
-                                            <span class="badge bg-danger">
-                                                Overdue: @a.NextPeriodic?.ToString("MMM dd, yyyy")
-                                            </span>
-                                        </td>
-                                        <td class="text-end">
-                                            <div class="btn-group">
-                                                <a href="@Url.Action("SendToSupplier", new { assetId = a.Id })" class="btn btn-sm btn-warning text-dark fw-semibold">
-                                                    <i class="fa-solid fa-truck-ramp-box me-1"></i> Send to Vendor
-                                                </a>
-                                                <form asp-action="QuickCompleteCheckup" method="post" class="d-inline ms-1">
-                                                    @Html.AntiForgeryToken()
-                                                    <input type="hidden" name="assetId" value="@a.Id" />
-                                                    <input type="hidden" name="technicianId" value="@(a.UserId ?? 1)" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-success">
-                                                        <i class="fa-solid fa-check me-1"></i> Internal Check
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-
-            <!-- 3. Due Within 30 Days Tab -->
-            <div class="tab-pane fade" id="upcoming" role="tabpanel">
-                @if (!Model.DueWithin30DaysAssets.Any())
-                {
-                    <div class="text-center text-muted py-4">
-                        <i class="fa-solid fa-clock-check fa-3x mb-2 text-secondary"></i>
-                        <h5>No Immediate PM Due</h5>
-                        <p class="text-muted">No equipment due for inspection within the next 30 days.</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Asset Tag / Equipment</th>
-                                    <th>Location</th>
-                                    <th>Custodian</th>
-                                    <th>Interval</th>
-                                    <th>Last Inspected</th>
-                                    <th>Due Date</th>
-                                    <th class="text-end">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var a in Model.DueWithin30DaysAssets)
-                                {
-                                    <tr>
-                                        <td>
-                                            <a href="@Url.Action("Details", "Assets", new { id = a.Id })" class="fw-bold text-decoration-none">
-                                                @a.HospitalNo &bull; @a.Brand (@a.Type)
-                                            </a>
-                                        </td>
-                                        <td>@(a.Room?.DisplayName ?? "Unassigned")</td>
-                                        <td>@(a.User?.FullName ?? "Central Stock")</td>
-                                        <td>Every @a.PeriodicInterval days</td>
-                                        <td>@(a.LastPeriodic?.ToString("MMM dd, yyyy") ?? "Never")</td>
-                                        <td>
-                                            <span class="badge bg-warning text-dark">
-                                                Due: @a.NextPeriodic?.ToString("MMM dd, yyyy")
-                                            </span>
-                                        </td>
-                                        <td class="text-end">
-                                            <a href="@Url.Action("SendToSupplier", new { assetId = a.Id })" class="btn btn-sm btn-outline-warning text-dark">
-                                                Schedule Maint.
-                                            </a>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </div>
-
-            <!-- 4. Up to Date Tab -->
-            <div class="tab-pane fade" id="uptodate" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Asset Tag / Equipment</th>
-                                <th>Location</th>
-                                <th>Custodian</th>
-                                <th>Interval</th>
-                                <th>Last Checkup</th>
-                                <th>Next Scheduled</th>
+                                <th>@Loc["Asset Tag / Hospital No"]</th>
+                                <th>@Loc["Target Maintenance Team"]</th>
+                                <th>@Loc["Brand & Model"]</th>
+                                <th>@Loc["Location / Room"]</th>
+                                <th>@Loc["Interval (Days)"]</th>
+                                <th>@Loc["Next Periodic Due"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var a in Model.UpToDateAssets)
+                            @foreach (var asset in Model.OverdueAssets)
                             {
                                 <tr>
                                     <td>
-                                        <a href="@Url.Action("Details", "Assets", new { id = a.Id })" class="fw-bold text-decoration-none">
-                                            @a.HospitalNo &bull; @a.Brand (@a.Type)
+                                        <a href="@Url.Action("Details", "Assets", new { id = asset.Id })" class="fw-bold text-decoration-none">
+                                            @asset.HospitalNo
                                         </a>
                                     </td>
-                                    <td>@(a.Room?.DisplayName ?? "Unassigned")</td>
-                                    <td>@(a.User?.FullName ?? "Central Stock")</td>
-                                    <td>Every @a.PeriodicInterval days</td>
-                                    <td>@(a.LastPeriodic?.ToString("MMM dd, yyyy") ?? "-")</td>
                                     <td>
-                                        <span class="badge bg-success bg-opacity-10 text-success border border-success">
-                                            @(a.NextPeriodic?.ToString("MMM dd, yyyy") ?? "Planned")
-                                        </span>
+                                        <span class="badge bg-primary">@Loc.TargetTeam(asset.MaintenanceTeam)</span>
+                                    </td>
+                                    <td>@asset.Brand (@asset.DisplayType)</td>
+                                    <td>@(asset.Room?.DisplayName ?? Loc["Unassigned"])</td>
+                                    <td>@asset.PeriodicInterval @(isArabic ? "يوم" : "Days")</td>
+                                    <td><span class="badge bg-danger">@asset.NextPeriodic?.ToString("MMM dd, yyyy")</span></td>
+                                    <td class="text-end">
+                                        <a href="@Url.Action("Log", new { assetId = asset.Id })" class="btn btn-sm btn-outline-danger">
+                                            <i class="fa-solid fa-check me-1"></i> @Loc["Maintenance"]
+                                        </a>
                                     </td>
                                 </tr>
                             }
@@ -361,67 +229,94 @@
                 </div>
             </div>
 
-            <!-- 5. Completed Work Logs Tab -->
+            <!-- 3. Upcoming Inspections Tab -->
+            <div class="tab-pane fade" id="upcoming" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>@Loc["Asset Tag / Hospital No"]</th>
+                                <th>@Loc["Target Maintenance Team"]</th>
+                                <th>@Loc["Brand & Model"]</th>
+                                <th>@Loc["Location / Room"]</th>
+                                <th>@Loc["Next Periodic Due"]</th>
+                                <th class="text-end">@Loc["Actions"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var asset in Model.DueWithin30DaysAssets)
+                            {
+                                <tr>
+                                    <td>@asset.HospitalNo</td>
+                                    <td><span class="badge bg-primary">@Loc.TargetTeam(asset.MaintenanceTeam)</span></td>
+                                    <td>@asset.Brand (@asset.DisplayType)</td>
+                                    <td>@(asset.Room?.DisplayName ?? Loc["Unassigned"])</td>
+                                    <td><span class="badge bg-warning text-dark">@asset.NextPeriodic?.ToString("MMM dd, yyyy")</span></td>
+                                    <td class="text-end">
+                                        <a href="@Url.Action("Log", new { assetId = asset.Id })" class="btn btn-sm btn-outline-primary">
+                                            @Loc["Maintenance"]
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. Up to Date Tab -->
+            <div class="tab-pane fade" id="uptodate" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>@Loc["Asset Tag / Hospital No"]</th>
+                                <th>@Loc["Target Maintenance Team"]</th>
+                                <th>@Loc["Brand & Model"]</th>
+                                <th>@Loc["Last Periodic Check"]</th>
+                                <th>@Loc["Next Periodic Due"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var asset in Model.UpToDateAssets)
+                            {
+                                <tr>
+                                    <td>@asset.HospitalNo</td>
+                                    <td><span class="badge bg-primary">@Loc.TargetTeam(asset.MaintenanceTeam)</span></td>
+                                    <td>@asset.Brand (@asset.DisplayType)</td>
+                                    <td>@asset.LastPeriodic?.ToString("MMM dd, yyyy")</td>
+                                    <td><span class="badge bg-success">@asset.NextPeriodic?.ToString("MMM dd, yyyy")</span></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 5. Completed Logs Tab -->
             <div class="tab-pane fade" id="logs" role="tabpanel">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Order #</th>
-                                <th>Date Completed</th>
-                                <th>Equipment</th>
-                                <th>Supplier / Vendor</th>
-                                <th>Description / Actions</th>
-                                <th>Replaced Parts (JSON)</th>
-                                <th>Cost</th>
-                                <th class="text-end">Action</th>
+                                <th>@Loc["Date Opened"]</th>
+                                <th>@Loc["Asset Tag / Hospital No"]</th>
+                                <th>@Loc["Type"]</th>
+                                <th>@Loc["Assigned Technician"]</th>
+                                <th>@Loc["Work Summary / Actions Taken"]</th>
+                                <th>@Loc["Cost"]</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var m in Model.RecentLogs)
+                            @foreach (var log in Model.RecentLogs)
                             {
                                 <tr>
-                                    <td>
-                                        <a href="@Url.Action("WorkOrderDetails", new { id = m.Id })" class="fw-bold font-monospace text-decoration-none">
-                                            #WO-@m.Id
-                                        </a>
-                                    </td>
-                                    <td>@(m.ReturnDate?.ToString("MMM dd, yyyy") ?? m.TimStamp?.ToString("MMM dd, yyyy"))</td>
-                                    <td>
-                                        <a href="@Url.Action("Details", "Assets", new { id = m.AssetId })" class="fw-bold text-decoration-none">
-                                            @(m.Asset?.HospitalNo ?? ("#" + m.AssetId))
-                                        </a>
-                                        <div class="small text-muted">@m.Asset?.Brand @m.Asset?.Type</div>
-                                    </td>
-                                    <td>
-                                        <i class="fa-solid fa-building text-secondary me-1"></i> @(m.Supplier?.Name ?? "Internal Staff")
-                                    </td>
-                                    <td>
-                                        <div class="small fw-semibold text-dark">@(string.IsNullOrWhiteSpace(m.ActionTaken) ? m.Description : m.ActionTaken)</div>
-                                    </td>
-                                    <td>
-                                        @if (m.ParsedParts.Any())
-                                        {
-                                            @foreach (var part in m.ParsedParts)
-                                            {
-                                                <span class="badge bg-light text-dark border me-1 mb-1" title="Model: @part.PartNumber | Qty: @part.Quantity">
-                                                    <i class="fa-solid fa-microchip text-primary me-1"></i> @part.PartName (@part.Quantity)
-                                                </span>
-                                            }
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted small">-</span>
-                                        }
-                                    </td>
-                                    <td>
-                                        @(m.Cost.HasValue && m.Cost > 0 ? m.Cost.Value.ToString("C2") : "-")
-                                    </td>
-                                    <td class="text-end">
-                                        <a href="@Url.Action("WorkOrderDetails", new { id = m.Id })" class="btn btn-sm btn-outline-secondary">
-                                            <i class="fa-solid fa-eye me-1"></i> Details
-                                        </a>
-                                    </td>
+                                    <td>@log.TimStamp?.ToString("MMM dd, yyyy")</td>
+                                    <td>@log.Asset?.HospitalNo</td>
+                                    <td><span class="badge bg-info text-dark">@log.DisplayTypeName</span></td>
+                                    <td>@(log.Technician?.DisplayFullName ?? Loc["Maintenance Provider"])</td>
+                                    <td>@log.Description</td>
+                                    <td>@(log.Cost.HasValue ? log.Cost.Value.ToString("C2", System.Globalization.CultureInfo.CurrentUICulture) : "-")</td>
                                 </tr>
                             }
                         </tbody>

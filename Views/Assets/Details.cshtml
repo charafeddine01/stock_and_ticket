@@ -1,7 +1,7 @@
 @model StockPortal.ViewModels.AssetDetailsViewModel
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
-    ViewData["Title"] = $"Asset Details: {Model.Asset.HospitalNo ?? ("#" + Model.Asset.Id)}";
+    ViewData["Title"] = $"{Loc["View Details"]}: {Model.Asset.HospitalNo ?? ("#" + Model.Asset.Id)}";
     var asset = Model.Asset;
     bool canManage = CurrentUser.CanManageAssets();
 }
@@ -10,23 +10,23 @@
     <div>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb mb-1">
-                <li class="breadcrumb-item"><a href="@Url.Action("Index")">Assets</a></li>
+                <li class="breadcrumb-item"><a href="@Url.Action("Index")">@Loc["Stock & Assets"]</a></li>
                 <li class="breadcrumb-item active" aria-current="page">@(asset.HospitalNo ?? $"Asset #{asset.Id}")</li>
             </ol>
         </nav>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h3 class="fw-bold mb-0">@(asset.Brand) @(asset.Type) &bull; <span class="text-primary font-monospace">@(asset.HospitalNo)</span></h3>
+            <h3 class="fw-bold mb-0">@(asset.Brand) @(asset.DisplayType) &bull; <span class="text-primary font-monospace">@(asset.HospitalNo)</span></h3>
             <span class="badge @(asset.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : asset.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-primary") fs-6">
-                <i class="fa-solid fa-users-gear me-1"></i> @asset.MaintenanceTeam Team
+                <i class="fa-solid fa-users-gear me-1"></i> @Loc.TargetTeam(asset.MaintenanceTeam)
             </span>
         </div>
     </div>
     <div class="d-flex gap-2">
         <a href="@Url.Action("PrintTag", new { id = asset.Id })" class="btn btn-outline-dark" target="_blank">
-            <i class="fa-solid fa-print me-1"></i> Print Tag
+            <i class="fa-solid fa-print me-1"></i> @Loc["Print Tag"]
         </a>
         <a href="@Url.Action("Create", "Tickets", new { assetId = asset.Id })" class="btn btn-warning text-dark">
-            <i class="fa-solid fa-ticket me-1"></i> Open Ticket
+            <i class="fa-solid fa-ticket me-1"></i> @Loc["Open Ticket"]
         </a>
         @if (canManage)
         {
@@ -36,27 +36,27 @@
                 if (activeWo != null)
                 {
                     <a href="@Url.Action("ReturnFromSupplier", "Maintenance", new { id = activeWo.Id })" class="btn btn-success fw-bold">
-                        <i class="fa-solid fa-box-open me-1"></i> Return from Maintenance
+                        <i class="fa-solid fa-box-open me-1"></i> @Loc["Return from Maintenance"]
                     </a>
                 }
             }
             else
             {
                 <a href="@Url.Action("SendToSupplier", "Maintenance", new { assetId = asset.Id })" class="btn btn-outline-warning text-dark fw-semibold">
-                    <i class="fa-solid fa-truck-ramp-box me-1"></i> Send to Vendor
+                    <i class="fa-solid fa-truck-ramp-box me-1"></i> @Loc["Send to Vendor"]
                 </a>
             }
             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
-                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> Transfer Custody
+                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
             </button>
             <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
-                <i class="fa-solid fa-pen me-1"></i> Edit
+                <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
             </a>
             <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
-                <i class="fa-solid fa-ban me-1"></i> Retire
+                <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
             </button>
             <a href="@Url.Action("Delete", new { id = asset.Id })" class="btn btn-outline-danger">
-                <i class="fa-solid fa-trash-can me-1"></i> Delete
+                <i class="fa-solid fa-trash-can me-1"></i> @Loc["Delete"]
             </a>
         }
     </div>
@@ -67,72 +67,72 @@
     <div class="col-lg-8">
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-circle-info text-primary me-2"></i> Technical & Purchase Specifications</h6>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-circle-info text-primary me-2"></i> @Loc["Technical Specifications Form"]</h6>
                 <span class="badge @(asset.Status == "In Service" ? "bg-success" : asset.Status == "Under Maintenance" ? "bg-warning text-dark" : "bg-info")">
-                    @(asset.Status ?? "In Service")
+                    @asset.DisplayStatus
                 </span>
             </div>
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-sm-4">
-                        <div class="text-muted small">Asset Tag / Hospital No:</div>
+                        <div class="text-muted small">@Loc["Asset Tag / Hospital No"]:</div>
                         <div class="fw-bold text-dark fs-6">@(asset.HospitalNo ?? "N/A")</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Serial Number:</div>
+                        <div class="text-muted small">@Loc["Serial Number"]:</div>
                         <div class="fw-bold text-dark font-monospace fs-6">@(asset.SerialNo ?? "N/A")</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Manufacturer / Brand:</div>
+                        <div class="text-muted small">@Loc["Brand / Manufacturer"]:</div>
                         <div class="fw-bold text-dark fs-6">@(asset.Brand ?? "N/A")</div>
                     </div>
 
                     <div class="col-sm-4">
-                        <div class="text-muted small">Equipment Type:</div>
-                        <div class="fw-bold text-dark fs-6">@(asset.Type ?? "General Equipment")</div>
+                        <div class="text-muted small">@Loc["Equipment Type"]:</div>
+                        <div class="fw-bold text-dark fs-6">@(asset.DisplayType ?? Loc["Equipment Type"])</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Model No / Variant:</div>
-                        <div class="fw-bold text-dark fs-6">@(asset.ModelNo.HasValue ? asset.ModelNo.ToString() : "Standard")</div>
+                        <div class="text-muted small">@Loc["Model / Version"]:</div>
+                        <div class="fw-bold text-dark fs-6">@(asset.ModelNo.HasValue ? asset.ModelNo.ToString() : (Loc.IsArabic ? "قياسي" : "Standard"))</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Registered Supplier:</div>
-                        <div class="fw-bold text-dark fs-6">@(asset.Supplier?.Name ?? "N/A")</div>
+                        <div class="text-muted small">@Loc["Approved Suppliers & Vendors"]:</div>
+                        <div class="fw-bold text-dark fs-6">@(asset.Supplier?.DisplayName ?? "N/A")</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Assigned Maintenance Team:</div>
+                        <div class="text-muted small">@Loc["Target Maintenance Team"]:</div>
                         <div class="fw-bold text-dark fs-6">
                             <span class="badge @(asset.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : asset.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-primary")">
-                                <i class="fa-solid fa-screwdriver-wrench me-1"></i> @asset.MaintenanceTeam
+                                <i class="fa-solid fa-screwdriver-wrench me-1"></i> @Loc.TargetTeam(asset.MaintenanceTeam)
                             </span>
                         </div>
                     </div>
 
                     <div class="col-sm-4">
-                        <div class="text-muted small">Purchase Price:</div>
+                        <div class="text-muted small">@Loc["Purchase Price"]:</div>
                         <div class="fw-bold text-success fs-6">@(asset.Price.HasValue ? asset.Price.Value.ToString("C2") : "N/A")</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Commissioning Date:</div>
+                        <div class="text-muted small">@Loc["Purchase Date"]:</div>
                         <div class="fw-bold text-dark fs-6">@(asset.BuyingDate?.ToString("MMM dd, yyyy") ?? "N/A")</div>
                     </div>
                     <div class="col-sm-4">
-                        <div class="text-muted small">Warranty Expiration:</div>
+                        <div class="text-muted small">@Loc["Warranty Expiration"]:</div>
                         <div class="fw-bold text-dark fs-6">
                             @if (asset.WarrantyTill.HasValue)
                             {
                                 if (asset.WarrantyTill.Value < DateTime.Now.Date)
                                 {
-                                    <span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> Expired (@asset.WarrantyTill.Value.ToString("MMM yyyy"))</span>
+                                    <span class="text-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i> @(Loc.IsArabic ? "منتهي الصلاحية" : "Expired") (@asset.WarrantyTill.Value.ToString("MMM yyyy"))</span>
                                 }
                                 else
                                 {
-                                    <span class="text-success"><i class="fa-solid fa-shield-halved me-1"></i> Active until @asset.WarrantyTill.Value.ToString("MMM dd, yyyy")</span>
+                                    <span class="text-success"><i class="fa-solid fa-shield-halved me-1"></i> @(Loc.IsArabic ? "ساري حتى" : "Active until") @asset.WarrantyTill.Value.ToString("MMM dd, yyyy")</span>
                                 }
                             }
                             else
                             {
-                                <span>No warranty recorded</span>
+                                <span>@(Loc.IsArabic ? "لا يوجد ضمان مسجل" : "No warranty recorded")</span>
                             }
                         </div>
                     </div>
@@ -148,7 +148,7 @@
                     catch { }
 
                     <div class="mt-4 pt-3 border-top">
-                        <h6 class="fw-bold small text-muted text-uppercase mb-3"><i class="fa-solid fa-microchip text-primary me-2"></i> Technical Specifications</h6>
+                        <h6 class="fw-bold small text-muted text-uppercase mb-3"><i class="fa-solid fa-microchip text-primary me-2"></i> @Loc["Technical Specifications"]</h6>
                         @if (specsMap != null && specsMap.Any())
                         {
                             <div class="table-responsive">
@@ -180,37 +180,37 @@
         <!-- Custody Card -->
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-user-shield text-info me-2"></i> Current Custody & Room</h6>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-user-shield text-info me-2"></i> @(Loc.IsArabic ? "العهدة والموقع الحالي" : "Current Custody & Room")</h6>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <div class="text-muted small">Assigned Custodian:</div>
+                    <div class="text-muted small">@Loc["Assigned Custodian"]:</div>
                     @if (asset.User != null)
                     {
-                        <div class="fw-bold text-dark fs-5">@asset.User.FullName</div>
-                        <div class="text-muted small">@asset.User.RoleDisplay &bull; @(asset.User.Department?.Name ?? "Staff")</div>
-                        <div class="badge bg-primary bg-opacity-10 text-primary mt-1">@(asset.CustodyType?.Type ?? "Custody")</div>
+                        <div class="fw-bold text-dark fs-5">@asset.User.DisplayFullName</div>
+                        <div class="text-muted small">@asset.User.DisplayRole &bull; @(asset.User.Department?.DisplayName ?? Loc["General Staff"])</div>
+                        <div class="badge bg-primary bg-opacity-10 text-primary mt-1">@(asset.CustodyType?.DisplayType ?? Loc["Custody"])</div>
                     }
                     else
                     {
-                        <div class="fw-bold text-secondary">In Central IT Stock / Unassigned</div>
+                        <div class="fw-bold text-secondary">@(Loc.IsArabic ? "في المخزن المركزي (غير مسند)" : "In Central IT Stock / Unassigned")</div>
                     }
                 </div>
 
                 <div class="mb-3">
-                    <div class="text-muted small">Physical Location:</div>
+                    <div class="text-muted small">@Loc["Location"]:</div>
                     @if (asset.Room != null)
                     {
                         <div class="fw-bold text-dark fs-5"><i class="fa-solid fa-location-dot text-danger me-1"></i> @asset.Room.DisplayName</div>
                     }
                     else
                     {
-                        <div class="text-muted fst-italic">Location not set</div>
+                        <div class="text-muted fst-italic">@Loc["Unassigned"]</div>
                     }
                 </div>
 
                 <button type="button" class="btn btn-outline-primary w-100 btn-sm" data-bs-toggle="modal" data-bs-target="#transferModal">
-                    <i class="fa-solid fa-right-left me-1"></i> Re-assign Custody / Room
+                    <i class="fa-solid fa-right-left me-1"></i> @Loc["Transfer Custody"]
                 </button>
             </div>
         </div>
@@ -218,34 +218,34 @@
         <!-- Periodic Maintenance Card -->
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-calendar-check text-warning me-2"></i> Preventive Maintenance</h6>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-calendar-check text-warning me-2"></i> @Loc["Scheduled & Preventive Maintenance"]</h6>
             </div>
             <div class="card-body">
                 @if (asset.NeedsPeriodic == true)
                 {
                     <div class="mb-2">
-                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-check me-1"></i> Scheduled Checkups Required</span>
+                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-check me-1"></i> @(Loc.IsArabic ? "فحوصات دورية مطلوبة" : "Scheduled Checkups Required")</span>
                     </div>
-                    <div class="small text-muted mb-1">Interval: <strong>@asset.PeriodicInterval Days</strong></div>
-                    <div class="small text-muted mb-1">Last Inspection: <strong>@(asset.LastPeriodic?.ToString("MMM dd, yyyy") ?? "Never")</strong></div>
+                    <div class="small text-muted mb-1">@Loc["Interval (Days)"]: <strong>@asset.PeriodicInterval @(Loc.IsArabic ? "يوم" : "Days")</strong></div>
+                    <div class="small text-muted mb-1">@Loc["Last Periodic Check"]: <strong>@(asset.LastPeriodic?.ToString("MMM dd, yyyy") ?? (Loc.IsArabic ? "لم يفحص بعد" : "Never"))</strong></div>
                     <div class="small mb-3">
-                        Next Due Date: 
+                        @Loc["Next Periodic Due"]: 
                         @if (asset.NextPeriodic.HasValue && asset.NextPeriodic.Value < DateTime.Now.Date)
                         {
-                            <span class="badge bg-danger">Overdue (@asset.NextPeriodic.Value.ToString("MMM dd, yyyy"))</span>
+                            <span class="badge bg-danger">@(Loc.IsArabic ? "متأخر" : "Overdue") (@asset.NextPeriodic.Value.ToString("MMM dd, yyyy"))</span>
                         }
                         else
                         {
-                            <span class="badge bg-success">@(asset.NextPeriodic?.ToString("MMM dd, yyyy") ?? "Not set")</span>
+                            <span class="badge bg-success">@(asset.NextPeriodic?.ToString("MMM dd, yyyy") ?? (Loc.IsArabic ? "غير محدد" : "Not set"))</span>
                         }
                     </div>
                     <a href="@Url.Action("Log", "Maintenance", new { assetId = asset.Id })" class="btn btn-sm btn-outline-warning w-100">
-                        <i class="fa-solid fa-wrench me-1"></i> Log Inspection Checkup
+                        <i class="fa-solid fa-wrench me-1"></i> @Loc["Record Work Order"]
                     </a>
                 }
                 else
                 {
-                    <div class="text-muted small">This equipment does not require recurring preventive maintenance.</div>
+                    <div class="text-muted small">@(Loc.IsArabic ? "هذا الجهاز لا يتطلب صيانة دورية متكررة." : "This equipment does not require recurring preventive maintenance.")</div>
                 }
             </div>
         </div>
@@ -258,17 +258,17 @@
         <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="assetTabs" role="tablist">
             <li class="nav-item">
                 <button class="nav-link active fw-semibold" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">
-                    <i class="fa-solid fa-timeline me-1"></i> Custody Audit Trail (@asset.History.Count)
+                    <i class="fa-solid fa-timeline me-1"></i> @Loc["Custody Audit Trail"] (@asset.History.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold" id="maintenance-tab" data-bs-toggle="tab" data-bs-target="#maintenance" type="button" role="tab">
-                    <i class="fa-solid fa-wrench me-1"></i> Maintenance Records (@asset.MaintenanceRecords.Count)
+                    <i class="fa-solid fa-wrench me-1"></i> @Loc["Maintenance Records"] (@asset.MaintenanceRecords.Count)
                 </button>
             </li>
             <li class="nav-item">
                 <button class="nav-link fw-semibold" id="tickets-tab" data-bs-toggle="tab" data-bs-target="#tickets" type="button" role="tab">
-                    <i class="fa-solid fa-ticket me-1"></i> Service Tickets (@asset.Tickets.Count)
+                    <i class="fa-solid fa-ticket me-1"></i> @Loc["Service Tickets"] (@asset.Tickets.Count)
                 </button>
             </li>
         </ul>
@@ -279,7 +279,7 @@
             <div class="tab-pane fade show active" id="history" role="tabpanel">
                 @if (!asset.History.Any())
                 {
-                    <div class="text-center text-muted py-4">No custody transitions recorded yet.</div>
+                    <div class="text-center text-muted py-4">@(Loc.IsArabic ? "لا توجد حركات عهدة سابقة مسجلة." : "No custody transitions recorded yet.")</div>
                 }
                 else
                 {
@@ -287,12 +287,12 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Assigned Custodian</th>
-                                    <th>Room / Location</th>
-                                    <th>Custody Type</th>
-                                    <th>Assigned Date</th>
-                                    <th>Returned Date</th>
-                                    <th>Notes</th>
+                                    <th>@Loc["Assigned Custodian"]</th>
+                                    <th>@Loc["Location"]</th>
+                                    <th>@Loc["Custody Type"]</th>
+                                    <th>@(Loc.IsArabic ? "تاريخ الإسناد" : "Assigned Date")</th>
+                                    <th>@(Loc.IsArabic ? "تاريخ الإرجاع" : "Returned Date")</th>
+                                    <th>@(Loc.IsArabic ? "ملاحظات" : "Notes")</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -300,10 +300,10 @@
                                 {
                                     <tr>
                                         <td>
-                                            <div class="fw-semibold">@(h.User?.FullName ?? "Unknown User")</div>
+                                            <div class="fw-semibold">@(h.User?.DisplayFullName ?? Loc["None assigned"])</div>
                                         </td>
-                                        <td>@(h.Room?.DisplayName ?? "Unassigned")</td>
-                                        <td><span class="badge bg-light text-dark border">@(h.CustodyType?.Type ?? "Standard")</span></td>
+                                        <td>@(h.Room?.DisplayName ?? Loc["Unassigned"])</td>
+                                        <td><span class="badge bg-light text-dark border">@(h.CustodyType?.DisplayType ?? Loc["Custody"])</span></td>
                                         <td>@h.AssignedOn.ToString("MMM dd, yyyy HH:mm")</td>
                                         <td>
                                             @if (h.ReturnedOn.HasValue)
@@ -312,7 +312,7 @@
                                             }
                                             else
                                             {
-                                                <span class="badge bg-success">Current Custodian</span>
+                                                <span class="badge bg-success">@(Loc.IsArabic ? "المسؤول الحالي" : "Current Custodian")</span>
                                             }
                                         </td>
                                         <td><small class="text-muted">@(h.Notes ?? "-")</small></td>
@@ -329,9 +329,9 @@
                 @if (!asset.MaintenanceRecords.Any())
                 {
                     <div class="text-center text-muted py-4">
-                        <p>No maintenance logs for this asset yet.</p>
+                        <p>@(Loc.IsArabic ? "لا توجد سجلات صيانة لهذا الأصل حتى الآن." : "No maintenance logs for this asset yet.")</p>
                         <a href="@Url.Action("Log", "Maintenance", new { assetId = asset.Id })" class="btn btn-sm btn-outline-warning">
-                            Log First Maintenance
+                            @Loc["Record Work Order"]
                         </a>
                     </div>
                 }
@@ -341,12 +341,12 @@
                         <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
-                                    <th>Parts Replaced</th>
-                                    <th>Technician / Vendor</th>
-                                    <th>Linked Ticket</th>
+                                    <th>@Loc["Date Opened"]</th>
+                                    <th>@Loc["Type"]</th>
+                                    <th>@Loc["Work Summary / Actions Taken"]</th>
+                                    <th>@Loc["Replaced Parts & Components"]</th>
+                                    <th>@Loc["Assigned Technician"]</th>
+                                    <th>@Loc["Tickets & Helpdesk"]</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -356,7 +356,7 @@
                                         <td>@m.TimStamp?.ToString("MMM dd, yyyy")</td>
                                         <td>
                                             <span class="badge @(m.MaintenanceType == 2 ? "bg-info text-dark" : "bg-danger")">
-                                                @m.TypeName
+                                                @Loc.MaintenanceType(m.MaintenanceType)
                                             </span>
                                         </td>
                                         <td>@m.Description</td>
@@ -376,15 +376,15 @@
                                             }
                                             else
                                             {
-                                                <span class="text-muted small">None</span>
+                                                <span class="text-muted small">@Loc["None assigned"]</span>
                                             }
                                         </td>
-                                        <td>@(m.Technician?.FullName ?? m.Supplier?.Name ?? "Staff")</td>
+                                        <td>@(m.Technician?.DisplayFullName ?? m.Supplier?.DisplayName ?? (Loc.IsArabic ? "فريق المستشفى" : "Staff"))</td>
                                         <td>
                                             @if (m.TicketId.HasValue)
                                             {
                                                 <a href="@Url.Action("Details", "Tickets", new { id = m.TicketId.Value })" class="btn btn-sm btn-light border py-0">
-                                                    Ticket #@m.TicketId
+                                                    @Loc["Ticket"] #@m.TicketId
                                                 </a>
                                             }
                                             else
@@ -405,9 +405,9 @@
                 @if (!asset.Tickets.Any())
                 {
                     <div class="text-center text-muted py-4">
-                        <p>No support tickets opened for this hardware.</p>
+                        <p>@(Loc.IsArabic ? "لا توجد تذاكر دعم فني مفتوحة لهذا الجهاز." : "No support tickets opened for this hardware.")</p>
                         <a href="@Url.Action("Create", "Tickets", new { assetId = asset.Id })" class="btn btn-sm btn-warning text-dark">
-                            Open Ticket
+                            @Loc["Open Ticket"]
                         </a>
                     </div>
                 }
@@ -418,12 +418,12 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>#</th>
-                                    <th>Type</th>
-                                    <th>Priority</th>
-                                    <th>Status</th>
-                                    <th>Opened Date</th>
-                                    <th>Technician</th>
-                                    <th>Actions</th>
+                                    <th>@Loc["Type"]</th>
+                                    <th>@Loc["Priority Level"]</th>
+                                    <th>@Loc["Status"]</th>
+                                    <th>@Loc["Date Opened"]</th>
+                                    <th>@Loc["Assigned Technician"]</th>
+                                    <th>@Loc["Actions"]</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -431,20 +431,20 @@
                                 {
                                     <tr>
                                         <td class="fw-bold">#@t.Id</td>
-                                        <td><span class="badge bg-light text-dark border">@t.Type</span></td>
+                                        <td><span class="badge bg-light text-dark border">@Loc.TicketType(t.Type)</span></td>
                                         <td>
-                                            <span class="badge @(t.Priority >= 3 ? "bg-danger" : "bg-info text-dark")">@t.PriorityName</span>
+                                            <span class="badge @(t.Priority >= 3 ? "bg-danger" : "bg-info text-dark")">@Loc.Priority(t.Priority)</span>
                                         </td>
                                         <td>
                                             <span class="badge @(t.StatusId == 5 ? "bg-success" : t.StatusId == 1 ? "bg-danger" : "bg-warning text-dark")">
-                                                @(t.Status?.Status ?? "Status")
+                                                @(t.Status?.DisplayStatus ?? Loc.Status(t.Status?.Status))
                                             </span>
                                         </td>
                                         <td>@t.OpenedDT?.ToString("MMM dd, yyyy")</td>
-                                        <td>@(t.Handler?.TechUser?.FullName ?? "Unassigned")</td>
+                                        <td>@(t.Handler?.TechUser?.DisplayFullName ?? Loc["Unassigned"])</td>
                                         <td>
                                             <a href="@Url.Action("Details", "Tickets", new { id = t.Id })" class="btn btn-sm btn-outline-primary py-0">
-                                                View Ticket
+                                                @Loc["View Details"]
                                             </a>
                                         </td>
                                     </tr>
@@ -468,26 +468,26 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="assetId" value="@asset.Id" />
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="transferModalLabel">Transfer Asset Custody & Location</h5>
+                        <h5 class="modal-title fw-bold" id="transferModalLabel">@Loc["Transfer Custody"]</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p class="small text-muted mb-3">
-                            Reassigning this asset will automatically archive the previous custody record and log a new entry into <code>asset_history</code>.
+                            @(Loc.IsArabic ? "إعادة تعيين العهدة تؤرشف العهدة السابقة تلقائياً وتنشئ حركة جديدة في سجل التدقيق." : "Reassigning this asset will automatically archive the previous custody record and log a new entry into asset_history.")
                         </p>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">New Assigned User / Custodian</label>
+                            <label class="form-label fw-semibold">@Loc["Assigned Staff / Custodian"]</label>
                             <select name="newUserId" class="form-select" required>
                                 @foreach (var u in Model.AvailableUsers)
                                 {
-                                    <option value="@u.Id" selected="@(u.Id == asset.UserId)">@u.FullName (@(u.Department?.Name ?? "Staff"))</option>
+                                    <option value="@u.Id" selected="@(u.Id == asset.UserId)">@u.DisplayFullName (@(u.Department?.DisplayName ?? Loc["General Staff"]))</option>
                                 }
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">New Room / Physical Location</label>
+                            <label class="form-label fw-semibold">@Loc["Location / Room"]</label>
                             <select name="newRoomId" class="form-select" required>
                                 @foreach (var r in Model.AvailableRooms)
                                 {
@@ -497,23 +497,23 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Custody Type</label>
+                            <label class="form-label fw-semibold">@Loc["Custody Type"]</label>
                             <select name="newCustodyTypeId" class="form-select" required>
                                 @foreach (var c in Model.AvailableCustodyTypes)
                                 {
-                                    <option value="@c.Id" selected="@(c.Id == asset.CustodyTypeId)">@c.Type</option>
+                                    <option value="@c.Id" selected="@(c.Id == asset.CustodyTypeId)">@c.DisplayType</option>
                                 }
                             </select>
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Transfer Notes / Reason</label>
-                            <textarea name="notes" class="form-control" rows="2" placeholder="e.g. Relocated to Floor 2 ICU for physician rotation"></textarea>
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "ملاحظات / سبب النقل" : "Transfer Notes / Reason")</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "مثال: تم النقل إلى قسم العناية المركزة في الطابق الثاني" : "e.g. Relocated to Floor 2 ICU for physician rotation")"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Confirm Transfer</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-primary">@Loc["Save Changes"]</button>
                     </div>
                 </form>
             </div>
@@ -528,21 +528,21 @@
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" value="@asset.Id" />
                     <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="retireModalLabel">Decommission / Retire Asset</h5>
+                        <h5 class="modal-title fw-bold" id="retireModalLabel">@Loc["Decommission Asset"]</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <p class="text-muted">
-                            Are you sure you want to mark asset <strong>@(asset.HospitalNo ?? ("#" + asset.Id))</strong> as <em>Retired / Scrapped</em>?
+                            @(Loc.IsArabic ? $"هل أنت متأكد من إسقاط / إتلاف الأصل {asset.HospitalNo ?? ("#" + asset.Id)} وخروجه من الخدمة نهائياً؟" : $"Are you sure you want to mark asset {asset.HospitalNo ?? ("#" + asset.Id)} as Retired / Scrapped?")
                         </p>
                         <div class="mb-3">
-                            <label class="form-label fw-semibold">Retirement Reason</label>
-                            <input type="text" name="reason" class="form-control" placeholder="e.g. Obsolete hardware, irreparable board failure..." required />
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "سبب الإسقاط / الإتلاف" : "Retirement Reason")</label>
+                            <input type="text" name="reason" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: جهاز قديم غير مجدٍ اقتصادياً، عطل غير قابل للإصلاح..." : "e.g. Obsolete hardware, irreparable board failure...")" required />
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning">Confirm Retirement</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-warning">@Loc["Retire"]</button>
                     </div>
                 </form>
             </div>

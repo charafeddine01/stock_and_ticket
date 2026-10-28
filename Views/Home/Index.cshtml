@@ -10,11 +10,11 @@
         <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Assets</div>
+                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Total Assets"]</div>
                     <div class="h2 fw-bold text-primary mb-1">@Model.TotalAssets</div>
                     <div class="small text-muted">
-                        <span class="text-success fw-semibold">@Model.InServiceAssets</span> in service &bull; 
-                        <span class="text-warning fw-semibold">@Model.UnderMaintenanceAssets</span> in repair
+                        <span class="text-success fw-semibold">@Model.InServiceAssets</span> @Loc["in service"] &bull; 
+                        <span class="text-warning fw-semibold">@Model.UnderMaintenanceAssets</span> @Loc["in repair"]
                     </div>
                 </div>
                 <div class="stat-icon bg-primary bg-opacity-10 text-primary">
@@ -22,8 +22,8 @@
                 </div>
             </div>
             <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                <span class="text-muted">Total Asset Value:</span>
-                <span class="fw-bold text-dark">@Model.TotalInventoryValue.ToString("C0")</span>
+                <span class="text-muted">@Loc["Total Asset Value"]:</span>
+                <span class="fw-bold text-dark">@Model.TotalInventoryValue.ToString("C0", System.Globalization.CultureInfo.CurrentUICulture)</span>
             </div>
         </div>
     </div>
@@ -33,11 +33,11 @@
         <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Open & Active Tickets</div>
+                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Open & Active Tickets"]</div>
                     <div class="h2 fw-bold text-warning mb-1">@(Model.OpenTickets + Model.PendingTickets)</div>
                     <div class="small text-muted">
-                        <span class="text-danger fw-semibold">@Model.OpenTickets</span> unassigned &bull; 
-                        <span class="text-info fw-semibold">@Model.PendingTickets</span> in progress
+                        <span class="text-danger fw-semibold">@Model.OpenTickets</span> @Loc["unassigned"] &bull; 
+                        <span class="text-info fw-semibold">@Model.PendingTickets</span> @Loc["in progress"]
                     </div>
                 </div>
                 <div class="stat-icon bg-warning bg-opacity-10 text-warning">
@@ -45,7 +45,7 @@
                 </div>
             </div>
             <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                <span class="text-muted">Closed Resolved:</span>
+                <span class="text-muted">@Loc["Closed Resolved"]:</span>
                 <span class="fw-bold text-success">@Model.ClosedTickets</span>
             </div>
         </div>
@@ -56,12 +56,12 @@
         <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Maintenance Alerts</div>
+                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Maintenance Alerts"]</div>
                     <div class="h2 fw-bold @(Model.OverduePeriodicAssets.Count > 0 ? "text-danger" : "text-success") mb-1">
                         @Model.OverduePeriodicAssets.Count
                     </div>
                     <div class="small text-muted">
-                        <span>Assets overdue for inspection</span>
+                        <span>@(Model.OverduePeriodicAssets.Count > 0 ? Loc["Requires Immediate Service"] : Loc["Scheduled Maintenance Up-to-date"])</span>
                     </div>
                 </div>
                 <div class="stat-icon bg-danger bg-opacity-10 text-danger">
@@ -69,8 +69,8 @@
                 </div>
             </div>
             <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                <span class="text-muted">Due within 30 days:</span>
-                <span class="fw-bold text-dark">@Model.UpcomingPeriodicAssets.Count assets</span>
+                <span class="text-muted">@Loc["Expiring in 30 Days"]:</span>
+                <span class="fw-bold text-dark">@Model.UpcomingPeriodicAssets.Count</span>
             </div>
         </div>
     </div>
@@ -80,14 +80,14 @@
         <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
-                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Service Resolution Rate</div>
+                    <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Service Resolution Rate"]</div>
                     @{
                         int total = Model.TotalTickets;
                         int rate = total > 0 ? (int)((double)Model.ClosedTickets / total * 100) : 100;
                     }
                     <div class="h2 fw-bold text-success mb-1">@rate%</div>
                     <div class="small text-muted">
-                        <span>@Model.ClosedTickets of @total tickets resolved</span>
+                        <span>@Model.ClosedTickets / @total @Loc["Closed Resolved"]</span>
                     </div>
                 </div>
                 <div class="stat-icon bg-success bg-opacity-10 text-success">
@@ -95,7 +95,7 @@
                 </div>
             </div>
             <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                <span class="text-muted">Delayed / Blocked:</span>
+                <span class="text-muted">@Loc["delayed"]:</span>
                 <span class="fw-bold text-danger">@Model.DelayedTickets</span>
             </div>
         </div>
@@ -111,8 +111,8 @@
             <div class="col-lg-6">
                 <div class="card border-danger shadow-sm">
                     <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                        <span class="fw-bold"><i class="fa-solid fa-bell me-2"></i> Overdue Preventive Maintenance</span>
-                        <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-light py-0">View All</a>
+                        <span class="fw-bold"><i class="fa-solid fa-bell me-2"></i> @Loc["Overdue Preventive Maintenance"]</span>
+                        <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-light py-0">@Loc["View Details"]</a>
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
@@ -120,17 +120,17 @@
                             {
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
-                                        <div class="fw-bold text-dark">@asset.HospitalNo &bull; @asset.Brand (@asset.Type)</div>
+                                        <div class="fw-bold text-dark">@asset.HospitalNo &bull; @asset.Brand (@asset.DisplayType)</div>
                                         <div class="small text-muted">
-                                            <i class="fa-solid fa-location-dot me-1"></i> @(asset.Room?.DisplayName ?? "Unassigned") &bull; 
-                                            Custodian: @(asset.User?.FullName ?? "None")
+                                            <i class="fa-solid fa-location-dot me-1"></i> @(asset.Room?.DisplayName ?? Loc["Unassigned"]) &bull; 
+                                            @Loc["Custodian"]: @(asset.User?.DisplayFullName ?? Loc["None"])
                                         </div>
                                     </div>
                                     <div class="text-end">
-                                        <span class="badge bg-danger">Due: @asset.NextPeriodic?.ToString("MMM dd, yyyy")</span>
+                                        <span class="badge bg-danger">@Loc["Next Periodic Due"]: @asset.NextPeriodic?.ToString("MMM dd, yyyy")</span>
                                         <div class="mt-1">
                                             <a href="@Url.Action("Log", "Maintenance", new { assetId = asset.Id })" class="btn btn-sm btn-outline-danger py-0" style="font-size: 0.75rem;">
-                                                Log Checkup
+                                                @Loc["Maintenance"]
                                             </a>
                                         </div>
                                     </div>
@@ -147,8 +147,8 @@
             <div class="col-lg-6">
                 <div class="card border-warning shadow-sm">
                     <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                        <span class="fw-bold"><i class="fa-solid fa-fire me-2"></i> High & Urgent Priority Tickets</span>
-                        <a href="@Url.Action("Index", "Tickets")" class="btn btn-sm btn-dark py-0">View Queue</a>
+                        <span class="fw-bold"><i class="fa-solid fa-fire me-2"></i> @Loc["High & Urgent Priority Tickets"]</span>
+                        <a href="@Url.Action("Index", "Tickets")" class="btn btn-sm btn-dark py-0">@Loc["View Details"]</a>
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
@@ -158,16 +158,16 @@
                                     <div>
                                         <div class="fw-bold text-dark">
                                             <a href="@Url.Action("Details", "Tickets", new { id = ticket.Id })" class="text-decoration-none">
-                                                Ticket #@ticket.Id &bull; @ticket.Type Issue
+                                                #@ticket.Id &bull; @ticket.DisplayType
                                             </a>
                                         </div>
                                         <div class="small text-muted">
-                                            Asset: @(ticket.Asset?.HospitalNo ?? "N/A") &bull; Opened by: @(ticket.OpenedByUser?.FullName ?? "Unknown")
+                                            @Loc["Asset Tag"]: @(ticket.Asset?.HospitalNo ?? "N/A") &bull; @Loc["Opened by Me"]: @(ticket.OpenedByUser?.DisplayFullName ?? "Unknown")
                                         </div>
                                     </div>
                                     <div class="text-end">
                                         <span class="badge @(ticket.Priority == 4 ? "bg-danger" : "bg-warning text-dark")">
-                                            @ticket.PriorityName
+                                            @ticket.DisplayPriority
                                         </span>
                                         <div class="small text-muted mt-1">@ticket.OpenedDT?.ToString("MMM dd HH:mm")</div>
                                     </div>
@@ -187,8 +187,8 @@
     <div class="col-lg-7">
         <div class="card shadow-sm h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-ticket text-primary me-2"></i> Recent Helpdesk Tickets</h6>
-                <a href="@Url.Action("Index", "Tickets")" class="btn btn-sm btn-outline-secondary">View All Tickets</a>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-ticket text-primary me-2"></i> @Loc["Recent Helpdesk Tickets"]</h6>
+                <a href="@Url.Action("Index", "Tickets")" class="btn btn-sm btn-outline-secondary">@Loc["All Tickets"]</a>
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
@@ -196,19 +196,19 @@
                         <thead class="table-light">
                             <tr>
                                 <th>#</th>
-                                <th>Asset & Tag</th>
-                                <th>Type</th>
-                                <th>Priority</th>
-                                <th>Status</th>
-                                <th>Technician</th>
-                                <th>Actions</th>
+                                <th>@Loc["Asset Tag"]</th>
+                                <th>@Loc["Type"]</th>
+                                <th>@Loc["Priority Level"]</th>
+                                <th>@Loc["Operational Status"]</th>
+                                <th>@Loc["Assigned Technician"]</th>
+                                <th>@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (!Model.RecentTickets.Any())
                             {
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">No tickets recorded yet.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">@Loc["No notifications found"]</td>
                                 </tr>
                             }
                             @foreach (var ticket in Model.RecentTickets)
@@ -228,39 +228,39 @@
                                             <span class="text-muted">None</span>
                                         }
                                     </td>
-                                    <td><span class="badge bg-light text-dark border">@ticket.Type</span></td>
+                                    <td><span class="badge bg-light text-dark border">@ticket.DisplayType</span></td>
                                     <td>
                                         @switch (ticket.Priority)
                                         {
-                                            case 4: <span class="badge bg-danger">Urgent</span>; break;
-                                            case 3: <span class="badge bg-warning text-dark">High</span>; break;
-                                            case 2: <span class="badge bg-info text-dark">Medium</span>; break;
-                                            default: <span class="badge bg-secondary">Low</span>; break;
+                                            case 4: <span class="badge bg-danger">@ticket.DisplayPriority</span>; break;
+                                            case 3: <span class="badge bg-warning text-dark">@ticket.DisplayPriority</span>; break;
+                                            case 2: <span class="badge bg-info text-dark">@ticket.DisplayPriority</span>; break;
+                                            default: <span class="badge bg-secondary">@ticket.DisplayPriority</span>; break;
                                         }
                                     </td>
                                     <td>
                                         @switch (ticket.StatusId)
                                         {
-                                            case 1: <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Opened</span>; break;
-                                            case 2: <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">Pending</span>; break;
-                                            case 3: <span class="badge bg-secondary">Delayed</span>; break;
-                                            case 4: <span class="badge bg-dark">Canceled</span>; break;
-                                            case 5: <span class="badge bg-success bg-opacity-10 text-success border border-success">Closed</span>; break;
-                                            default: <span class="badge bg-light text-dark">Unknown</span>; break;
+                                            case 1: <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">@Loc["opened"]</span>; break;
+                                            case 2: <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">@Loc["pending"]</span>; break;
+                                            case 3: <span class="badge bg-secondary">@Loc["delayed"]</span>; break;
+                                            case 4: <span class="badge bg-dark">@Loc["canceled"]</span>; break;
+                                            case 5: <span class="badge bg-success bg-opacity-10 text-success border border-success">@Loc["closed"]</span>; break;
+                                            default: <span class="badge bg-light text-dark">@Loc.Status(ticket.Status?.Status)</span>; break;
                                         }
                                     </td>
                                     <td>
                                         @if (ticket.Handler?.TechUser != null)
                                         {
-                                            <span class="small fw-semibold"><i class="fa-solid fa-user-gear text-muted me-1"></i> @ticket.Handler.TechUser.FullName</span>
+                                            <span class="small fw-semibold"><i class="fa-solid fa-user-gear text-muted me-1"></i> @ticket.Handler.TechUser.DisplayFullName</span>
                                         }
                                         else
                                         {
-                                            <span class="small text-muted fst-italic">Unassigned</span>
+                                            <span class="small text-muted fst-italic">@Loc["Unassigned"]</span>
                                         }
                                     </td>
                                     <td>
-                                        <a href="@Url.Action("Details", "Tickets", new { id = ticket.Id })" class="btn btn-sm btn-light border py-1 px-2">
+                                        <a href="@Url.Action("Details", "Tickets", new { id = ticket.Id })" class="btn btn-sm btn-light border py-1 px-2" title="@Loc["View Details"]">
                                             <i class="fa-solid fa-arrow-up-right-from-square"></i>
                                         </a>
                                     </td>
@@ -277,21 +277,21 @@
     <div class="col-lg-5">
         <div class="card shadow-sm h-100">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-wrench text-warning me-2"></i> Recent Maintenance Work</h6>
-                <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-outline-secondary">Schedule</a>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-wrench text-warning me-2"></i> @Loc["Recent Maintenance Work"]</h6>
+                <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-outline-secondary">@Loc["Inspection Schedule"]</a>
             </div>
             <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                     @if (!Model.RecentMaintenance.Any())
                     {
-                        <div class="text-center text-muted py-4">No maintenance orders logged yet.</div>
+                        <div class="text-center text-muted py-4">@Loc["No notifications found"]</div>
                     }
                     @foreach (var log in Model.RecentMaintenance)
                     {
                         <div class="list-group-item p-3">
                             <div class="d-flex justify-content-between align-items-start mb-1">
                                 <span class="badge @(log.MaintenanceType == 2 ? "bg-info text-dark" : "bg-danger")">
-                                    @log.TypeName
+                                    @log.DisplayTypeName
                                 </span>
                                 <small class="text-muted">@log.TimStamp?.ToString("MMM dd, yyyy")</small>
                             </div>
@@ -302,11 +302,11 @@
                                 @log.Description
                             </p>
                             <div class="small d-flex justify-content-between text-secondary">
-                                <span><i class="fa-solid fa-user-check me-1"></i> @(log.Technician?.FullName ?? "Contractor")</span>
+                                <span><i class="fa-solid fa-user-check me-1"></i> @(log.Technician?.DisplayFullName ?? Loc["Maintenance Provider"])</span>
                                 @if (log.TicketId.HasValue)
                                 {
                                     <a href="@Url.Action("Details", "Tickets", new { id = log.TicketId.Value })" class="text-decoration-none">
-                                        Ticket #@log.TicketId
+                                        #@log.TicketId
                                     </a>
                                 }
                             </div>

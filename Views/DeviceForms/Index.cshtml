@@ -1,16 +1,16 @@
 @model IEnumerable<StockPortal.Models.DeviceForm>
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
-    ViewData["Title"] = "Universal Device Forms & Specifications";
+    ViewData["Title"] = Loc["Universal Device Forms & Specifications"];
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h4 class="fw-bold mb-0"><i class="fa-solid fa-shapes text-primary me-2"></i> Device Specification Forms & Templates</h4>
-        <small class="text-muted">Universal dynamic forms used to standardize equipment technical specifications in Hospital Assets</small>
+        <h4 class="fw-bold mb-0"><i class="fa-solid fa-shapes text-primary me-2"></i> @Loc["Device Specification Forms & Templates"]</h4>
+        <small class="text-muted">@(Loc.IsArabic ? "نماذج ديناميكية شاملة تُستخدم لتوحيد المواصفات الفنية للمعدات في أصول المستشفى" : "Universal dynamic forms used to standardize equipment technical specifications in Hospital Assets")</small>
     </div>
     <a href="@Url.Action("Create")" class="btn btn-primary">
-        <i class="fa-solid fa-plus me-1"></i> Add New Device Form
+        <i class="fa-solid fa-plus me-1"></i> @Loc["Add New Device Form"]
     </a>
 </div>
 
@@ -19,7 +19,7 @@
     <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-2 mb-4">
         <i class="fa-solid fa-screwdriver-wrench fs-5"></i>
         <div>
-            <strong>@CurrentUser.GetMaintenanceTeam() Maintenance Scope:</strong> You can create and configure device forms for your department's equipment. These forms will be presented when registering new assets.
+            <strong>@(Loc.IsArabic ? $"صلاحيات هندسة {Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}:" : $"{CurrentUser.GetMaintenanceTeam()} Maintenance Scope:")</strong> @(Loc.IsArabic ? "يمكنك إنشاء وتعديل نماذج الأجهزة التابعة لتخصص قسمك، وستظهر هذه النماذج تلقائياً عند تسجيل أي أصل جديد." : "You can create and configure device forms for your department's equipment. These forms will be presented when registering new assets.")
         </div>
     </div>
 }
@@ -31,10 +31,10 @@
             <div class="card shadow-sm border-0 text-center py-5">
                 <div class="card-body">
                     <i class="fa-solid fa-folder-open fa-3x text-muted mb-3"></i>
-                    <h5 class="fw-bold">No Device Forms Configured</h5>
-                    <p class="text-muted">Create your first universal device template to start standardizing equipment specifications.</p>
+                    <h5 class="fw-bold">@(Loc.IsArabic ? "لا توجد نماذج أجهزة مهيأة حالياً" : "No Device Forms Configured")</h5>
+                    <p class="text-muted">@(Loc.IsArabic ? "قم بإنشاء النموذج الأول لبدء توحيد المواصفات الفنية للأجهزة والمعدات." : "Create your first universal device template to start standardizing equipment specifications.")</p>
                     <a href="@Url.Action("Create")" class="btn btn-primary">
-                        <i class="fa-solid fa-plus me-1"></i> Create Device Form
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Add New Device Form"]
                     </a>
                 </div>
             </div>
@@ -50,11 +50,11 @@
                         <i class="fa-solid fa-microchip text-primary me-1"></i> @form.Name
                     </h6>
                     <span class="badge @(form.Department == "BIOMEDICAL" ? "bg-info text-dark" : form.Department == "GENERAL" ? "bg-warning text-dark" : "bg-primary")">
-                        @form.Department
+                        @Loc.TargetTeam(form.Department)
                     </span>
                 </div>
                 <div class="card-body">
-                    <div class="small text-muted mb-2 fw-semibold">Dynamic Specifications Schema (@fields.Count fields):</div>
+                    <div class="small text-muted mb-2 fw-semibold">@(Loc.IsArabic ? $"مخطط المواصفات الفنية ({fields.Count} حقول):" : $"Dynamic Specifications Schema ({fields.Count} fields):")</div>
                     <ul class="list-group list-group-flush small mb-3">
                         @foreach (var f in fields.Take(5))
                         {
@@ -66,7 +66,7 @@
                         @if (fields.Count > 5)
                         {
                             <li class="list-group-item px-0 py-1 text-muted text-center fst-italic">
-                                + @(fields.Count - 5) more fields...
+                                + @(fields.Count - 5) @(Loc.IsArabic ? "حقول إضافية أخرى..." : "more fields...")
                             </li>
                         }
                     </ul>
@@ -75,9 +75,9 @@
                     <span class="small text-muted">ID: #@form.Id</span>
                     <div class="d-flex gap-1">
                         <a href="@Url.Action("Edit", new { id = form.Id })" class="btn btn-sm btn-outline-primary">
-                            <i class="fa-solid fa-pen-to-square me-1"></i> Edit
+                            <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
                         </a>
-                        <form method="post" asp-action="Delete" asp-route-id="@form.Id" onsubmit="return confirm('Are you sure you want to delete the @form.Name form?');">
+                        <form method="post" asp-action="Delete" asp-route-id="@form.Id" onsubmit="return confirm('@(Loc.IsArabic ? $"هل أنت متأكد من حذف نموذج {form.Name}؟" : $"Are you sure you want to delete the {form.Name} form?")');">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-sm btn-outline-danger">
                                 <i class="fa-solid fa-trash-can"></i>

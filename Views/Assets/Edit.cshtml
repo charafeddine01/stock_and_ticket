@@ -1,7 +1,7 @@
 @model StockPortal.Models.Asset
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
-    ViewData["Title"] = $"Edit Asset: {Model.HospitalNo ?? ("#" + Model.Id)}";
+    ViewData["Title"] = $"{Loc["Edit"]}: {Model.HospitalNo ?? ("#" + Model.Id)}";
     var deviceForm = ViewBag.DeviceForm as StockPortal.Models.DeviceForm;
     var specsDict = ViewBag.SpecsDictionary as Dictionary<string, string> ?? new();
     bool isMaintenance = CurrentUser.IsMaintenance();
@@ -11,9 +11,9 @@
     <div class="col-lg-10">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i> Edit Equipment: @(Model.HospitalNo ?? $"Asset #{Model.Id}")</h5>
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-pen-to-square text-primary me-2"></i> @Loc["Edit"]: @(Model.HospitalNo ?? $"Asset #{Model.Id}")</h5>
                 <span class="badge @(Model.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : Model.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-primary")">
-                    @Model.MaintenanceTeam Maintenance
+                    @Loc.TargetTeam(Model.MaintenanceTeam)
                 </span>
             </div>
             <div class="card-body p-4">
@@ -30,11 +30,11 @@
                         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                             <h6 class="fw-bold mb-0 text-dark">
                                 <i class="fa-solid fa-microchip text-primary me-2"></i> 
-                                @(deviceForm != null ? $"{deviceForm.Name} Specifications" : "Technical Specifications")
+                                @(deviceForm != null ? $"{deviceForm.Name} {Loc["Technical Specifications Form"]}" : Loc["Technical Specifications Form"])
                             </h6>
                             @if (deviceForm != null)
                             {
-                                <span class="badge bg-light text-muted border">Template: @deviceForm.Name</span>
+                                <span class="badge bg-light text-muted border">@(Loc.IsArabic ? "النموذج:" : "Template:") @deviceForm.Name</span>
                             }
                         </div>
                         <div class="card-body p-4">
@@ -51,7 +51,7 @@
                                             @if (field.Type == "select")
                                             {
                                                 <select name="spec_@field.Name" class="form-select" @(field.Required ? "required" : "")>
-                                                    <option value="">-- Select @field.Label --</option>
+                                                    <option value="">@(Loc.IsArabic ? $"-- اختر {field.Label} --" : $"-- Select {field.Label} --")</option>
                                                     @foreach (var opt in field.Options)
                                                     {
                                                         <option value="@opt" selected="@(currentVal == opt)">@opt</option>
@@ -78,7 +78,7 @@
                             else
                             {
                                 <div class="mb-3">
-                                    <label asp-for="Specs" class="form-label fw-semibold">Raw Specifications</label>
+                                    <label asp-for="Specs" class="form-label fw-semibold">@Loc["Technical Specifications"]</label>
                                     <textarea asp-for="Specs" class="form-control font-monospace" rows="3"></textarea>
                                 </div>
                             }
@@ -86,77 +86,77 @@
                     </div>
 
                     <!-- 2. Identification Details -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">2. Equipment Identification</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Identification & Serial Numbers"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="HospitalNo" class="form-label fw-semibold">Asset Tag / Tag No</label>
+                            <label asp-for="HospitalNo" class="form-label fw-semibold">@Loc["Hospital Asset Tag / Tag No"]</label>
                             <input asp-for="HospitalNo" class="form-control" required />
                             <span asp-validation-for="HospitalNo" class="text-danger small"></span>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="SerialNo" class="form-label fw-semibold">Serial Number</label>
+                            <label asp-for="SerialNo" class="form-label fw-semibold">@Loc["Serial Number"]</label>
                             <input asp-for="SerialNo" class="form-control font-monospace" required />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Equipment Type</label>
-                            <input type="text" class="form-control bg-light" value="@Model.Type" readonly />
+                            <label class="form-label fw-semibold">@Loc["Equipment Type"]</label>
+                            <input type="text" class="form-control bg-light" value="@Model.DisplayType" readonly />
                         </div>
 
                         <div class="col-md-4">
-                            <label asp-for="Brand" class="form-label fw-semibold">Brand / Manufacturer</label>
+                            <label asp-for="Brand" class="form-label fw-semibold">@Loc["Brand / Manufacturer"]</label>
                             <input asp-for="Brand" class="form-control" required />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="ModelNo" class="form-label fw-semibold">Model No</label>
+                            <label asp-for="ModelNo" class="form-label fw-semibold">@Loc["Model / Version"]</label>
                             <input asp-for="ModelNo" class="form-control" />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="SupplierId" class="form-label fw-semibold">Supplier / Vendor</label>
+                            <label asp-for="SupplierId" class="form-label fw-semibold">@Loc["Approved Suppliers & Vendors"]</label>
                             <select asp-for="SupplierId" class="form-select" asp-items="ViewBag.Suppliers">
-                                <option value="">-- None --</option>
+                                <option value="">@(Loc.IsArabic ? "-- بدون مورد --" : "-- None --")</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- 3. Status & Location -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">3. Status & Location</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Initial Custody & Placement"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="Status" class="form-label fw-semibold">Operational Status</label>
+                            <label asp-for="Status" class="form-label fw-semibold">@Loc["Operational Status"]</label>
                             <select asp-for="Status" class="form-select">
-                                <option value="In Service">In Service</option>
-                                <option value="In Stock">In Stock (Spare)</option>
-                                <option value="Under Maintenance">Under Maintenance</option>
-                                <option value="Retired">Retired / Scrapped</option>
+                                <option value="In Service" selected="@(Model.Status == "In Service")">@Loc.Status("In Service")</option>
+                                <option value="In Stock" selected="@(Model.Status == "In Stock")">@Loc.Status("In Stock")</option>
+                                <option value="Under Maintenance" selected="@(Model.Status == "Under Maintenance")">@Loc.Status("Under Maintenance")</option>
+                                <option value="Retired" selected="@(Model.Status == "Retired")">@Loc.Status("Retired")</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="UserId" class="form-label fw-semibold">Assigned Custodian</label>
+                            <label asp-for="UserId" class="form-label fw-semibold">@Loc["Assigned Staff / Custodian"]</label>
                             <select asp-for="UserId" class="form-select" asp-items="ViewBag.Users">
-                                <option value="">-- Central Department Stock --</option>
+                                <option value="">@(Loc.IsArabic ? "-- المخزن المركزي للقسم --" : "-- Central Department Stock --")</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="RoomId" class="form-label fw-semibold">Location / Room</label>
+                            <label asp-for="RoomId" class="form-label fw-semibold">@Loc["Location / Room"]</label>
                             <select asp-for="RoomId" class="form-select" asp-items="ViewBag.Rooms">
-                                <option value="">-- Select Room --</option>
+                                <option value="">@(Loc.IsArabic ? "-- اختر الغرفة --" : "-- Select Room --")</option>
                             </select>
                         </div>
                     </div>
 
                     <!-- 4. Commercial & Periodic Maintenance -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">4. Financial & Periodic Inspection</h6>
+                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Purchase, Warranty & Periodic Inspection"]</h6>
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
-                            <label asp-for="Price" class="form-label fw-semibold">Purchase Price ($)</label>
+                            <label asp-for="Price" class="form-label fw-semibold">@Loc["Purchase Price"] ($)</label>
                             <input asp-for="Price" class="form-control" type="number" step="0.01" />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="BuyingDate" class="form-label fw-semibold">Purchase Date</label>
+                            <label asp-for="BuyingDate" class="form-label fw-semibold">@Loc["Purchase Date"]</label>
                             <input asp-for="BuyingDate" class="form-control" type="date" />
                         </div>
                         <div class="col-md-4">
-                            <label asp-for="WarrantyTill" class="form-label fw-semibold">Warranty Expiration Date</label>
+                            <label asp-for="WarrantyTill" class="form-label fw-semibold">@Loc["Warranty Expiration"]</label>
                             <input asp-for="WarrantyTill" class="form-control" type="date" />
                         </div>
 
@@ -164,20 +164,20 @@
                             <div class="form-check mt-3">
                                 <input type="checkbox" name="NeedsPeriodic" value="true" class="form-check-input" id="chkNeedsPeriodic" @(Model.NeedsPeriodic == true ? "checked" : "") />
                                 <label class="form-check-label fw-semibold" for="chkNeedsPeriodic">
-                                    Requires Scheduled Periodic Maintenance
+                                    @Loc["Requires Periodic Maintenance"]
                                 </label>
                             </div>
                         </div>
                         <div class="col-md-6" id="periodicIntervalContainer" style="display: @(Model.NeedsPeriodic == true ? "block" : "none");">
-                            <label asp-for="PeriodicInterval" class="form-label fw-semibold">Inspection Interval (Days)</label>
+                            <label asp-for="PeriodicInterval" class="form-label fw-semibold">@Loc["Interval (Days)"]</label>
                             <input asp-for="PeriodicInterval" class="form-control" type="number" />
                         </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a href="@Url.Action("Details", new { id = Model.Id })" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="@Url.Action("Details", new { id = Model.Id })" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
                         <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="fa-solid fa-floppy-disk me-1"></i> Save Changes
+                            <i class="fa-solid fa-floppy-disk me-1"></i> @Loc["Save Changes"]
                         </button>
                     </div>
                 </form>

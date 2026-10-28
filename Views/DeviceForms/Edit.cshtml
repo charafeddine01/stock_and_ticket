@@ -1,7 +1,7 @@
 @model StockPortal.Models.DeviceForm
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
-    ViewData["Title"] = $"Edit Device Form: {Model.Name}";
+    ViewData["Title"] = $"{Loc["Edit Device Form"]}: {Model.Name}";
     var availableTeams = ViewBag.AvailableTeams as string[] ?? StockPortal.Models.MaintenanceTeams.All;
     bool isMaintenance = CurrentUser.IsMaintenance();
 }
@@ -10,7 +10,7 @@
     <div class="col-lg-10">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-shapes text-primary me-2"></i> Edit Device Form: @Model.Name</h5>
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-shapes text-primary me-2"></i> @Loc["Edit Device Form"]: @Model.Name</h5>
             </div>
             <div class="card-body p-4">
                 <form asp-action="Edit" asp-route-id="@Model.Id" method="post" id="deviceFormEditor">
@@ -21,25 +21,25 @@
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label asp-for="Name" class="form-label fw-semibold">Device Type / Template Name <span class="text-danger">*</span></label>
+                            <label asp-for="Name" class="form-label fw-semibold">@(Loc.IsArabic ? "نوع الجهاز / اسم النموذج" : "Device Type / Template Name") <span class="text-danger">*</span></label>
                             <input asp-for="Name" class="form-control" required />
                             <span asp-validation-for="Name" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label asp-for="Department" class="form-label fw-semibold">Maintenance Department <span class="text-danger">*</span></label>
+                            <label asp-for="Department" class="form-label fw-semibold">@Loc["Target Maintenance Team"] <span class="text-danger">*</span></label>
                             @if (isMaintenance)
                             {
-                                <input type="text" class="form-control bg-light fw-bold" value="@Model.Department" readonly />
+                                <input type="text" class="form-control bg-light fw-bold" value="@Loc.TargetTeam(Model.Department)" readonly />
                                 <input type="hidden" asp-for="Department" />
-                                <div class="form-text small text-success"><i class="fa-solid fa-lock me-1"></i> Locked to your maintenance engineering discipline.</div>
+                                <div class="form-text small text-success"><i class="fa-solid fa-lock me-1"></i> @(Loc.IsArabic ? "مقفل وفقاً لاختصاص فريق الصيانة الخاص بك." : "Locked to your maintenance engineering discipline.")</div>
                             }
                             else
                             {
                                 <select asp-for="Department" class="form-select">
                                     @foreach (var t in availableTeams)
                                     {
-                                        <option value="@t" selected="@(Model.Department == t)">@t Maintenance</option>
+                                        <option value="@t" selected="@(Model.Department == t)">@Loc.TargetTeam(t)</option>
                                     }
                                 </select>
                             }
@@ -50,11 +50,11 @@
                     <div class="card bg-light border mb-4">
                         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
                             <div>
-                                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-list-check text-primary me-2"></i> Dynamic Specification Fields</h6>
-                                <small class="text-muted">Modify or add custom fields for this equipment specification form</small>
+                                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-list-check text-primary me-2"></i> @Loc["Dynamic Specification Fields"]</h6>
+                                <small class="text-muted">@(Loc.IsArabic ? "تعديل أو إضافة حقول مخصصة لنموذج مواصفات هذا الجهاز" : "Modify or add custom fields for this equipment specification form")</small>
                             </div>
                             <button type="button" class="btn btn-sm btn-primary" id="btnAddField">
-                                <i class="fa-solid fa-plus me-1"></i> Add Field
+                                <i class="fa-solid fa-plus me-1"></i> @Loc["Add Field"]
                             </button>
                         </div>
                         <div class="card-body p-0">
@@ -62,12 +62,12 @@
                                 <table class="table table-bordered align-middle mb-0" id="fieldsTable">
                                     <thead class="table-light">
                                         <tr>
-                                            <th style="width: 25%;">Field Display Label <span class="text-danger">*</span></th>
-                                            <th style="width: 20%;">Variable Key <span class="text-danger">*</span></th>
-                                            <th style="width: 15%;">Field Type</th>
-                                            <th style="width: 25%;">Dropdown Options (Comma-separated)</th>
-                                            <th style="width: 10%;" class="text-center">Required?</th>
-                                            <th style="width: 5%;" class="text-center">Remove</th>
+                                            <th style="width: 25%;">@Loc["Field Display Label"] <span class="text-danger">*</span></th>
+                                            <th style="width: 20%;">@Loc["Variable Key"] <span class="text-danger">*</span></th>
+                                            <th style="width: 15%;">@Loc["Field Type"]</th>
+                                            <th style="width: 25%;">@Loc["Dropdown Options (Comma-separated)"]</th>
+                                            <th style="width: 10%;" class="text-center">@Loc["Required?"]</th>
+                                            <th style="width: 5%;" class="text-center">@Loc["Actions"]</th>
                                         </tr>
                                     </thead>
                                     <tbody id="fieldsContainer">
@@ -79,9 +79,9 @@
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
                         <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="fa-solid fa-floppy-disk me-1"></i> Update Device Form
+                            <i class="fa-solid fa-floppy-disk me-1"></i> @Loc["Update Device Form"]
                         </button>
                     </div>
                 </form>
@@ -93,6 +93,7 @@
 @section Scripts {
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const isAr = document.documentElement.dir === 'rtl' || document.documentElement.lang.startsWith('ar');
         const fieldsContainer = document.getElementById("fieldsContainer");
         const btnAddField = document.getElementById("btnAddField");
         const formEl = document.getElementById("deviceFormEditor");
@@ -109,21 +110,21 @@
             const tr = document.createElement("tr");
             tr.innerHTML = `
                 <td>
-                    <input type="text" class="form-control form-control-sm field-label" value="${field.label || ''}" placeholder="e.g. Processor / CPU" required />
+                    <input type="text" class="form-control form-control-sm field-label" value="${field.label || ''}" placeholder="${isAr ? 'مثال: المعالج / الذاكرة' : 'e.g. Processor / CPU'}" required />
                 </td>
                 <td>
                     <input type="text" class="form-control form-control-sm font-monospace field-name" value="${field.name || ''}" placeholder="e.g. CPU" required />
                 </td>
                 <td>
                     <select class="form-select form-select-sm field-type">
-                        <option value="text" ${field.type === 'text' ? 'selected' : ''}>Text Input</option>
-                        <option value="select" ${field.type === 'select' ? 'selected' : ''}>Dropdown Select</option>
-                        <option value="number" ${field.type === 'number' ? 'selected' : ''}>Numeric</option>
-                        <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>Multi-line Text</option>
+                        <option value="text" ${field.type === 'text' ? 'selected' : ''}>${isAr ? 'نص مدخل' : 'Text Input'}</option>
+                        <option value="select" ${field.type === 'select' ? 'selected' : ''}>${isAr ? 'قائمة منسدلة' : 'Dropdown Select'}</option>
+                        <option value="number" ${field.type === 'number' ? 'selected' : ''}>${isAr ? 'رقمي' : 'Numeric'}</option>
+                        <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>${isAr ? 'نص متعدد الأسطر' : 'Multi-line Text'}</option>
                     </select>
                 </td>
                 <td>
-                    <input type="text" class="form-control form-control-sm field-options" value="${(field.options || []).join(', ')}" placeholder="e.g. Option 1, Option 2" ${field.type === 'select' ? '' : 'disabled'} />
+                    <input type="text" class="form-control form-control-sm field-options" value="${(field.options || []).join(', ')}" placeholder="${isAr ? 'مثال: خيار 1، خيار 2' : 'e.g. Option 1, Option 2'}" ${field.type === 'select' ? '' : 'disabled'} />
                 </td>
                 <td class="text-center">
                     <input type="checkbox" class="form-check-input field-required" ${field.required ? 'checked' : ''} />
@@ -149,10 +150,10 @@
             typeSelect.addEventListener("change", function() {
                 if (typeSelect.value === "select") {
                     optionsInput.disabled = false;
-                    optionsInput.placeholder = "e.g. Option A, Option B, Option C";
+                    optionsInput.placeholder = isAr ? "مثال: خيار أ، خيار ب، خيار ج" : "e.g. Option A, Option B, Option C";
                 } else {
                     optionsInput.disabled = true;
-                    optionsInput.placeholder = "N/A for text/number";
+                    optionsInput.placeholder = isAr ? "غير متاح للنص/الرقم" : "N/A for text/number";
                 }
             });
 
@@ -200,7 +201,7 @@
             });
 
             if (fields.length === 0) {
-                alert("Please define at least one specification field for this device.");
+                alert(isAr ? "يرجى تحديد حقل مواصفات واحد على الأقل لهذا الجهاز." : "Please define at least one specification field for this device.");
                 e.preventDefault();
                 return false;
             }
