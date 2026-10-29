@@ -1,0 +1,425 @@
+@model IEnumerable<StockPortal.Models.Asset>
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="@Loc.CurrentCulture" dir="@Loc.Direction">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(Loc.IsArabic ? "طباعة مجمعة لملصقات الأصول" : "Bulk Asset Tag Label Printing")</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    @if (Loc.IsArabic)
+    {
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    }
+    else
+    {
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <style>
+        @@media print {
+            .no-print { display: none !important; }
+            body { 
+                background: white !important; 
+                padding: 0 !important; 
+                margin: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .bulk-grid { 
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 12px !important;
+                padding: 10px !important;
+            }
+            .tag-card { 
+                border: 2px solid #000 !important; 
+                box-shadow: none !important; 
+                page-break-inside: avoid;
+                margin: 0 auto;
+                width: 100% !important;
+                max-width: 360px !important;
+            }
+        }
+
+        body {
+            background-color: #f1f5f9;
+            font-family: @(Loc.IsArabic ? "'Cairo', " : "") 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 1.5rem 1rem 3rem 1rem;
+            color: #0f172a;
+        }
+
+        .customizer-panel {
+            max-width: 960px;
+            margin: 0 auto 1.5rem auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+
+        .customizer-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 20px;
+        }
+
+        .customizer-body {
+            padding: 18px 20px;
+        }
+
+        .bulk-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .tag-card {
+            background: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+            page-break-inside: avoid;
+        }
+
+        .tag-top-facility {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            color: #475569;
+            text-transform: uppercase;
+        }
+
+        .tag-top-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+
+        .tag-badge-pill {
+            font-size: 11px;
+            font-weight: 700;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 2px 7px;
+            border-radius: 4px;
+            display: inline-block;
+            font-family: monospace;
+            letter-spacing: 1.2px;
+        }
+
+        .tag-data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 4px;
+            font-size: 11px;
+            line-height: 1.25;
+        }
+
+        .tag-data-label {
+            color: #64748b;
+            font-weight: 600;
+            flex-shrink: 0;
+            margin-inline-end: 6px;
+        }
+
+        .tag-data-value {
+            font-weight: 700;
+            color: #0f172a;
+            text-align: end;
+            word-break: break-word;
+        }
+
+        .tag-qr-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+
+        .tag-footer-text {
+            font-size: 8px;
+            font-weight: 700;
+            color: #475569;
+            line-height: 1.25;
+        }
+
+        .tag-footer-sub {
+            font-size: 7.5px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .toast-saved {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            background: #059669;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-weight: 600;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="saveToast" class="toast-saved">
+        <i class="fa-solid fa-circle-check me-2"></i>
+        <span>@(Loc.IsArabic ? "تم حفظ التنسيق لجميع البطاقات!" : "Template saved for all cards!")</span>
+    </div>
+
+    <!-- Customizer Toolbar -->
+    <div class="customizer-panel no-print">
+        <div class="customizer-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h6 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-tags text-primary me-2"></i>
+                    @(Loc.IsArabic ? $"طباعة ملصقات الأصول ({Model.Count()} بطاقة)" : $"Bulk Asset Tag Printing ({Model.Count()} Cards)")
+                </h6>
+                <small class="text-muted">@(Loc.IsArabic ? "التنسيق المحفوظ يطبق تلقائياً على كافة الملصقات" : "Customized header, footer, columns & QR code apply across all tags")</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" onclick="saveTagDefaults()" class="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>@(Loc.IsArabic ? "حفظ التنسيق كافتراضي" : "Save as Default")</span>
+                </button>
+                <button type="button" onclick="window.print()" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-print"></i>
+                    <span class="fw-bold">@Loc["Print All Labels"]</span>
+                </button>
+                <button type="button" onclick="window.close()" class="btn btn-outline-dark btn-sm">
+                    @Loc["Close"]
+                </button>
+            </div>
+        </div>
+
+        <div class="customizer-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي (اسم المنشأة)" : "Top Header Line 1")</label>
+                    <input type="text" id="cfgTopLine1" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
+                           value="@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 2 (عنوان البطاقة)" : "Top Header Line 2")</label>
+                    <input type="text" id="cfgTopLine2" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
+                           value="@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي (التحذير)" : "Bottom Warning Text")</label>
+                    <input type="text" id="cfgBottomText" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
+                           value="@(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي الثانوي" : "Bottom Secondary Text")</label>
+                    <input type="text" id="cfgBottomSub" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
+                           value="@(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")" />
+                </div>
+                <div class="col-md-6 d-flex align-items-center">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="cfgShowQR" checked onchange="updateAllCardsLive()">
+                        <label class="form-check-label fw-bold small" for="cfgShowQR">
+                            @(Loc.IsArabic ? "تضمين رمز QR حقيقي لكل بطاقة" : "Include Real QR Code on Each Card")
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cards Grid -->
+    <div class="bulk-grid">
+        @foreach (var item in Model)
+        {
+            var itemTag = string.IsNullOrWhiteSpace(item.HospitalNo) ? $"ASSET-{item.Id:D5}" : item.HospitalNo;
+            var itemUrl = $"{Context.Request.Scheme}://{Context.Request.Host}/Assets/Details/{item.Id}";
+
+            <div class="tag-card" data-asset-id="@item.Id" data-tag="@itemTag" data-serial="@(item.SerialNo ?? "")" data-type="@(item.DisplayType ?? "")" data-brand="@(item.Brand ?? "")" data-room="@(item.Room?.DisplayName ?? "")" data-user="@(item.User?.DisplayFullName ?? "")" data-calib="@(item.NeedsCalibration == true ? (item.IsCalibrationOverdue ? "Overdue" : "Valid until " + item.NextCalibration?.ToString("yyyy-MM-dd")) : "Not Required")" data-url="@itemUrl">
+                
+                <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-2 mb-2">
+                    <div>
+                        <div class="tag-top-facility lbl-bulk-top1">@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")</div>
+                        <div class="tag-top-title lbl-bulk-top2">@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")</div>
+                    </div>
+                    <div class="text-primary text-center">
+                        <i class="fa-solid fa-shield-heart fa-lg"></i>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between gap-2 my-1 py-1">
+                    <div class="flex-grow-1">
+                        <div class="text-muted small" style="font-size: 9px; font-weight: 700; text-transform: uppercase;">@Loc["Asset Tag / ID"]</div>
+                        <div class="tag-badge-pill mt-1">@itemTag</div>
+                        <div class="tag-data-row mt-1 mb-0" style="font-size: 10px;">
+                            <span class="text-muted font-monospace">SN: @(item.SerialNo ?? "N/A")</span>
+                        </div>
+                    </div>
+                    <div class="tag-qr-container bulk-qr-box">
+                        <div id="qr_@item.Id"></div>
+                        <div class="mt-1 text-center font-monospace" style="font-size: 7px; color: #475569;">@itemTag</div>
+                    </div>
+                </div>
+
+                <div class="border-top border-dark pt-2 mt-2">
+                    <div class="tag-data-row">
+                        <span class="tag-data-label">@Loc["Type"]:</span>
+                        <span class="tag-data-value">@(item.DisplayType ?? "General Equipment")</span>
+                    </div>
+                    <div class="tag-data-row">
+                        <span class="tag-data-label">@Loc["Brand & Model"]:</span>
+                        <span class="tag-data-value">@(item.Brand ?? "Unbranded") @(item.ModelNo.HasValue ? item.ModelNo.ToString() : "")</span>
+                    </div>
+                    <div class="tag-data-row">
+                        <span class="tag-data-label">@Loc["Location"]:</span>
+                        <span class="tag-data-value">@(item.Room?.DisplayName ?? Loc["Unassigned"])</span>
+                    </div>
+                    <div class="tag-data-row">
+                        <span class="tag-data-label">@Loc["Custodian"]:</span>
+                        <span class="tag-data-value">@(item.User?.DisplayFullName ?? Loc["Central IT Stock"])</span>
+                    </div>
+                    <div class="tag-data-row">
+                        <span class="tag-data-label">@(Loc.IsArabic ? "المعايرة" : "Calibration"):</span>
+                        <span class="tag-data-value">
+                            @if (item.NeedsCalibration == true)
+                            {
+                                if (item.IsCalibrationOverdue)
+                                {
+                                    <span class="text-danger fw-bold">@(Loc.IsArabic ? "متأخرة" : "Overdue")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-success fw-bold">@(Loc.IsArabic ? "صالحة" : "Valid") (@item.NextCalibration?.ToString("yyyy-MM-dd"))</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">@(Loc.IsArabic ? "غير مطلوبة" : "N/A")</span>
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-2 pt-1 border-top border-dark text-center">
+                    <div class="tag-footer-text lbl-bulk-bot">
+                        @(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")
+                    </div>
+                    <div class="tag-footer-sub lbl-bulk-botsub">
+                        @(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")
+                    </div>
+                </div>
+
+            </div>
+        }
+    </div>
+
+    <script src="~/lib/qrcode.min.js"></script>
+    <script>
+        const STORAGE_KEY = 'StockPortal_AssetTagConfig';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadBulkDefaults();
+            renderAllQRCodes();
+            updateAllCardsLive();
+        });
+
+        function updateAllCardsLive() {
+            const top1 = document.getElementById('cfgTopLine1').value;
+            const top2 = document.getElementById('cfgTopLine2').value;
+            const bot = document.getElementById('cfgBottomText').value;
+            const botSub = document.getElementById('cfgBottomSub').value;
+            const showQR = document.getElementById('cfgShowQR').checked;
+
+            document.querySelectorAll('.lbl-bulk-top1').forEach(el => el.textContent = top1);
+            document.querySelectorAll('.lbl-bulk-top2').forEach(el => el.textContent = top2);
+            document.querySelectorAll('.lbl-bulk-bot').forEach(el => el.textContent = bot);
+            document.querySelectorAll('.lbl-bulk-botsub').forEach(el => el.textContent = botSub);
+            document.querySelectorAll('.bulk-qr-box').forEach(el => el.style.display = showQR ? 'flex' : 'none');
+        }
+
+        function renderAllQRCodes() {
+            document.querySelectorAll('.tag-card').forEach(card => {
+                const id = card.getAttribute('data-asset-id');
+                const tag = card.getAttribute('data-tag');
+                const serial = card.getAttribute('data-serial');
+                const type = card.getAttribute('data-type');
+                const brand = card.getAttribute('data-brand');
+                const room = card.getAttribute('data-room');
+                const user = card.getAttribute('data-user');
+                const calib = card.getAttribute('data-calib');
+                const url = card.getAttribute('data-url');
+
+                const container = document.getElementById('qr_' + id);
+                if (!container) return;
+                container.innerHTML = '';
+
+                const qrText = `[ASSET: ${tag}]\nSN: ${serial}\nType: ${type}\nBrand: ${brand}\nLoc: ${room}\nUser: ${user}\nCalib: ${calib}\nURL: ${url}`;
+
+                try {
+                    new QRCode(container, {
+                        text: qrText,
+                        width: 90,
+                        height: 90,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                } catch (e) {
+                    console.error("QR render error", e);
+                }
+            });
+        }
+
+        function saveTagDefaults() {
+            const config = {
+                topLine1: document.getElementById('cfgTopLine1').value,
+                topLine2: document.getElementById('cfgTopLine2').value,
+                bottomText: document.getElementById('cfgBottomText').value,
+                bottomSub: document.getElementById('cfgBottomSub').value,
+                showQR: document.getElementById('cfgShowQR').checked
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+            const toast = document.getElementById('saveToast');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function loadBulkDefaults() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+            try {
+                const config = JSON.parse(saved);
+                if (config.topLine1 !== undefined) document.getElementById('cfgTopLine1').value = config.topLine1;
+                if (config.topLine2 !== undefined) document.getElementById('cfgTopLine2').value = config.topLine2;
+                if (config.bottomText !== undefined) document.getElementById('cfgBottomText').value = config.bottomText;
+                if (config.bottomSub !== undefined) document.getElementById('cfgBottomSub').value = config.bottomSub;
+                if (config.showQR !== undefined) document.getElementById('cfgShowQR').checked = config.showQR;
+            } catch (e) {}
+        }
+    </script>
+</body>
+</html>

@@ -43,6 +43,13 @@ namespace StockPortal.Controllers
                 .Include(a => a.Supplier)
                 .AsQueryable();
 
+            var calibrationAssetsQuery = _context.Assets
+                .Where(a => a.NeedsCalibration == true)
+                .Include(a => a.User)
+                .Include(a => a.Room)
+                .Include(a => a.Supplier)
+                .AsQueryable();
+
             var logsQuery = _context.AssetMaintenances
                 .Include(m => m.Asset)
                 .Include(m => m.Technician)
@@ -64,11 +71,13 @@ namespace StockPortal.Controllers
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
                 periodicAssetsQuery = periodicAssetsQuery.Where(a => a.MaintenanceTeam == myTeam);
+                calibrationAssetsQuery = calibrationAssetsQuery.Where(a => a.MaintenanceTeam == myTeam);
                 logsQuery = logsQuery.Where(m => m.Asset != null && m.Asset.MaintenanceTeam == myTeam);
                 activeWorkOrdersQuery = activeWorkOrdersQuery.Where(m => m.Asset != null && m.Asset.MaintenanceTeam == myTeam);
             }
 
             var periodicAssets = await periodicAssetsQuery.ToListAsync();
+            var calibrationAssets = await calibrationAssetsQuery.ToListAsync();
             var recentLogs = await logsQuery.OrderByDescending(m => m.TimStamp).Take(50).ToListAsync();
             var activeWorkOrders = await activeWorkOrdersQuery.OrderByDescending(m => m.SentDate).ToListAsync();
 
@@ -87,6 +96,21 @@ namespace StockPortal.Controllers
                 UpToDateAssets = periodicAssets
                     .Where(a => !a.NextPeriodic.HasValue || a.NextPeriodic.Value > thirtyDaysFromNow)
                     .OrderBy(a => a.NextPeriodic)
+                    .ToList(),
+
+                OverdueCalibrationAssets = calibrationAssets
+                    .Where(a => a.NextCalibration.HasValue && a.NextCalibration.Value < now)
+                    .OrderBy(a => a.NextCalibration)
+                    .ToList(),
+
+                UpcomingCalibrationAssets = calibrationAssets
+                    .Where(a => a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= thirtyDaysFromNow)
+                    .OrderBy(a => a.NextCalibration)
+                    .ToList(),
+
+                ValidCalibrationAssets = calibrationAssets
+                    .Where(a => !a.NextCalibration.HasValue || a.NextCalibration.Value > thirtyDaysFromNow)
+                    .OrderBy(a => a.NextCalibration)
                     .ToList(),
 
                 RecentLogs = recentLogs,

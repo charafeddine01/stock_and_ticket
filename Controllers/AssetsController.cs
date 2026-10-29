@@ -27,7 +27,7 @@ namespace StockPortal.Controllers
         }
 
         // GET: Assets
-        public async Task<IActionResult> Index(string? search, string? status, string? type, int? roomId, string? warranty)
+        public async Task<IActionResult> Index(string? search = null, string? status = null, string? type = null, int? roomId = null, string? warranty = null, string? calibration = null)
         {
             var query = _context.Assets
                 .Include(a => a.User)
@@ -93,11 +93,35 @@ namespace StockPortal.Controllers
                 }
             }
 
+            if (!string.IsNullOrWhiteSpace(calibration))
+            {
+                var now = DateTime.Now.Date;
+                if (calibration == "required")
+                {
+                    query = query.Where(a => a.NeedsCalibration == true);
+                }
+                else if (calibration == "overdue")
+                {
+                    query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < now);
+                }
+                else if (calibration == "due30")
+                {
+                    var future30 = now.AddDays(30);
+                    query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= future30);
+                }
+                else if (calibration == "valid")
+                {
+                    var future30 = now.AddDays(30);
+                    query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value > future30);
+                }
+            }
+
             ViewBag.Search = search;
             ViewBag.SelectedStatus = status;
             ViewBag.SelectedType = type;
             ViewBag.SelectedRoomId = roomId;
             ViewBag.SelectedWarranty = warranty;
+            ViewBag.SelectedCalibration = calibration;
 
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync();
             ViewBag.Types = await _context.Assets.Where(a => a.Type != null).Select(a => a.Type!).Distinct().ToListAsync();
@@ -250,6 +274,20 @@ namespace StockPortal.Controllers
                     asset.NextPeriodic = asset.LastPeriodic.Value.AddDays(asset.PeriodicInterval.Value);
                 }
 
+                // Calculate next calibration if needed (Task 2)
+                if (asset.NeedsCalibration == true && asset.CalibrationInterval.HasValue && asset.CalibrationInterval.Value > 0)
+                {
+                    asset.LastCalibration ??= DateTime.Now;
+                    if (!asset.NextCalibration.HasValue)
+                    {
+                        asset.NextCalibration = asset.LastCalibration.Value.AddDays(asset.CalibrationInterval.Value);
+                    }
+                }
+                else if (asset.NeedsCalibration != true)
+                {
+                    asset.NextCalibration = null;
+                }
+
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
@@ -394,6 +432,19 @@ namespace StockPortal.Controllers
                     else
                     {
                         asset.NextPeriodic = null;
+                    }
+
+                    // Calculate next calibration if needed (Task 2)
+                    if (asset.NeedsCalibration == true && asset.CalibrationInterval.HasValue && asset.CalibrationInterval.Value > 0)
+                    {
+                        if (asset.LastCalibration.HasValue)
+                        {
+                            asset.NextCalibration = asset.LastCalibration.Value.AddDays(asset.CalibrationInterval.Value);
+                        }
+                    }
+                    else if (asset.NeedsCalibration != true)
+                    {
+                        asset.NextCalibration = null;
                     }
 
                     _context.Update(asset);
@@ -546,6 +597,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.CustodyType)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (asset == null) return NotFound();
@@ -553,6 +605,94 @@ namespace StockPortal.Controllers
             if (!_currentUserService.CanAccessAsset(asset)) return Forbid();
 
             return View(asset);
+        }
+
+        // GET: Assets/PrintBulkTags
+        public async Task<IActionResult> PrintBulkTags(string? search = null, string? status = null, string? type = null, int? roomId = null, string? ids = null)
+        {
+            var query = _context.Assets
+                .Include(a => a.User)
+                .Include(a => a.Room)
+                .Include(a => a.Supplier)
+                .Include(a => a.CustodyType)
+                .AsQueryable();
+
+            if (_currentUserService.IsEndUser())
+            {
+                int currentUserId = _currentUserService.GetUserId();
+                query = query.Where(a => a.UserId == currentUserId);
+            }
+            else if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam();
+                query = query.Where(a => a.MaintenanceTeam == myTeam || a.MaintenanceTeam == null);
+            }
+
+            if (!string.IsNullOrWhiteSpace(ids))
+            {
+                var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                .Select(s => int.TryParse(s, out var v) ? v : 0)
+                                .Where(v => v > 0)
+                                .ToList();
+                if (idList.Any())
+                {
+                    query = query.Where(a => idList.Contains(a.Id));
+                }
+            }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var s = search.Trim().ToLower();
+                    query = query.Where(a => (a.HospitalNo != null && a.HospitalNo.ToLower().Contains(s)) ||
+                                             (a.SerialNo != null && a.SerialNo.ToLower().Contains(s)) ||
+                                             (a.Brand != null && a.Brand.ToLower().Contains(s)) ||
+                                             (a.Type != null && a.Type.ToLower().Contains(s)));
+                }
+                if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
+                if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
+                if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId);
+            }
+
+            var assets = await query.OrderBy(a => a.HospitalNo ?? a.Id.ToString()).ToListAsync();
+            return View(assets);
+        }
+
+        // POST: Assets/LogCalibration (Task 2)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LogCalibration(int assetId, DateTime calibrationDate, int? intervalDays, string? certNo, string? calibratedBy, string? notes)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            asset.NeedsCalibration = true;
+            if (intervalDays.HasValue && intervalDays.Value > 0)
+            {
+                asset.CalibrationInterval = intervalDays.Value;
+            }
+            asset.LastCalibration = calibrationDate;
+            int interval = asset.CalibrationInterval ?? 180;
+            asset.NextCalibration = calibrationDate.AddDays(interval);
+            if (!string.IsNullOrWhiteSpace(certNo)) asset.CalibrationCertNo = certNo.Trim();
+            if (!string.IsNullOrWhiteSpace(calibratedBy)) asset.CalibratedBy = calibratedBy.Trim();
+            if (!string.IsNullOrWhiteSpace(notes)) asset.CalibrationNotes = notes.Trim();
+
+            // Record verification in asset maintenance logs
+            _context.AssetMaintenances.Add(new AssetMaintenance
+            {
+                AssetId = asset.Id,
+                MaintenanceType = 2, // Periodic Inspection / Calibration
+                TimStamp = DateTime.Now,
+                UserId = _currentUserService.GetUserId(),
+                Description = $"Periodic Calibration completed on {calibrationDate:yyyy-MM-dd}. Certificate #{certNo ?? "N/A"} issued by {calibratedBy ?? "Authorized Metrology Body"}. Next due date: {asset.NextCalibration:yyyy-MM-dd}. Notes: {notes ?? "Compliant with standard specifications."}"
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Calibration successfully recorded for {asset.HospitalNo ?? ("#" + asset.Id)}! Next calibration due on {asset.NextCalibration:MMM dd, yyyy}.";
+            return RedirectToAction(nameof(Details), new { id = asset.Id });
         }
 
         // GET: Assets/ExportCsv
@@ -595,11 +735,11 @@ namespace StockPortal.Controllers
             var assets = await query.OrderBy(a => a.Id).ToListAsync();
 
             var sb = new StringBuilder();
-            sb.AppendLine("ID,Hospital Tag,Maintenance Team,Serial Number,Brand,Model,Type,Status,Room Location,Custodian,Custody Type,Supplier,Price,Buying Date,Warranty Expiration,Needs Periodic,Next Periodic");
+            sb.AppendLine("ID,Hospital Tag,Maintenance Team,Serial Number,Brand,Model,Type,Status,Room Location,Custodian,Custody Type,Supplier,Price,Buying Date,Warranty Expiration,Needs Periodic,Next Periodic,Needs Calibration,Calibration Interval,Last Calibration,Next Calibration,Calibration Cert,Calibrated By");
 
             foreach (var a in assets)
             {
-                sb.AppendLine($"\"{a.Id}\",\"{EscapeCsv(a.HospitalNo)}\",\"{EscapeCsv(a.MaintenanceTeam)}\",\"{EscapeCsv(a.SerialNo)}\",\"{EscapeCsv(a.Brand)}\",\"{a.ModelNo}\",\"{EscapeCsv(a.Type)}\",\"{EscapeCsv(a.Status)}\",\"{EscapeCsv(a.Room?.DisplayName)}\",\"{EscapeCsv(a.User?.FullName)}\",\"{EscapeCsv(a.CustodyType?.Type)}\",\"{EscapeCsv(a.Supplier?.Name)}\",\"{a.Price:F2}\",\"{a.BuyingDate:yyyy-MM-dd}\",\"{a.WarrantyTill:yyyy-MM-dd}\",\"{(a.NeedsPeriodic == true ? "Yes" : "No")}\",\"{a.NextPeriodic:yyyy-MM-dd}\"");
+                sb.AppendLine($"\"{a.Id}\",\"{EscapeCsv(a.HospitalNo)}\",\"{EscapeCsv(a.MaintenanceTeam)}\",\"{EscapeCsv(a.SerialNo)}\",\"{EscapeCsv(a.Brand)}\",\"{a.ModelNo}\",\"{EscapeCsv(a.Type)}\",\"{EscapeCsv(a.Status)}\",\"{EscapeCsv(a.Room?.DisplayName)}\",\"{EscapeCsv(a.User?.FullName)}\",\"{EscapeCsv(a.CustodyType?.Type)}\",\"{EscapeCsv(a.Supplier?.Name)}\",\"{a.Price:F2}\",\"{a.BuyingDate:yyyy-MM-dd}\",\"{a.WarrantyTill:yyyy-MM-dd}\",\"{(a.NeedsPeriodic == true ? "Yes" : "No")}\",\"{a.NextPeriodic:yyyy-MM-dd}\",\"{(a.NeedsCalibration == true ? "Yes" : "No")}\",\"{a.CalibrationInterval}\",\"{a.LastCalibration:yyyy-MM-dd}\",\"{a.NextCalibration:yyyy-MM-dd}\",\"{EscapeCsv(a.CalibrationCertNo)}\",\"{EscapeCsv(a.CalibratedBy)}\"");
             }
 
             var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();

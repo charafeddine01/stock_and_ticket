@@ -172,6 +172,49 @@
                             <label asp-for="PeriodicInterval" class="form-label fw-semibold">@Loc["Interval (Days)"]</label>
                             <input asp-for="PeriodicInterval" class="form-control" type="number" />
                         </div>
+
+                        <!-- Calibration Data (Task 2) -->
+                        <div class="col-12 mt-3 pt-3 border-top">
+                            <h6 class="fw-bold text-muted text-uppercase mb-2">
+                                <i class="fa-solid fa-award text-success me-1"></i>
+                                @(Loc.IsArabic ? "المعايرة الدورية والقياس الطبي (Periodic Calibration)" : "Periodic Calibration & Metrology")
+                            </h6>
+                            <div class="form-check form-switch mb-2">
+                                <input type="checkbox" name="NeedsCalibration" value="true" class="form-check-input" id="chkNeedsCalibration" @(Model.NeedsCalibration == true ? "checked" : "") />
+                                <label class="form-check-label fw-semibold text-dark" for="chkNeedsCalibration">
+                                    @(Loc.IsArabic ? "يتطلب هذا المنتج / الجهاز معايرة دورية دورياً (بعض الأجهزة تتطلب ذلك وأخرى لا تتطلب)" : "Product Requires Periodic Calibration (e.g. Medical / Precision Devices)")
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="calibrationContainer" class="col-12" style="display: @(Model.NeedsCalibration == true ? "block" : "none");">
+                            <div class="row g-3 p-3 bg-light rounded border">
+                                <div class="col-md-4">
+                                    <label asp-for="CalibrationInterval" class="form-label small fw-semibold">@(Loc.IsArabic ? "فترة المعايرة (أيام)" : "Calibration Interval (Days)")</label>
+                                    <input asp-for="CalibrationInterval" class="form-control form-control-sm" type="number" placeholder="e.g. 180 or 365" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label asp-for="LastCalibration" class="form-label small fw-semibold">@(Loc.IsArabic ? "تاريخ آخر معايرة" : "Last Calibration Date")</label>
+                                    <input asp-for="LastCalibration" class="form-control form-control-sm" type="date" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label asp-for="NextCalibration" class="form-label small fw-semibold">@(Loc.IsArabic ? "تاريخ المعايرة القادمة" : "Next Calibration Due")</label>
+                                    <input asp-for="NextCalibration" class="form-control form-control-sm" type="date" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label asp-for="CalibrationCertNo" class="form-label small fw-semibold">@(Loc.IsArabic ? "رقم الشهادة / المحضر" : "Calibration Certificate / Protocol No")</label>
+                                    <input asp-for="CalibrationCertNo" class="form-control form-control-sm font-monospace" placeholder="e.g. CAL-2026-MED-881" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label asp-for="CalibratedBy" class="form-label small fw-semibold">@(Loc.IsArabic ? "الجهة المعتمدة للمعايرة" : "Calibrated By / Certified Lab")</label>
+                                    <input asp-for="CalibratedBy" class="form-control form-control-sm" placeholder="e.g. National Metrology Authority" />
+                                </div>
+                                <div class="col-12">
+                                    <label asp-for="CalibrationNotes" class="form-label small fw-semibold">@(Loc.IsArabic ? "ملاحظات ومعايير المعايرة" : "Calibration Standards & Tolerance Notes")</label>
+                                    <textarea asp-for="CalibrationNotes" class="form-control form-control-sm" rows="2" placeholder="e.g. Energy discharge tested within 1.5% margin. IEC 60601 compliant."></textarea>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
@@ -195,6 +238,14 @@
         if (chkPeriodic && intervalBox) {
             chkPeriodic.addEventListener("change", function () {
                 intervalBox.style.display = chkPeriodic.checked ? "block" : "none";
+            });
+        }
+
+        const chkCalib = document.getElementById("chkNeedsCalibration");
+        const calibBox = document.getElementById("calibrationContainer");
+        if (chkCalib && calibBox) {
+            chkCalib.addEventListener("change", function () {
+                calibBox.style.display = chkCalib.checked ? "block" : "none";
             });
         }
     });

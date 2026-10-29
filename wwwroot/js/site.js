@@ -477,9 +477,42 @@
     };
 
     /* ==========================================================================
-       4. INITIALIZATION ON DOM READY
+       4. THEME CONTROLLER & PERSISTENCE (TASK 4)
+       ========================================================================== */
+    const THEME_STORAGE_KEY = "stockportal_theme";
+    const THEME_LABELS = {
+        "clarity": isArabic ? "كلاريتي لايت (واضح)" : "Clarity Pro",
+        "clinical": isArabic ? "الرعاية الطبية (مينت)" : "Clinical Healthcare",
+        "navy": isArabic ? "الكحلي التنفيذي" : "Executive Navy",
+        "dark": isArabic ? "الداكن النقي" : "Dark Clarity"
+    };
+
+    window.setAppTheme = function (themeName) {
+        if (!themeName || !THEME_LABELS[themeName]) themeName = "clarity";
+        document.documentElement.setAttribute("data-theme", themeName);
+        try {
+            localStorage.setItem(THEME_STORAGE_KEY, themeName);
+        } catch (e) { }
+
+        const labelElem = document.getElementById("currentThemeLabel");
+        if (labelElem && THEME_LABELS[themeName]) {
+            labelElem.textContent = THEME_LABELS[themeName];
+        }
+    };
+
+    function initTheme() {
+        let savedTheme = "clarity";
+        try {
+            savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "clarity";
+        } catch (e) { }
+        window.setAppTheme(savedTheme);
+    }
+
+    /* ==========================================================================
+       5. INITIALIZATION ON DOM READY
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", function () {
+        initTheme();
         initSidebar();
         initPageTransitions();
         checkUnreadNotifications();

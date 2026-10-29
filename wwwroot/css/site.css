@@ -1,17 +1,129 @@
 /* ==========================================================================
-   STOCK & HELPDESK MANAGEMENT PORTAL - MODERN UI, ANIMATIONS & RESPONSIVE
+   STOCK & HELPDESK MANAGEMENT PORTAL - MULTI-THEME & HIGH-CLARITY DESIGN
    ========================================================================== */
 
-:root {
+/* 1. CLARITY PRO (Default - Pure High-Contrast Light, Nordic Blue, Crisp Cards) */
+:root, [data-theme="clarity"] {
     --sidebar-width: 260px;
     --sidebar-collapsed-width: 0px;
+    
     --primary-color: #2563eb;
     --primary-hover: #1d4ed8;
-    --sidebar-bg: #0f172a;
-    --sidebar-hover: #1e293b;
+    --primary-light: #eff6ff;
+    
+    --sidebar-bg: #0b132b;
+    --sidebar-border: #1c2541;
+    --sidebar-hover: #1c2541;
+    --sidebar-text: #94a3b8;
+    --sidebar-active-bg: #2563eb;
+    --sidebar-active-text: #ffffff;
+    
     --body-bg: #f8fafc;
+    --card-bg: #ffffff;
     --card-border: #e2e8f0;
+    --top-navbar-bg: rgba(255, 255, 255, 0.96);
+    --top-navbar-border: #e2e8f0;
+    
+    --text-heading: #0f172a;
+    --text-body: #1e293b;
+    --text-muted: #64748b;
+    
+    --table-head-bg: #f8fafc;
+    --table-hover-bg: #f1f5f9;
     --notif-shadow: 0 20px 35px -10px rgba(15, 23, 42, 0.2), 0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+/* 2. CLINICAL HEALTHCARE (Fresh Mint/Teal Medical Aesthetic) */
+[data-theme="clinical"] {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 0px;
+    
+    --primary-color: #0d9488;
+    --primary-hover: #0f766e;
+    --primary-light: #f0fdfa;
+    
+    --sidebar-bg: #134e4a;
+    --sidebar-border: #115e59;
+    --sidebar-hover: #115e59;
+    --sidebar-text: #ccfbf1;
+    --sidebar-active-bg: #0d9488;
+    --sidebar-active-text: #ffffff;
+    
+    --body-bg: #f0fdfa;
+    --card-bg: #ffffff;
+    --card-border: #ccfbf1;
+    --top-navbar-bg: rgba(255, 255, 255, 0.96);
+    --top-navbar-border: #99f6e4;
+    
+    --text-heading: #134e4a;
+    --text-body: #0f172a;
+    --text-muted: #475569;
+    
+    --table-head-bg: #f0fdfa;
+    --table-hover-bg: #f5fdfc;
+    --notif-shadow: 0 20px 35px -10px rgba(19, 78, 74, 0.2), 0 0 0 1px rgba(19, 78, 74, 0.08);
+}
+
+/* 3. EXECUTIVE NAVY (Corporate Sapphire & Steel) */
+[data-theme="navy"] {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 0px;
+    
+    --primary-color: #1e40af;
+    --primary-hover: #1e3a8a;
+    --primary-light: #eff6ff;
+    
+    --sidebar-bg: #1e293b;
+    --sidebar-border: #334155;
+    --sidebar-hover: #334155;
+    --sidebar-text: #cbd5e1;
+    --sidebar-active-bg: #3b82f6;
+    --sidebar-active-text: #ffffff;
+    
+    --body-bg: #f8fafc;
+    --card-bg: #ffffff;
+    --card-border: #cbd5e1;
+    --top-navbar-bg: rgba(255, 255, 255, 0.96);
+    --top-navbar-border: #cbd5e1;
+    
+    --text-heading: #0f172a;
+    --text-body: #1e293b;
+    --text-muted: #475569;
+    
+    --table-head-bg: #f1f5f9;
+    --table-hover-bg: #f8fafc;
+    --notif-shadow: 0 20px 35px -10px rgba(30, 41, 59, 0.25), 0 0 0 1px rgba(30, 41, 59, 0.08);
+}
+
+/* 4. DARK CLARITY (OLED High-Contrast Dark Mode) */
+[data-theme="dark"] {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 0px;
+    
+    --primary-color: #3b82f6;
+    --primary-hover: #60a5fa;
+    --primary-light: rgba(59, 130, 246, 0.15);
+    
+    --sidebar-bg: #030712;
+    --sidebar-border: #1f2937;
+    --sidebar-hover: #1f2937;
+    --sidebar-text: #9ca3af;
+    --sidebar-active-bg: #2563eb;
+    --sidebar-active-text: #ffffff;
+    
+    --body-bg: #0b0f19;
+    --card-bg: #111827;
+    --card-border: #1f2937;
+    --top-navbar-bg: rgba(17, 24, 39, 0.96);
+    --top-navbar-border: #1f2937;
+    
+    --text-heading: #f9fafb;
+    --text-body: #e5e7eb;
+    --text-muted: #9ca3af;
+    
+    --table-head-bg: #1f2937;
+    --table-hover-bg: #1e293b;
+    --notif-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* --------------------------------------------------------------------------
@@ -20,7 +132,7 @@
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: var(--body-bg);
-    color: #1e293b;
+    color: var(--text-body);
     margin: 0;
     padding: 0;
     overflow-x: hidden;
@@ -198,8 +310,8 @@ body {
 
 /* Top Navbar */
 .top-navbar {
-    background-color: #ffffff;
-    border-bottom: 1px solid var(--card-border);
+    background-color: var(--top-navbar-bg);
+    border-bottom: 1px solid var(--top-navbar-border);
     padding: 0.75rem 2rem;
     display: flex;
     align-items: center;
@@ -209,7 +321,6 @@ body {
     z-index: 1020;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    background-color: rgba(255, 255, 255, 0.96);
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
 }
 
@@ -658,16 +769,52 @@ body {
    4. SYSTEM-WIDE ANIMATIONS & INTERACTIONS (TASK 2)
    -------------------------------------------------------------------------- */
 
-/* Stat Cards Hover Lift & Subtle Glow */
+/* Stat Cards Hover Lift & Visual Hierarchy */
 .stat-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border) !important;
     border-radius: 0.75rem;
     padding: 1.35rem;
+    position: relative;
+    overflow: hidden;
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
+.stat-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: transparent;
+}
+
+.stat-card.stat-card-blue::before { background: #2563eb; }
+.stat-card.stat-card-amber::before { background: #f59e0b; }
+.stat-card.stat-card-rose::before { background: #ef4444; }
+.stat-card.stat-card-emerald::before { background: #10b981; }
+.stat-card.stat-card-teal::before { background: #0d9488; }
+.stat-card.stat-card-orange::before { background: #f97316; }
+
+/* Subtle light mode card backgrounds for clarity */
+[data-theme="clarity"] .stat-card.stat-card-blue { background: linear-gradient(180deg, #f8faff 0%, #ffffff 100%); }
+[data-theme="clarity"] .stat-card.stat-card-amber { background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%); }
+[data-theme="clarity"] .stat-card.stat-card-rose { background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%); }
+[data-theme="clarity"] .stat-card.stat-card-emerald { background: linear-gradient(180deg, #fafffa 0%, #ffffff 100%); }
+[data-theme="clarity"] .stat-card.stat-card-teal { background: linear-gradient(180deg, #f7fdfb 0%, #ffffff 100%); }
+[data-theme="clarity"] .stat-card.stat-card-orange { background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%); }
+
+[data-theme="dark"] .stat-card.stat-card-blue { background: linear-gradient(180deg, rgba(37, 99, 235, 0.08) 0%, #111827 100%); }
+[data-theme="dark"] .stat-card.stat-card-amber { background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, #111827 100%); }
+[data-theme="dark"] .stat-card.stat-card-rose { background: linear-gradient(180deg, rgba(239, 68, 68, 0.08) 0%, #111827 100%); }
+[data-theme="dark"] .stat-card.stat-card-emerald { background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, #111827 100%); }
+[data-theme="dark"] .stat-card.stat-card-teal { background: linear-gradient(180deg, rgba(13, 148, 136, 0.08) 0%, #111827 100%); }
+[data-theme="dark"] .stat-card.stat-card-orange { background: linear-gradient(180deg, rgba(249, 115, 22, 0.08) 0%, #111827 100%); }
+
 .stat-card:hover {
-    transform: translateY(-4px) !important;
-    box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.1) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.09) !important;
 }
 
 .stat-icon {
@@ -682,23 +829,52 @@ body {
 }
 
 .stat-card:hover .stat-icon {
-    transform: scale(1.12) rotate(3deg);
+    transform: scale(1.08) rotate(2deg);
 }
 
 /* Modern Card Defaults */
 .card {
-    border: 1px solid var(--card-border);
+    border: 1px solid var(--card-border) !important;
     border-radius: 0.75rem;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
-    background-color: #ffffff;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    background-color: var(--card-bg);
+    color: var(--text-body);
     transition: box-shadow 0.2s ease;
 }
 
 .card-header {
-    background-color: #ffffff;
-    border-bottom: 1px solid var(--card-border);
+    background-color: var(--card-bg) !important;
+    border-bottom: 1px solid var(--card-border) !important;
+    color: var(--text-heading) !important;
     padding: 1.15rem 1.35rem;
     font-weight: 600;
+}
+
+.card-footer {
+    background-color: var(--card-bg) !important;
+    border-top: 1px solid var(--card-border) !important;
+    color: var(--text-muted);
+}
+
+/* Universal Typography & Contrast Clarity */
+h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-header-title {
+    color: var(--text-heading);
+}
+
+[data-theme="dark"] .text-dark {
+    color: var(--text-heading) !important;
+}
+
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.bg-white {
+    background-color: var(--card-bg) !important;
+}
+
+.border-light-subtle {
+    border-color: var(--card-border) !important;
 }
 
 /* Interactive Buttons */
@@ -740,9 +916,30 @@ body {
 .dropdown-menu {
     border-radius: 0.75rem !important;
     border: 1px solid var(--card-border) !important;
+    background-color: var(--card-bg) !important;
+    color: var(--text-body) !important;
     box-shadow: 0 14px 30px -6px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.04) !important;
     padding: 0.5rem !important;
     animation: dropdownPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-item {
+    color: var(--text-body);
+    border-radius: 0.4rem;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.dropdown-item:hover, .dropdown-item:focus {
+    background-color: var(--table-hover-bg);
+    color: var(--text-heading);
+}
+
+.dropdown-divider {
+    border-top: 1px solid var(--card-border) !important;
+}
+
+.dropdown-header {
+    color: var(--text-muted);
 }
 
 @keyframes dropdownPop {
@@ -756,18 +953,83 @@ body {
     }
 }
 
-/* Table Hover Row Animation */
+/* Modern High-Clarity Table Styling */
+.table {
+    color: var(--text-body);
+    border-color: var(--card-border);
+}
+
 .table > :not(caption) > * > * {
     padding: 0.85rem 1rem;
     vertical-align: middle;
+    background-color: transparent;
+    border-bottom: 1px solid var(--card-border);
+    color: inherit;
+}
+
+.table thead th, .table-light, .table-light th {
+    background-color: var(--table-head-bg) !important;
+    color: var(--text-heading) !important;
+    font-size: 0.76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid var(--card-border) !important;
 }
 
 .table-hover tbody tr {
     transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
-.table-hover tbody tr:hover {
-    background-color: #f1f5f9;
+.table-hover tbody tr:hover, .table-hover tbody tr:hover > * {
+    background-color: var(--table-hover-bg) !important;
+}
+
+/* Modals & Dialogs */
+.modal-content {
+    background-color: var(--card-bg);
+    color: var(--text-body);
+    border: 1px solid var(--card-border);
+    border-radius: 0.85rem;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--card-border);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--card-border);
+}
+
+/* List Groups */
+.list-group-item {
+    background-color: var(--card-bg);
+    color: var(--text-body);
+    border-color: var(--card-border);
+}
+
+/* Nav Tabs */
+.nav-tabs {
+    border-bottom: 1px solid var(--card-border);
+}
+
+.nav-tabs .nav-link {
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    border-color: var(--card-border) var(--card-border) transparent;
+    color: var(--text-heading);
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--card-bg);
+    border-color: var(--card-border) var(--card-border) var(--card-bg);
+    color: var(--primary-color) !important;
+    font-weight: 600;
 }
 
 /* Alert Slide Entrance */
@@ -790,12 +1052,23 @@ body {
 /* Form Controls Focus Transition */
 .form-control, .form-select {
     border-radius: 0.5rem;
+    background-color: var(--card-bg);
+    color: var(--text-body);
+    border: 1px solid var(--card-border);
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .form-control:focus, .form-select:focus {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    background-color: var(--card-bg);
+    color: var(--text-body);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.input-group-text {
+    background-color: var(--table-head-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--card-border);
 }
 
 /* Accessibility: Respect Reduced Motion */

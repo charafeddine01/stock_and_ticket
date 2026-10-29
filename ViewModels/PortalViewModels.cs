@@ -22,6 +22,8 @@ namespace StockPortal.ViewModels
         public List<Ticket> RecentTickets { get; set; } = new();
         public List<Asset> OverduePeriodicAssets { get; set; } = new();
         public List<Asset> UpcomingPeriodicAssets { get; set; } = new();
+        public List<Asset> OverdueCalibrationAssets { get; set; } = new();
+        public List<Asset> UpcomingCalibrationAssets { get; set; } = new();
         public List<AssetMaintenance> RecentMaintenance { get; set; } = new();
     }
 
@@ -62,6 +64,9 @@ namespace StockPortal.ViewModels
         public List<Asset> OverdueAssets { get; set; } = new();
         public List<Asset> DueWithin30DaysAssets { get; set; } = new();
         public List<Asset> UpToDateAssets { get; set; } = new();
+        public List<Asset> OverdueCalibrationAssets { get; set; } = new();
+        public List<Asset> UpcomingCalibrationAssets { get; set; } = new();
+        public List<Asset> ValidCalibrationAssets { get; set; } = new();
         public List<AssetMaintenance> RecentLogs { get; set; } = new();
         public List<AssetMaintenance> ActiveWorkOrders { get; set; } = new();
     }

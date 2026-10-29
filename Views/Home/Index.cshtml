@@ -7,7 +7,7 @@
 <div class="row g-3 mb-4">
     <!-- Assets Card -->
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);">
+        <div class="card stat-card stat-card-blue shadow-sm">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Total Assets"]</div>
@@ -30,7 +30,7 @@
 
     <!-- Active Tickets Card -->
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);">
+        <div class="card stat-card stat-card-amber shadow-sm">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Open & Active Tickets"]</div>
@@ -51,17 +51,24 @@
         </div>
     </div>
 
-    <!-- Preventive Maintenance Alert Card -->
+    <!-- Preventive Maintenance & Calibration Alert Card -->
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);">
+        <div class="card stat-card stat-card-rose shadow-sm">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Maintenance Alerts"]</div>
-                    <div class="h2 fw-bold @(Model.OverduePeriodicAssets.Count > 0 ? "text-danger" : "text-success") mb-1">
-                        @Model.OverduePeriodicAssets.Count
+                    <div class="h2 fw-bold @((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0 ? "text-danger" : "text-success") mb-1">
+                        @(Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count)
                     </div>
                     <div class="small text-muted">
-                        <span>@(Model.OverduePeriodicAssets.Count > 0 ? Loc["Requires Immediate Service"] : Loc["Scheduled Maintenance Up-to-date"])</span>
+                        @if ((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0)
+                        {
+                            <span>@Model.OverduePeriodicAssets.Count @Loc["Maintenance"] &bull; @Model.OverdueCalibrationAssets.Count @Loc["Calibration Overdue"]</span>
+                        }
+                        else
+                        {
+                            <span>@Loc["Scheduled Maintenance Up-to-date"]</span>
+                        }
                     </div>
                 </div>
                 <div class="stat-icon bg-danger bg-opacity-10 text-danger">
@@ -70,14 +77,14 @@
             </div>
             <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
                 <span class="text-muted">@Loc["Expiring in 30 Days"]:</span>
-                <span class="fw-bold text-dark">@Model.UpcomingPeriodicAssets.Count</span>
+                <span class="fw-bold text-dark">@(Model.UpcomingPeriodicAssets.Count + Model.UpcomingCalibrationAssets.Count)</span>
             </div>
         </div>
     </div>
 
     <!-- Resolved Tickets / Health Card -->
     <div class="col-xl-3 col-md-6">
-        <div class="card stat-card border-0 shadow-sm" style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
+        <div class="card stat-card stat-card-emerald shadow-sm">
             <div class="d-flex align-items-center justify-content-between">
                 <div>
                     <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Service Resolution Rate"]</div>
@@ -103,20 +110,20 @@
 </div>
 
 <!-- Urgent Attention Alert Row (if any) -->
-@if (Model.OverduePeriodicAssets.Any() || Model.UrgentTickets.Any())
+@if (Model.OverduePeriodicAssets.Any() || Model.OverdueCalibrationAssets.Any() || Model.UrgentTickets.Any())
 {
     <div class="row g-3 mb-4">
         @if (Model.OverduePeriodicAssets.Any())
         {
-            <div class="col-lg-6">
-                <div class="card border-danger shadow-sm">
+            <div class="col-lg-@(Model.OverdueCalibrationAssets.Any() ? "4" : "6")">
+                <div class="card border-danger shadow-sm h-100">
                     <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
                         <span class="fw-bold"><i class="fa-solid fa-bell me-2"></i> @Loc["Overdue Preventive Maintenance"]</span>
                         <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-light py-0">@Loc["View Details"]</a>
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
-                            @foreach (var asset in Model.OverduePeriodicAssets)
+                            @foreach (var asset in Model.OverduePeriodicAssets.Take(4))
                             {
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
@@ -142,17 +149,53 @@
             </div>
         }
 
+        @if (Model.OverdueCalibrationAssets.Any())
+        {
+            <div class="col-lg-@(Model.OverduePeriodicAssets.Any() ? "4" : "6")">
+                <div class="card border-danger shadow-sm h-100">
+                    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="fa-solid fa-scale-balanced me-2"></i> @Loc["Calibration Overdue"]</span>
+                        <a href="@Url.Action("Index", "Maintenance")" class="btn btn-sm btn-light py-0">@Loc["View Details"]</a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush">
+                            @foreach (var asset in Model.OverdueCalibrationAssets.Take(4))
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-bold text-dark">@asset.HospitalNo &bull; @asset.Brand (@asset.DisplayType)</div>
+                                        <div class="small text-muted">
+                                            <i class="fa-solid fa-certificate me-1 text-danger"></i> @(asset.CalibrationCertNo ?? "No Cert") &bull; 
+                                            @Loc["Next Calibration Due"]: @asset.NextCalibration?.ToString("MMM dd, yyyy")
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-danger">@Loc["Calibration Overdue"]</span>
+                                        <div class="mt-1">
+                                            <a href="@Url.Action("Details", "Assets", new { id = asset.Id })" class="btn btn-sm btn-outline-danger py-0" style="font-size: 0.75rem;">
+                                                @Loc["Log / Renew Calibration"]
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (Model.UrgentTickets.Any())
         {
-            <div class="col-lg-6">
-                <div class="card border-warning shadow-sm">
+            <div class="col-lg-@((Model.OverduePeriodicAssets.Any() && Model.OverdueCalibrationAssets.Any()) ? "4" : "6")">
+                <div class="card border-warning shadow-sm h-100">
                     <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
                         <span class="fw-bold"><i class="fa-solid fa-fire me-2"></i> @Loc["High & Urgent Priority Tickets"]</span>
                         <a href="@Url.Action("Index", "Tickets")" class="btn btn-sm btn-dark py-0">@Loc["View Details"]</a>
                     </div>
                     <div class="card-body p-0">
                         <div class="list-group list-group-flush">
-                            @foreach (var ticket in Model.UrgentTickets)
+                            @foreach (var ticket in Model.UrgentTickets.Take(4))
                             {
                                 <div class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>

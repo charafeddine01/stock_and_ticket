@@ -216,7 +216,7 @@
         </div>
 
         <!-- Periodic Maintenance Card -->
-        <div class="card shadow-sm border-0">
+        <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white">
                 <h6 class="mb-0 fw-bold"><i class="fa-solid fa-calendar-check text-warning me-2"></i> @Loc["Scheduled & Preventive Maintenance"]</h6>
             </div>
@@ -246,6 +246,78 @@
                 else
                 {
                     <div class="text-muted small">@(Loc.IsArabic ? "هذا الجهاز لا يتطلب صيانة دورية متكررة." : "This equipment does not require recurring preventive maintenance.")</div>
+                }
+            </div>
+        </div>
+
+        <!-- Periodic Calibration Card (Task 2) -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-award text-success me-2"></i> @(Loc.IsArabic ? "المعايرة الدورية والقياس" : "Periodic Calibration & Metrology")</h6>
+                @if (asset.NeedsCalibration == true)
+                {
+                    if (asset.IsCalibrationOverdue)
+                    {
+                        <span class="badge bg-danger">@(Loc.IsArabic ? "متأخرة" : "Overdue")</span>
+                    }
+                    else if (asset.IsCalibrationDueSoon)
+                    {
+                        <span class="badge bg-warning text-dark">@(Loc.IsArabic ? "تستحق قريباً" : "Due Soon")</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">@(Loc.IsArabic ? "معتمدة وصالحة" : "Calibrated")</span>
+                    }
+                }
+                else
+                {
+                    <span class="badge bg-secondary">@(Loc.IsArabic ? "غير مطلوبة" : "Not Required")</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (asset.NeedsCalibration == true)
+                {
+                    <div class="small text-muted mb-1">@(Loc.IsArabic ? "فترة المعايرة (أيام)" : "Calibration Interval"): <strong>@(asset.CalibrationInterval ?? 180) @(Loc.IsArabic ? "يوم" : "Days")</strong></div>
+                    <div class="small text-muted mb-1">@(Loc.IsArabic ? "آخر معايرة" : "Last Calibration"): <strong>@(asset.LastCalibration?.ToString("MMM dd, yyyy") ?? "Never")</strong></div>
+                    <div class="small text-muted mb-1">
+                        @(Loc.IsArabic ? "الاستحقاق القادم" : "Next Due Date"): 
+                        @if (asset.NextCalibration.HasValue)
+                        {
+                            <strong class="@(asset.IsCalibrationOverdue ? "text-danger" : "text-dark")">@asset.NextCalibration.Value.ToString("MMM dd, yyyy")</strong>
+                        }
+                        else
+                        {
+                            <span class="text-muted">@(Loc.IsArabic ? "غير محدد" : "Not scheduled")</span>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(asset.CalibrationCertNo))
+                    {
+                        <div class="small text-muted mb-1">@(Loc.IsArabic ? "رقم الشهادة" : "Cert #"): <strong class="font-monospace">@asset.CalibrationCertNo</strong></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(asset.CalibratedBy))
+                    {
+                        <div class="small text-muted mb-2">@(Loc.IsArabic ? "الجهة المعتمدة" : "Calibrated By"): <strong>@asset.CalibratedBy</strong></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(asset.CalibrationNotes))
+                    {
+                        <div class="p-2 bg-light rounded small text-muted mb-3 font-monospace" style="font-size: 0.75rem;">@asset.CalibrationNotes</div>
+                    }
+                    @if (canManage)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#logCalibrationModal">
+                            <i class="fa-solid fa-file-signature me-1"></i> @(Loc.IsArabic ? "تسجيل / تجديد شهادة المعايرة" : "Log / Renew Calibration")
+                        </button>
+                    }
+                }
+                else
+                {
+                    <div class="text-muted small mb-3">@(Loc.IsArabic ? "هذا الأصل/المنتج لا يتطلب معايرة دورية دورياً (أجهزة عامة)." : "This equipment does not require periodic calibration (Standard IT hardware).")</div>
+                    @if (canManage)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#logCalibrationModal">
+                            <i class="fa-solid fa-plus me-1"></i> @(Loc.IsArabic ? "تفعيل المعايرة وتسجيل فحص" : "Enable Calibration Tracking")
+                        </button>
+                    }
                 }
             </div>
         </div>
@@ -543,6 +615,64 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
                         <button type="submit" class="btn btn-warning">@Loc["Retire"]</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log / Renew Calibration Modal (Task 2) -->
+    <div class="modal fade" id="logCalibrationModal" tabindex="-1" aria-labelledby="logCalibrationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="LogCalibration" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="assetId" value="@asset.Id" />
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="logCalibrationModalLabel">
+                            <i class="fa-solid fa-award text-success me-2"></i>
+                            @(Loc.IsArabic ? "تسجيل فحص ومعايرة الأصل" : "Log Periodic Calibration Verification")
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info py-2 px-3 small border-0 mb-3">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            @(Loc.IsArabic ? $"تسجيل شهادة المعايرة للأصل: {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})" : $"Recording official calibration protocol for {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})")
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-semibold">@(Loc.IsArabic ? "تاريخ إجراء المعايرة" : "Calibration Date")</label>
+                                <input type="date" name="calibrationDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-semibold">@(Loc.IsArabic ? "دورة المعايرة (بالأيام)" : "Interval (Days)")</label>
+                                <input type="number" name="intervalDays" class="form-control" value="@(asset.CalibrationInterval ?? 180)" min="1" max="3650" required />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">@(Loc.IsArabic ? "رقم شهادة المعايرة / المحضر" : "Calibration Certificate / Protocol No")</label>
+                            <input type="text" name="certNo" class="form-control font-monospace" placeholder="e.g. CAL-2026-MED-881" value="@asset.CalibrationCertNo" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">@(Loc.IsArabic ? "الجهة القائمة بالمعايرة / المختبر المعتمد" : "Calibrated By / Certified Body / Specialist")</label>
+                            <input type="text" name="calibratedBy" class="form-control" placeholder="e.g. National Biomedical Metrology Lab or Philips Healthcare" value="@asset.CalibratedBy" required />
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold">@(Loc.IsArabic ? "ملاحظات المعايرة والمعايير المستخدمة" : "Calibration Standards / Verification Notes")</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="@(Loc.IsArabic ? "مثال: تم ضبط مقاييس الطاقة وخرج الموجات، ونسب التفاوت مقبولة وفق معيار IEC 60601" : "e.g. Energy discharge verified within ±1% tolerance, IEC 60601 electrical safety compliant")">@asset.CalibrationNotes</textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fa-solid fa-check me-1"></i>
+                            @(Loc.IsArabic ? "حفظ وتجديد الصلاحية" : "Save & Verify Calibration")
+                        </button>
                     </div>
                 </form>
             </div>

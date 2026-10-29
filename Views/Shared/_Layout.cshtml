@@ -35,6 +35,14 @@
     
     <!-- Custom Site Styles, Animations, RTL & Autohide Layout -->
     <link rel="stylesheet" href="~/css/site.css" />
+    
+    <!-- Instant Theme Preloader (Task 4) -->
+    <script>
+        (function() {
+            var savedTheme = localStorage.getItem('stockportal_theme') || 'clarity';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
@@ -329,6 +337,42 @@
                         <span>العربية</span>
                     </a>
                 }
+
+                <!-- Theme Switcher Dropdown (Task 4) -->
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-1 shadow-sm rounded-pill px-2 py-1" 
+                            type="button" id="themeDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" title="@Loc["Change UI Theme"]">
+                        <i class="fa-solid fa-palette text-primary"></i>
+                        <span id="currentThemeLabel" class="d-none d-sm-inline" style="font-size: 0.8rem;">@Loc["Clarity Pro"]</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-1" aria-labelledby="themeDropdownBtn" style="min-width: 210px;">
+                        <li><h6 class="dropdown-header small text-uppercase fw-bold text-muted">@Loc["Select Theme"]</h6></li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('clarity')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-sparkles text-primary me-2"></i> @Loc["Clarity Pro (Clean Light)"]</span>
+                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #2563eb;"></span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('clinical')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-heart-pulse me-2" style="color: #0d9488;"></i> @Loc["Clinical Healthcare"]</span>
+                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #0d9488;"></span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('navy')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-building-columns me-2" style="color: #1e3a8a;"></i> @Loc["Executive Navy"]</span>
+                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #1e3a8a;"></span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('dark')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-moon text-warning me-2"></i> @Loc["Dark Clarity"]</span>
+                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #111827;"></span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
 
                 <!-- Notifications Bell Icon -->
                 <a href="@Url.Action("Index", "Notifications")" id="navNotificationsLink" class="btn btn-sm btn-light border position-relative" title="@Loc["Notifications"]">

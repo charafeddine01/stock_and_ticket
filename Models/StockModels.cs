@@ -431,6 +431,55 @@ namespace StockPortal.Models
         [DataType(DataType.Date)]
         public DateTime? NextPeriodic { get; set; }
 
+        [Column("needsCalibration")]
+        [Display(Name = "Requires Periodic Calibration")]
+        public bool? NeedsCalibration { get; set; } = false;
+
+        [Column("calibrationInterval")]
+        [Display(Name = "Calibration Interval (Days)")]
+        public int? CalibrationInterval { get; set; }
+
+        [Column("lastCalibration", TypeName = "date")]
+        [Display(Name = "Last Calibration Date")]
+        [DataType(DataType.Date)]
+        public DateTime? LastCalibration { get; set; }
+
+        [Column("nextCalibration", TypeName = "date")]
+        [Display(Name = "Next Calibration Due Date")]
+        [DataType(DataType.Date)]
+        public DateTime? NextCalibration { get; set; }
+
+        [Column("calibrationCertNo")]
+        [StringLength(255)]
+        [Display(Name = "Calibration Certificate / Report No")]
+        public string? CalibrationCertNo { get; set; }
+
+        [Column("calibratedBy")]
+        [StringLength(255)]
+        [Display(Name = "Calibrated By / Calibration Agency")]
+        public string? CalibratedBy { get; set; }
+
+        [Column("calibrationNotes")]
+        [StringLength(1024)]
+        [Display(Name = "Calibration Notes / Standards")]
+        public string? CalibrationNotes { get; set; }
+
+        [NotMapped]
+        public bool IsCalibrationOverdue =>
+            NeedsCalibration == true && NextCalibration.HasValue && NextCalibration.Value < DateTime.Now.Date;
+
+        [NotMapped]
+        public bool IsCalibrationDueSoon =>
+            NeedsCalibration == true && NextCalibration.HasValue &&
+            NextCalibration.Value >= DateTime.Now.Date &&
+            NextCalibration.Value <= DateTime.Now.Date.AddDays(30);
+
+        [NotMapped]
+        public string CalibrationStatus => NeedsCalibration != true ? "Not Required" :
+            IsCalibrationOverdue ? "Overdue" :
+            IsCalibrationDueSoon ? "Due Soon" :
+            NextCalibration.HasValue ? "Calibrated & Valid" : "Pending Calibration";
+
         public virtual ICollection<AssetHistory> History { get; set; } = new List<AssetHistory>();
         public virtual ICollection<AssetMaintenance> MaintenanceRecords { get; set; } = new List<AssetMaintenance>();
         public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();

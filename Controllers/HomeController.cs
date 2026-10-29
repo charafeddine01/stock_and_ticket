@@ -75,6 +75,16 @@ namespace StockPortal.Controllers
                     .OrderBy(a => a.NextPeriodic)
                     .ToList(),
 
+                OverdueCalibrationAssets = assets
+                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < now)
+                    .OrderBy(a => a.NextCalibration)
+                    .ToList(),
+
+                UpcomingCalibrationAssets = assets
+                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= thirtyDaysFromNow)
+                    .OrderBy(a => a.NextCalibration)
+                    .ToList(),
+
                 RecentMaintenance = recentMaintenance
             };
 

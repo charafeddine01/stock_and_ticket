@@ -2,17 +2,19 @@
 @{
     Layout = null;
     var tag = string.IsNullOrWhiteSpace(Model.HospitalNo) ? $"ASSET-{Model.Id:D5}" : Model.HospitalNo;
+    var assetUrl = $"{Context.Request.Scheme}://{Context.Request.Host}/Assets/Details/{Model.Id}";
 }
 <!DOCTYPE html>
 <html lang="@Loc.CurrentCulture" dir="@Loc.Direction">
 <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@(Loc.IsArabic ? $"طباعة ملصق الأصل - {tag}" : $"Print Asset Tag - {tag}")</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     @if (Loc.IsArabic)
     {
@@ -23,90 +25,690 @@
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     }
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
     <style>
         @@media print {
             .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            .tag-card { border: 2px solid #000 !important; box-shadow: none !important; page-break-inside: avoid; }
+            body { 
+                background: white !important; 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .tag-wrapper { padding: 0 !important; margin: 0 !important; }
+            .tag-card { 
+                border: 2px solid #000 !important; 
+                box-shadow: none !important; 
+                page-break-inside: avoid;
+                margin: 0 auto;
+            }
         }
+
         body {
             background-color: #f1f5f9;
-            font-family: @(Loc.IsArabic ? "'Cairo', " : "") -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            padding: 2rem;
+            font-family: @(Loc.IsArabic ? "'Cairo', " : "") 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 1.5rem 1rem 3rem 1rem;
+            color: #0f172a;
+        }
+
+        /* Customization Toolbar */
+        .customizer-panel {
+            max-width: 960px;
+            margin: 0 auto 1.5rem auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+
+        .customizer-header {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 20px;
+        }
+
+        .customizer-body {
+            padding: 18px 20px;
+        }
+
+        /* Printable Tag Card */
+        .tag-wrapper {
+            display: flex;
+            justify-content: center;
+            padding: 1rem 0;
+        }
+
+        .tag-card {
+            width: 380px;
+            background: #ffffff;
+            border: 2px solid #0f172a;
+            border-radius: 10px;
+            padding: 16px 18px;
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .tag-top-facility {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #475569;
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+
+        .tag-top-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.5px;
+            line-height: 1.3;
+        }
+
+        .tag-badge-pill {
+            font-size: 11px;
+            font-weight: 700;
+            background: #0f172a;
+            color: #ffffff;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            font-family: monospace;
+            letter-spacing: 1.5px;
+        }
+
+        .tag-data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .tag-data-label {
+            color: #64748b;
+            font-weight: 600;
+            flex-shrink: 0;
+            margin-inline-end: 8px;
+        }
+
+        .tag-data-value {
+            font-weight: 700;
+            color: #0f172a;
+            text-align: end;
+            word-break: break-word;
+        }
+
+        .tag-qr-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-        .tag-card {
-            width: 360px;
+            justify-content: center;
+            padding: 6px;
             background: #ffffff;
-            border: 2px solid #0f172a;
+            border: 1px solid #e2e8f0;
             border-radius: 8px;
-            padding: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
-        .barcode {
-            letter-spacing: 5px;
-            font-family: monospace;
-            font-size: 20px;
-            background: #f8fafc;
-            border: 1px dashed #cbd5e1;
-            padding: 8px;
-            text-align: center;
+
+        .tag-qr-container canvas, .tag-qr-container img {
+            display: block;
+        }
+
+        .tag-footer-text {
+            font-size: 8.5px;
             font-weight: 700;
+            color: #475569;
+            line-height: 1.3;
+            letter-spacing: 0.3px;
+        }
+
+        .tag-footer-sub {
+            font-size: 8px;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .toast-saved {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 99999;
+            background: #059669;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            font-weight: 600;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <div class="no-print mb-4 d-flex gap-2">
-        <button onclick="window.print()" class="btn btn-primary btn-lg shadow-sm">
-            <i class="fa-solid fa-print me-2"></i> @Loc["Print Asset Tag Label"]
-        </button>
-        <button onclick="window.close()" class="btn btn-outline-secondary btn-lg">
-            @Loc["Close"]
-        </button>
+
+    <!-- Saved Notification Toast -->
+    <div id="saveToast" class="toast-saved">
+        <i class="fa-solid fa-circle-check me-2"></i>
+        <span>@(Loc.IsArabic ? "تم حفظ التنسيق كافتراضي لجميع الملصقات بنجاح!" : "Tag settings saved as default for all cards!")</span>
     </div>
 
-    <div class="tag-card">
-        <div class="d-flex align-items-center justify-content-between border-bottom pb-2 mb-2">
-            <div>
-                <div class="fw-bold text-uppercase" style="font-size: 11px; letter-spacing: 1px; color: #475569;">@(Loc.IsArabic ? "عهدة وممتلكات المستشفى" : "Hospital IT Property")</div>
-                <div class="fw-bold" style="font-size: 15px; color: #0f172a;">@(Loc.IsArabic ? "ملصق تعريف العهدة والأصل" : "ASSET IDENTIFICATION TAG")</div>
+    <!-- Top Action & Customizer Panel (Hidden on print) -->
+    <div class="customizer-panel no-print">
+        <div class="customizer-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary p-2 rounded-circle">
+                    <i class="fa-solid fa-sliders text-white"></i>
+                </span>
+                <div>
+                    <h6 class="mb-0 fw-bold">@(Loc.IsArabic ? "تخصيص ملصق وبطاقة التعريف (Tag Customizer)" : "Asset Tag Label Customizer")</h6>
+                    <small class="text-muted">@(Loc.IsArabic ? "حدد النصوص العلوية والسفلية، والبيانات المراد طباعتها، وخيارات رمز QR" : "Configure top & bottom texts, columns to include, and QR code settings")</small>
+                </div>
             </div>
-            <i class="fa-solid fa-server fa-2x text-primary"></i>
-        </div>
-
-        <div class="text-center my-2">
-            <div class="barcode">||| | |||| | ||| || |||</div>
-            <div class="fw-bold font-monospace mt-1" style="font-size: 18px; letter-spacing: 2px;">@tag</div>
-        </div>
-
-        <div class="small mt-2 pt-2 border-top">
-            <div class="d-flex justify-content-between mb-1">
-                <span class="text-muted">@Loc["Type"]:</span>
-                <span class="fw-semibold">@(Model.DisplayType ?? "Hardware")</span>
-            </div>
-            <div class="d-flex justify-content-between mb-1">
-                <span class="text-muted">@Loc["Brand & Model"]:</span>
-                <span class="fw-semibold">@(Model.Brand) @(Model.ModelNo.HasValue ? Model.ModelNo.ToString() : "")</span>
-            </div>
-            <div class="d-flex justify-content-between mb-1">
-                <span class="text-muted">@Loc["Serial Number"]:</span>
-                <span class="font-monospace fw-semibold">@(Model.SerialNo ?? "N/A")</span>
-            </div>
-            <div class="d-flex justify-content-between mb-1">
-                <span class="text-muted">@Loc["Location"]:</span>
-                <span class="fw-semibold">@(Model.Room?.DisplayName ?? Loc["Unassigned"])</span>
-            </div>
-            <div class="d-flex justify-content-between">
-                <span class="text-muted">@Loc["Custodian"]:</span>
-                <span class="fw-semibold">@(Model.User?.DisplayFullName ?? Loc["None assigned"])</span>
+            <div class="d-flex gap-2">
+                <button type="button" onclick="saveTagDefaults()" class="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>@(Loc.IsArabic ? "حفظ كافتراضي لجميع البطاقات" : "Save as Default (All Cards)")</span>
+                </button>
+                <button type="button" onclick="resetTagDefaults()" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" title="@Loc["Reset to Defaults"]">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span>@(Loc.IsArabic ? "استعادة الافتراضي" : "Reset")</span>
+                </button>
+                <button type="button" onclick="window.print()" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                    <i class="fa-solid fa-print"></i>
+                    <span class="fw-bold">@Loc["Print"]</span>
+                </button>
+                <button type="button" onclick="window.close()" class="btn btn-outline-dark btn-sm">
+                    @Loc["Close"]
+                </button>
             </div>
         </div>
 
-        <div class="mt-3 pt-2 border-top text-center" style="font-size: 9px; color: #64748b;">
-            @(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")
+        <div class="customizer-body">
+            <div class="row g-3">
+                <!-- Top & Bottom Header/Footer Texts -->
+                <div class="col-lg-6">
+                    <div class="card bg-light border-0 p-3 h-100">
+                        <h6 class="fw-bold small text-uppercase text-secondary mb-2">
+                            <i class="fa-solid fa-heading me-1 text-primary"></i>
+                            @(Loc.IsArabic ? "نصوص البطاقة (العلوي والسفلي)" : "Card Header & Footer Texts")
+                        </h6>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 1 (اسم المنشأة / القسم)" : "Top Header Line 1 (Facility / Org)")</label>
+                            <input type="text" id="cfgTopLine1" class="form-control form-control-sm" oninput="updateCardLive()" 
+                                   value="@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 2 (عنوان بطاقة الأصل)" : "Top Header Line 2 (Card Title)")</label>
+                            <input type="text" id="cfgTopLine2" class="form-control form-control-sm" oninput="updateCardLive()" 
+                                   value="@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")" />
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي (إخلاء المسؤولية / التحذير)" : "Bottom Footer Note (Warning / Ownership)")</label>
+                            <input type="text" id="cfgBottomText" class="form-control form-control-sm" oninput="updateCardLive()" 
+                                   value="@(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")" />
+                        </div>
+                        <div>
+                            <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي الثانوي (هاتف الدعم الفني)" : "Bottom Secondary Text (Helpline / Dept)")</label>
+                            <input type="text" id="cfgBottomSub" class="form-control form-control-sm" oninput="updateCardLive()" 
+                                   value="@(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QR Code & Card Layout Options -->
+                <div class="col-lg-6">
+                    <div class="card bg-light border-0 p-3 h-100">
+                        <h6 class="fw-bold small text-uppercase text-secondary mb-2">
+                            <i class="fa-solid fa-qrcode me-1 text-primary"></i>
+                            @(Loc.IsArabic ? "خيارات رمز الاستجابة السريعة (QR Code)" : "QR Code & Layout Options")
+                        </h6>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="cfgShowQR" checked onchange="updateCardLive()">
+                            <label class="form-check-label fw-bold small" for="cfgShowQR">
+                                @(Loc.IsArabic ? "تضمين رمز QR حقيقي على الملصق" : "Include Real Dynamic QR Code")
+                            </label>
+                            <div class="text-muted small" style="font-size: 0.72rem;">
+                                @(Loc.IsArabic ? "يحتوي الرمز على نفس بيانات الأصل المعروضة على البطاقة ويمكن مسحه بكاميرا الهاتف" : "Encodes the card data (Tag, Serial, Type, Brand, Custodian, Calibration)")
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "حجم رمز QR" : "QR Code Size")</label>
+                                <select id="cfgQRSize" class="form-select form-select-sm" onchange="updateCardLive()">
+                                    <option value="85">@(Loc.IsArabic ? "مدمج (85 بكسل)" : "Compact (85px)")</option>
+                                    <option value="105" selected>@(Loc.IsArabic ? "قياسي (105 بكسل)" : "Standard (105px)")</option>
+                                    <option value="130">@(Loc.IsArabic ? "كبير (130 بكسل)" : "Large (130px)")</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "عرض البطاقة" : "Card Width")</label>
+                                <select id="cfgCardWidth" class="form-select form-select-sm" onchange="updateCardLive()">
+                                    <option value="320px">@(Loc.IsArabic ? "ملصق مدمج (320px)" : "Compact Label (320px)")</option>
+                                    <option value="380px" selected>@(Loc.IsArabic ? "قياسي (380px)" : "Standard Badge (380px)")</option>
+                                    <option value="450px">@(Loc.IsArabic ? "بطاقة عريضة (450px)" : "Wide Placard (450px)")</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-2 pt-2 border-top">
+                            <small class="text-muted d-block">
+                                <i class="fa-solid fa-lightbulb text-warning me-1"></i>
+                                @(Loc.IsArabic ? "النقر على 'حفظ كافتراضي' سيجعل أي أصل يتم طباعته مستقبلاً يستخدم نفس هذا التنسيق والبيانات المحددة." : "Clicking 'Save as Default' applies these settings to all asset tags system-wide.")
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column / Fields Selection Checkboxes -->
+                <div class="col-12">
+                    <div class="card bg-light border-0 p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold small text-uppercase text-secondary mb-0">
+                                <i class="fa-solid fa-table-columns me-1 text-primary"></i>
+                                @(Loc.IsArabic ? "البيانات (الأعمدة) المراد تضمينها على البطاقة" : "Data Fields (Columns) to Include on Card")
+                            </h6>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllColumns(true)">@Loc["Select All"]</button>
+                                <span class="text-muted">|</span>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" onclick="toggleAllColumns(false)">@Loc["Clear All"]</button>
+                            </div>
+                        </div>
+
+                        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-2">
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkHospitalNo" data-col="colHospitalNo" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkHospitalNo">@Loc["Hospital Tag / ID"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkSerial" data-col="colSerial" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkSerial">@Loc["Serial Number"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkType" data-col="colType" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkType">@Loc["Equipment Type"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkBrand" data-col="colBrand" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkBrand">@Loc["Brand & Model"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkLocation" data-col="colLocation" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkLocation">@Loc["Location"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkCustodian" data-col="colCustodian" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkCustodian">@Loc["Custodian"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkStatus" data-col="colStatus" onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkStatus">@Loc["Status"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkCalibration" data-col="colCalibration" checked onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkCalibration">
+                                        <i class="fa-solid fa-award text-success me-1"></i>
+                                        @(Loc.IsArabic ? "حالة وتاريخ المعايرة الدورية" : "Periodic Calibration Status")
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkPeriodic" data-col="colPeriodic" onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkPeriodic">@Loc["Next Periodic Due"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkCommissioning" data-col="colCommissioning" onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkCommissioning">@Loc["Commissioning Date"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkWarranty" data-col="colWarranty" onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkWarranty">@Loc["Warranty Expiration"]</label>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input col-chk" type="checkbox" id="chkSupplier" data-col="colSupplier" onchange="updateCardLive()">
+                                    <label class="form-check-label small" for="chkSupplier">@Loc["Supplier"]</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Live Preview Label (The Physical Card) -->
+    <div class="tag-wrapper">
+        <div id="physicalTagCard" class="tag-card">
+            
+            <!-- Top Header (Customizable) -->
+            <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-2 mb-2">
+                <div>
+                    <div id="lblTopLine1" class="tag-top-facility">@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")</div>
+                    <div id="lblTopLine2" class="tag-top-title">@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")</div>
+                </div>
+                <div class="text-primary text-center">
+                    <i class="fa-solid fa-shield-heart fa-2x"></i>
+                </div>
+            </div>
+
+            <!-- Asset Tag Badge & QR Container -->
+            <div class="d-flex align-items-center justify-content-between gap-2 my-2 py-1">
+                <div class="flex-grow-1">
+                    <div class="text-muted small" style="font-size: 10px; font-weight: 700; text-transform: uppercase;">@Loc["Asset Tag / ID"]</div>
+                    <div class="tag-badge-pill mt-1">@tag</div>
+                    <div id="rowSerialCompact" class="tag-data-row mt-1 mb-0" style="font-size: 11px;">
+                        <span class="text-muted font-monospace">SN: @(Model.SerialNo ?? "N/A")</span>
+                    </div>
+                </div>
+                <!-- Real Dynamic QR Code (Task 3) -->
+                <div id="cardQRContainer" class="tag-qr-container">
+                    <div id="qrcode"></div>
+                    <div class="mt-1 text-center font-monospace" style="font-size: 7.5px; color: #475569; letter-spacing: 0.5px;">@tag</div>
+                </div>
+            </div>
+
+            <!-- Asset Specifications Columns (Customizable toggles) -->
+            <div class="border-top border-dark pt-2 mt-2">
+                
+                <div id="colHospitalNo" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Hospital Tag / ID"]:</span>
+                    <span class="tag-data-value font-monospace">@tag</span>
+                </div>
+
+                <div id="colSerial" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Serial Number"]:</span>
+                    <span class="tag-data-value font-monospace">@(Model.SerialNo ?? "N/A")</span>
+                </div>
+
+                <div id="colType" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Equipment Type"]:</span>
+                    <span class="tag-data-value">@(Model.DisplayType ?? "General Equipment")</span>
+                </div>
+
+                <div id="colBrand" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Brand & Model"]:</span>
+                    <span class="tag-data-value">@(Model.Brand ?? "Unbranded") @(Model.ModelNo.HasValue ? Model.ModelNo.ToString() : "")</span>
+                </div>
+
+                <div id="colLocation" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Location"]:</span>
+                    <span class="tag-data-value">@(Model.Room?.DisplayName ?? Loc["Unassigned"])</span>
+                </div>
+
+                <div id="colCustodian" class="tag-data-row">
+                    <span class="tag-data-label">@Loc["Custodian"]:</span>
+                    <span class="tag-data-value">@(Model.User?.DisplayFullName ?? Loc["Central IT Stock"])</span>
+                </div>
+
+                <div id="colStatus" class="tag-data-row" style="display: none;">
+                    <span class="tag-data-label">@Loc["Status"]:</span>
+                    <span class="tag-data-value">@(Model.DisplayStatus)</span>
+                </div>
+
+                <!-- Calibration Column (Task 2) -->
+                <div id="colCalibration" class="tag-data-row">
+                    <span class="tag-data-label">@(Loc.IsArabic ? "المعايرة الدورية" : "Calibration"):</span>
+                    <span class="tag-data-value">
+                        @if (Model.NeedsCalibration == true)
+                        {
+                            if (Model.IsCalibrationOverdue)
+                            {
+                                <span class="text-danger fw-bold">@(Loc.IsArabic ? "متأخرة" : "Overdue") (@Model.NextCalibration?.ToString("yyyy-MM-dd"))</span>
+                            }
+                            else if (Model.IsCalibrationDueSoon)
+                            {
+                                <span class="text-warning fw-bold">@(Loc.IsArabic ? "تستحق قريباً" : "Due Soon") (@Model.NextCalibration?.ToString("yyyy-MM-dd"))</span>
+                            }
+                            else
+                            {
+                                <span class="text-success fw-bold">@(Loc.IsArabic ? "معتمد وصالح" : "Valid") (@Model.NextCalibration?.ToString("yyyy-MM-dd"))</span>
+                            }
+                        }
+                        else
+                        {
+                            <span class="text-muted fw-normal">@(Loc.IsArabic ? "غير مطلوبة" : "Not Required")</span>
+                        }
+                    </span>
+                </div>
+
+                <div id="colPeriodic" class="tag-data-row" style="display: none;">
+                    <span class="tag-data-label">@Loc["Next Periodic Due"]:</span>
+                    <span class="tag-data-value">@(Model.NeedsPeriodic == true ? (Model.NextPeriodic?.ToString("yyyy-MM-dd") ?? Loc["Not scheduled"]) : Loc["Not Required"])</span>
+                </div>
+
+                <div id="colCommissioning" class="tag-data-row" style="display: none;">
+                    <span class="tag-data-label">@Loc["Commissioning Date"]:</span>
+                    <span class="tag-data-value">@(Model.BuyingDate?.ToString("yyyy-MM-dd") ?? "N/A")</span>
+                </div>
+
+                <div id="colWarranty" class="tag-data-row" style="display: none;">
+                    <span class="tag-data-label">@Loc["Warranty Expiration"]:</span>
+                    <span class="tag-data-value">@(Model.WarrantyTill?.ToString("yyyy-MM-dd") ?? "N/A")</span>
+                </div>
+
+                <div id="colSupplier" class="tag-data-row" style="display: none;">
+                    <span class="tag-data-label">@Loc["Supplier"]:</span>
+                    <span class="tag-data-value">@(Model.Supplier?.DisplayName ?? "N/A")</span>
+                </div>
+
+            </div>
+
+            <!-- Bottom Footer (Customizable) -->
+            <div class="mt-3 pt-2 border-top border-dark text-center">
+                <div id="lblBottomText" class="tag-footer-text">
+                    @(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")
+                </div>
+                <div id="lblBottomSub" class="tag-footer-sub">
+                    @(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="~/lib/qrcode.min.js"></script>
+    <script>
+        // Asset data representation for QR Code payload
+        const currentAsset = {
+            id: '@tag',
+            serial: '@(Model.SerialNo ?? "")',
+            type: '@(Model.DisplayType ?? "")',
+            brand: '@(Model.Brand ?? "") @(Model.ModelNo.HasValue ? Model.ModelNo.ToString() : "")',
+            location: '@(Model.Room?.DisplayName ?? "Unassigned")',
+            custodian: '@(Model.User?.DisplayFullName ?? "Central IT Stock")',
+            status: '@(Model.DisplayStatus)',
+            calibration: '@(Model.NeedsCalibration == true ? (Model.IsCalibrationOverdue ? "Overdue" : "Valid until " + Model.NextCalibration?.ToString("yyyy-MM-dd")) : "Not Required")',
+            certNo: '@(Model.CalibrationCertNo ?? "")',
+            url: '@assetUrl'
+        };
+
+        const STORAGE_KEY = 'StockPortal_AssetTagConfig';
+        let qrcodeInstance = null;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            loadTagDefaults();
+            updateCardLive();
+        });
+
+        function updateCardLive() {
+            // Update Top Texts
+            const topLine1 = document.getElementById('cfgTopLine1').value;
+            const topLine2 = document.getElementById('cfgTopLine2').value;
+            document.getElementById('lblTopLine1').textContent = topLine1;
+            document.getElementById('lblTopLine2').textContent = topLine2;
+
+            // Update Bottom Texts
+            const bottomText = document.getElementById('cfgBottomText').value;
+            const bottomSub = document.getElementById('cfgBottomSub').value;
+            document.getElementById('lblBottomText').textContent = bottomText;
+            document.getElementById('lblBottomSub').textContent = bottomSub;
+
+            // Update Card Width
+            const cardWidth = document.getElementById('cfgCardWidth').value;
+            document.getElementById('physicalTagCard').style.width = cardWidth;
+
+            // Update Column Visibility
+            const colCheckboxes = document.querySelectorAll('.col-chk');
+            colCheckboxes.forEach(chk => {
+                const colId = chk.getAttribute('data-col');
+                const colElem = document.getElementById(colId);
+                if (colElem) {
+                    colElem.style.display = chk.checked ? 'flex' : 'none';
+                }
+            });
+
+            // Compact serial row in header
+            const chkSerial = document.getElementById('chkSerial').checked;
+            const compactSerial = document.getElementById('rowSerialCompact');
+            if (compactSerial) {
+                compactSerial.style.display = chkSerial ? 'none' : 'none';
+            }
+
+            // Update QR Code
+            renderQRCode();
+        }
+
+        function renderQRCode() {
+            const showQR = document.getElementById('cfgShowQR').checked;
+            const qrContainer = document.getElementById('cardQRContainer');
+            const qrWrapper = document.getElementById('qrcode');
+
+            if (!showQR) {
+                qrContainer.style.display = 'none';
+                return;
+            }
+
+            qrContainer.style.display = 'flex';
+            const qrSize = parseInt(document.getElementById('cfgQRSize').value) || 105;
+
+            // Build structured QR content with active fields
+            let qrText = `[ASSET TAG: ${currentAsset.id}]\n`;
+            if (document.getElementById('chkSerial').checked && currentAsset.serial) {
+                qrText += `SN: ${currentAsset.serial}\n`;
+            }
+            if (document.getElementById('chkType').checked && currentAsset.type) {
+                qrText += `Type: ${currentAsset.type}\n`;
+            }
+            if (document.getElementById('chkBrand').checked && currentAsset.brand) {
+                qrText += `Brand: ${currentAsset.brand}\n`;
+            }
+            if (document.getElementById('chkLocation').checked && currentAsset.location) {
+                qrText += `Room: ${currentAsset.location}\n`;
+            }
+            if (document.getElementById('chkCustodian').checked && currentAsset.custodian) {
+                qrText += `User: ${currentAsset.custodian}\n`;
+            }
+            if (document.getElementById('chkCalibration').checked) {
+                qrText += `Calib: ${currentAsset.calibration}\n`;
+                if (currentAsset.certNo) qrText += `Cert#: ${currentAsset.certNo}\n`;
+            }
+            qrText += `URL: ${currentAsset.url}`;
+
+            // Clear previous QR code canvas/image
+            qrWrapper.innerHTML = '';
+
+            try {
+                qrcodeInstance = new QRCode(qrWrapper, {
+                    text: qrText,
+                    width: qrSize,
+                    height: qrSize,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch (err) {
+                console.warn("QR code generation exception:", err);
+            }
+        }
+
+        function toggleAllColumns(selectAll) {
+            document.querySelectorAll('.col-chk').forEach(chk => {
+                chk.checked = selectAll;
+            });
+            updateCardLive();
+        }
+
+        function saveTagDefaults() {
+            const config = {
+                topLine1: document.getElementById('cfgTopLine1').value,
+                topLine2: document.getElementById('cfgTopLine2').value,
+                bottomText: document.getElementById('cfgBottomText').value,
+                bottomSub: document.getElementById('cfgBottomSub').value,
+                showQR: document.getElementById('cfgShowQR').checked,
+                qrSize: document.getElementById('cfgQRSize').value,
+                cardWidth: document.getElementById('cfgCardWidth').value,
+                columns: {}
+            };
+
+            document.querySelectorAll('.col-chk').forEach(chk => {
+                config.columns[chk.id] = chk.checked;
+            });
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+
+            // Show Toast
+            const toast = document.getElementById('saveToast');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 2500);
+        }
+
+        function loadTagDefaults() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+
+            try {
+                const config = JSON.parse(saved);
+                if (config.topLine1 !== undefined) document.getElementById('cfgTopLine1').value = config.topLine1;
+                if (config.topLine2 !== undefined) document.getElementById('cfgTopLine2').value = config.topLine2;
+                if (config.bottomText !== undefined) document.getElementById('cfgBottomText').value = config.bottomText;
+                if (config.bottomSub !== undefined) document.getElementById('cfgBottomSub').value = config.bottomSub;
+                if (config.showQR !== undefined) document.getElementById('cfgShowQR').checked = config.showQR;
+                if (config.qrSize !== undefined) document.getElementById('cfgQRSize').value = config.qrSize;
+                if (config.cardWidth !== undefined) document.getElementById('cfgCardWidth').value = config.cardWidth;
+
+                if (config.columns) {
+                    for (const [id, checked] of Object.entries(config.columns)) {
+                        const elem = document.getElementById(id);
+                        if (elem) elem.checked = checked;
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to parse saved tag configuration:", e);
+            }
+        }
+
+        function resetTagDefaults() {
+            localStorage.removeItem(STORAGE_KEY);
+            location.reload();
+        }
+    </script>
 </body>
 </html>

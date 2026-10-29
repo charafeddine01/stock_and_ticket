@@ -649,6 +649,9 @@ namespace StockPortal.Data
 
             // Seed Arabic localization values in database
             EnsureArabicSeedData(context);
+
+            // Seed / Update Calibration data for products (Task 2)
+            EnsureCalibrationSeedData(context);
         }
 
         private static void EnsureArabicSchema(StockDbContext context)
@@ -668,6 +671,15 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN equipment_type_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN status_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN title_ar TEXT NULL;");
+
+                    // Calibration Schema (Task 2)
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN needsCalibration INTEGER NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibrationInterval INTEGER NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN lastCalibration TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN nextCalibration TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibrationCertNo TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibratedBy TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibrationNotes TEXT NULL;");
                 }
                 else
                 {
@@ -681,6 +693,15 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `equipment_type_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `title_ar` varchar(255) NULL;");
+
+                    // Calibration Schema (Task 2)
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `needsCalibration` tinyint(1) NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibrationInterval` int NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `lastCalibration` date NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `nextCalibration` date NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibrationCertNo` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibratedBy` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibrationNotes` varchar(1024) NULL;");
                 }
             }
             catch {}
@@ -818,6 +839,54 @@ namespace StockPortal.Data
                         var info = userMap[u.FullName];
                         if (string.IsNullOrEmpty(u.FullNameAr)) u.FullNameAr = info.NameAr;
                         if (string.IsNullOrEmpty(u.RoleAr)) u.RoleAr = info.RoleAr;
+                    }
+                }
+                context.SaveChanges();
+            }
+            catch {}
+        }
+
+        private static void EnsureCalibrationSeedData(StockDbContext context)
+        {
+            try
+            {
+                var assets = context.Assets.ToList();
+                foreach (var asset in assets)
+                {
+                    var isBiomedical = asset.MaintenanceTeam == MaintenanceTeams.Biomedical ||
+                                       (asset.Type != null && (asset.Type.Contains("Ultrasound", StringComparison.OrdinalIgnoreCase) ||
+                                                              asset.Type.Contains("Monitor", StringComparison.OrdinalIgnoreCase) ||
+                                                              asset.Type.Contains("Defibrillator", StringComparison.OrdinalIgnoreCase) ||
+                                                              asset.Type.Contains("ECG", StringComparison.OrdinalIgnoreCase) ||
+                                                              asset.Type.Contains("Ventilator", StringComparison.OrdinalIgnoreCase)));
+
+                    if (isBiomedical && (asset.NeedsCalibration == null || asset.NeedsCalibration == false))
+                    {
+                        asset.NeedsCalibration = true;
+                        if (asset.Type?.Contains("Ultrasound", StringComparison.OrdinalIgnoreCase) == true)
+                        {
+                            asset.CalibrationInterval = 365;
+                            asset.LastCalibration = DateTime.Now.AddDays(-340);
+                            asset.NextCalibration = DateTime.Now.AddDays(25); // Due soon (25 days left)
+                            asset.CalibrationCertNo = "CAL-2025-US-991";
+                            asset.CalibratedBy = "Philips Precision Calibration Lab";
+                            asset.CalibrationNotes = "AIUM ultrasound acoustic output and frequency verification within ±1.5% tolerance standard.";
+                        }
+                        else
+                        {
+                            // Patient Monitor or other biomedical device
+                            asset.CalibrationInterval = 180;
+                            asset.LastCalibration = DateTime.Now.AddDays(-200);
+                            asset.NextCalibration = DateTime.Now.AddDays(-20); // Overdue by 20 days!
+                            asset.CalibrationCertNo = "CAL-2025-MON-442";
+                            asset.CalibratedBy = "National Biomedical Metrology Authority";
+                            asset.CalibrationNotes = "ECG gain accuracy 10mm/mV, NIBP transducer calibrated against mercury manometer NIST standard.";
+                        }
+                    }
+                    else if (!isBiomedical && asset.NeedsCalibration == null)
+                    {
+                        // IT & General hardware does not need calibration
+                        asset.NeedsCalibration = false;
                     }
                 }
                 context.SaveChanges();
