@@ -2,8 +2,8 @@
    STOCK & HELPDESK MANAGEMENT PORTAL - MULTI-THEME & HIGH-CLARITY DESIGN
    ========================================================================== */
 
-/* 1. CLARITY PRO (Default - Pure High-Contrast Light, Nordic Blue, Crisp Cards) */
-:root, [data-theme="clarity"] {
+/* 1. LIGHT THEME (Default - High-Contrast Clean Light, Nordic Blue, Crisp Cards) */
+:root, [data-theme="light"], [data-theme="clarity"] {
     --sidebar-width: 260px;
     --sidebar-collapsed-width: 0px;
     
@@ -33,69 +33,38 @@
     --notif-shadow: 0 20px 35px -10px rgba(15, 23, 42, 0.2), 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 
-/* 2. CLINICAL HEALTHCARE (Fresh Mint/Teal Medical Aesthetic) */
+/* 2. CLINICAL THEME (Medical Light Green & Crisp Mint Aesthetic) */
 [data-theme="clinical"] {
     --sidebar-width: 260px;
     --sidebar-collapsed-width: 0px;
     
-    --primary-color: #0d9488;
-    --primary-hover: #0f766e;
-    --primary-light: #f0fdfa;
+    --primary-color: #059669;
+    --primary-hover: #047857;
+    --primary-light: #ecfdf5;
     
-    --sidebar-bg: #134e4a;
-    --sidebar-border: #115e59;
-    --sidebar-hover: #115e59;
-    --sidebar-text: #ccfbf1;
-    --sidebar-active-bg: #0d9488;
+    --sidebar-bg: #064e3b;
+    --sidebar-border: #065f46;
+    --sidebar-hover: #065f46;
+    --sidebar-text: #a7f3d0;
+    --sidebar-active-bg: #10b981;
     --sidebar-active-text: #ffffff;
     
-    --body-bg: #f0fdfa;
+    --body-bg: #f0fdf4;
     --card-bg: #ffffff;
-    --card-border: #ccfbf1;
+    --card-border: #bbf7d0;
     --top-navbar-bg: rgba(255, 255, 255, 0.96);
-    --top-navbar-border: #99f6e4;
+    --top-navbar-border: #86efac;
     
-    --text-heading: #134e4a;
+    --text-heading: #064e3b;
     --text-body: #0f172a;
     --text-muted: #475569;
     
-    --table-head-bg: #f0fdfa;
-    --table-hover-bg: #f5fdfc;
-    --notif-shadow: 0 20px 35px -10px rgba(19, 78, 74, 0.2), 0 0 0 1px rgba(19, 78, 74, 0.08);
+    --table-head-bg: #f0fdf4;
+    --table-hover-bg: #f7fee7;
+    --notif-shadow: 0 20px 35px -10px rgba(6, 78, 59, 0.2), 0 0 0 1px rgba(6, 78, 59, 0.08);
 }
 
-/* 3. EXECUTIVE NAVY (Corporate Sapphire & Steel) */
-[data-theme="navy"] {
-    --sidebar-width: 260px;
-    --sidebar-collapsed-width: 0px;
-    
-    --primary-color: #1e40af;
-    --primary-hover: #1e3a8a;
-    --primary-light: #eff6ff;
-    
-    --sidebar-bg: #1e293b;
-    --sidebar-border: #334155;
-    --sidebar-hover: #334155;
-    --sidebar-text: #cbd5e1;
-    --sidebar-active-bg: #3b82f6;
-    --sidebar-active-text: #ffffff;
-    
-    --body-bg: #f8fafc;
-    --card-bg: #ffffff;
-    --card-border: #cbd5e1;
-    --top-navbar-bg: rgba(255, 255, 255, 0.96);
-    --top-navbar-border: #cbd5e1;
-    
-    --text-heading: #0f172a;
-    --text-body: #1e293b;
-    --text-muted: #475569;
-    
-    --table-head-bg: #f1f5f9;
-    --table-hover-bg: #f8fafc;
-    --notif-shadow: 0 20px 35px -10px rgba(30, 41, 59, 0.25), 0 0 0 1px rgba(30, 41, 59, 0.08);
-}
-
-/* 4. DARK CLARITY (OLED High-Contrast Dark Mode) */
+/* 3. DARK THEME (OLED High-Contrast Dark Mode) */
 [data-theme="dark"] {
     --sidebar-width: 260px;
     --sidebar-collapsed-width: 0px;
@@ -169,17 +138,15 @@ body {
 .content-area {
     padding: 2rem;
     flex-grow: 1;
-    animation: pageEntrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: pageEntrance 0.25s ease-out;
 }
 
 @keyframes pageEntrance {
     0% {
         opacity: 0;
-        transform: translateY(8px);
     }
     100% {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -797,13 +764,26 @@ body {
 .stat-card.stat-card-teal::before { background: #0d9488; }
 .stat-card.stat-card-orange::before { background: #f97316; }
 
-/* Subtle light mode card backgrounds for clarity */
+/* Subtle card backgrounds by theme */
+[data-theme="light"] .stat-card.stat-card-blue,
 [data-theme="clarity"] .stat-card.stat-card-blue { background: linear-gradient(180deg, #f8faff 0%, #ffffff 100%); }
+[data-theme="light"] .stat-card.stat-card-amber,
 [data-theme="clarity"] .stat-card.stat-card-amber { background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%); }
+[data-theme="light"] .stat-card.stat-card-rose,
 [data-theme="clarity"] .stat-card.stat-card-rose { background: linear-gradient(180deg, #fffafa 0%, #ffffff 100%); }
+[data-theme="light"] .stat-card.stat-card-emerald,
 [data-theme="clarity"] .stat-card.stat-card-emerald { background: linear-gradient(180deg, #fafffa 0%, #ffffff 100%); }
+[data-theme="light"] .stat-card.stat-card-teal,
 [data-theme="clarity"] .stat-card.stat-card-teal { background: linear-gradient(180deg, #f7fdfb 0%, #ffffff 100%); }
+[data-theme="light"] .stat-card.stat-card-orange,
 [data-theme="clarity"] .stat-card.stat-card-orange { background: linear-gradient(180deg, #fffaf5 0%, #ffffff 100%); }
+
+[data-theme="clinical"] .stat-card.stat-card-blue { background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%); }
+[data-theme="clinical"] .stat-card.stat-card-amber { background: linear-gradient(180deg, #fefce8 0%, #ffffff 100%); }
+[data-theme="clinical"] .stat-card.stat-card-rose { background: linear-gradient(180deg, #fff1f2 0%, #ffffff 100%); }
+[data-theme="clinical"] .stat-card.stat-card-emerald { background: linear-gradient(180deg, #ecfdf5 0%, #ffffff 100%); }
+[data-theme="clinical"] .stat-card.stat-card-teal { background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 100%); }
+[data-theme="clinical"] .stat-card.stat-card-orange { background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%); }
 
 [data-theme="dark"] .stat-card.stat-card-blue { background: linear-gradient(180deg, rgba(37, 99, 235, 0.08) 0%, #111827 100%); }
 [data-theme="dark"] .stat-card.stat-card-amber { background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, #111827 100%); }
@@ -986,6 +966,14 @@ h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-header-title {
 }
 
 /* Modals & Dialogs */
+.modal {
+    z-index: 1055;
+}
+
+.modal-backdrop {
+    z-index: 1050;
+}
+
 .modal-content {
     background-color: var(--card-bg);
     color: var(--text-body);

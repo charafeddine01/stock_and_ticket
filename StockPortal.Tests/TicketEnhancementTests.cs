@@ -9,6 +9,7 @@ using StockPortal.Controllers;
 using StockPortal.Data;
 using StockPortal.Models;
 using StockPortal.Services;
+using StockPortal.ViewModels;
 using Xunit;
 
 namespace StockPortal.Tests
@@ -355,37 +356,497 @@ namespace StockPortal.Tests
         // ==========================================
         // Task 2 (Phase 2): Notifications Popup Endpoint Test
         // ==========================================
+        // ==========================================
+        // Task: Custody Items Search & Maintenance Department Filter Tests
+        // ==========================================
         [Fact]
-        public async Task NotificationsController_GetLatestUnread_ReturnsJsonResults()
+        public async Task TicketsController_GetUserAssets_ReturnsCustodyAssetsWithMaintenanceDepartment()
         {
             using var context = CreateInMemoryDbContext();
 
-            var user = new User { Id = 77, FullName = "Nurse Mary" };
+            var user = new User { Id = 88, FullName = "Dr. Custodian", Role = SystemRoles.EndUser, IsActive = true };
             context.Users.Add(user);
 
-            context.Notifications.Add(new Notification
-            {
-                Id = 501,
-                UserId = 77,
-                Title = "New Ticket Update",
-                Message = "Technician dispatched to Room 201",
-                Type = "TicketStatus",
-                IsRead = false,
-                CreatedAt = DateTime.Now
-            });
+            var room101 = new Room { Id = 1, RoomNo = 101, Floor = 1 };
+            context.Rooms.Add(room101);
+
+            // Add multiple custody assets belonging to different maintenance departments
+            context.Assets.AddRange(
+                new Asset { Id = 10, HospitalNo = "HOSP-IT-01", Brand = "Dell", Type = "Laptop", MaintenanceTeam = MaintenanceTeams.IT, UserId = 88, RoomId = 1 },
+                new Asset { Id = 11, HospitalNo = "HOSP-BIO-01", Brand = "Philips", Type = "Patient Monitor", MaintenanceTeam = MaintenanceTeams.Biomedical, UserId = 88, RoomId = 1 },
+                new Asset { Id = 12, HospitalNo = "HOSP-GEN-01", Brand = "Carrier", Type = "HVAC Unit", MaintenanceTeam = MaintenanceTeams.General, UserId = 88 },
+                new Asset { Id = 13, HospitalNo = "HOSP-OTHER-01", Brand = "HP", Type = "PC", MaintenanceTeam = MaintenanceTeams.IT, UserId = 99 } // Different user
+            );
             await context.SaveChangesAsync();
 
             var mockUserService = new Mock<ICurrentUserService>();
-            mockUserService.Setup(s => s.GetUserId()).Returns(77);
+            mockUserService.Setup(s => s.GetUserId()).Returns(88);
 
-            var notifController = new NotificationsController(new NotificationService(context), mockUserService.Object);
-            var result = await notifController.GetLatestUnread();
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            var result = await controller.GetUserAssets(userId: 88);
 
             var jsonResult = Assert.IsType<JsonResult>(result);
-            var countProp = jsonResult.Value!.GetType().GetProperty("count");
+            Assert.NotNull(jsonResult.Value);
+
+            var countProp = jsonResult.Value.GetType().GetProperty("count");
+            var successProp = jsonResult.Value.GetType().GetProperty("success");
+            var assetsProp = jsonResult.Value.GetType().GetProperty("assets");
+
             Assert.NotNull(countProp);
+            Assert.NotNull(assetsProp);
+
             var countVal = (int)countProp.GetValue(jsonResult.Value)!;
-            Assert.Equal(1, countVal);
+            var successVal = (bool)successProp!.GetValue(jsonResult.Value)!;
+
+            Assert.True(successVal);
+            Assert.Equal(3, countVal); // 3 assets for user 88, excluding user 99's asset
+        }
+
+        [Fact]
+        public async Task TicketsController_Create_PreservesAssetIdAndTeam_WhenSelectedFromColleagueCustody()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var userA = new User { Id = 91, FullName = "Submitter Secretary", Role = SystemRoles.EndUser, IsActive = true };
+            var userB = new User { Id = 92, FullName = "Dr. Colleague", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.AddRange(userA, userB);
+
+            var bioAsset = new Asset
+            {
+                Id = 75,
+                HospitalNo = "BIO-PUMP-75",
+                Brand = "B. Braun",
+                Type = "Infusion Pump",
+                MaintenanceTeam = MaintenanceTeams.Biomedical,
+                UserId = 92
+            };
+            context.Assets.Add(bioAsset);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(91);
+            mockUserService.Setup(s => s.IsEndUser()).Returns(true);
+
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var ticket = new Ticket
+            {
+                AssetId = bioAsset.Id,
+                OpenedBy = 91,
+                OnBehalfOf = 92,
+                TargetTeam = MaintenanceTeams.Biomedical,
+                Type = "Infusion & Syringe Pump",
+                Priority = 3
+            };
+
+            var actionResult = await controller.Create(ticket, manualAsset: null, initialMessage: "Pump occlusion alarm won't clear", assignedTechId: null);
+
+            var createdTicket = await context.Tickets.FirstOrDefaultAsync(t => t.AssetId == bioAsset.Id);
+            Assert.NotNull(createdTicket);
+            Assert.Equal(91, createdTicket.OpenedBy);
+            Assert.Equal(92, createdTicket.OnBehalfOf);
+            Assert.Equal(75, createdTicket.AssetId);
+            Assert.Equal(MaintenanceTeams.Biomedical, createdTicket.TargetTeam);
+        }
+
+        // ==========================================
+        // Task: PC Error Log & Screenshot Paste & Installed Software Tests
+        // ==========================================
+        [Fact]
+        public void TicketsController_GetPcErrorLog_ReturnsTelemetryAndFormattedEvents()
+        {
+            using var context = CreateInMemoryDbContext();
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(1);
+
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            var result = controller.GetPcErrorLog("TEST-WORKSTATION-01");
+
+            var jsonResult = Assert.IsType<JsonResult>(result);
+            Assert.NotNull(jsonResult.Value);
+
+            var successProp = jsonResult.Value.GetType().GetProperty("success");
+            var machineNameProp = jsonResult.Value.GetType().GetProperty("machineName");
+            var countProp = jsonResult.Value.GetType().GetProperty("count");
+            var formattedProp = jsonResult.Value.GetType().GetProperty("formatted");
+
+            Assert.NotNull(successProp);
+            Assert.NotNull(machineNameProp);
+            Assert.NotNull(countProp);
+            Assert.NotNull(formattedProp);
+
+            Assert.True((bool)successProp.GetValue(jsonResult.Value)!);
+            Assert.Equal("TEST-WORKSTATION-01", (string)machineNameProp.GetValue(jsonResult.Value)!);
+            Assert.True((int)countProp.GetValue(jsonResult.Value)! > 0);
+            Assert.False(string.IsNullOrWhiteSpace((string)formattedProp.GetValue(jsonResult.Value)!));
+        }
+
+        [Fact]
+        public async Task TicketsController_Create_SavesAffectedSoftwarePcNameErrorLogAndScreenshots()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var user = new User { Id = 33, FullName = "Dr. Clinic", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(user);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(33);
+            mockUserService.Setup(s => s.IsEndUser()).Returns(true);
+
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var ticket = new Ticket
+            {
+                OpenedBy = 33,
+                OnBehalfOf = 33,
+                TargetTeam = MaintenanceTeams.IT,
+                Type = "OS & Software Crash",
+                AffectedSoftware = "HIS - Hospital Information System (EHR)",
+                PcName = "MED-WORKSTATION-07",
+                Priority = 3
+            };
+
+            string errorLogText = "[2026-11-03 09:30:11] [ERROR] [Application Error] (EventID: 1000)\n  Faulting application: his_client.exe version 4.5.1";
+            // Valid 1x1 PNG base64 DataURL
+            string singlePngBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+            string screenshotsJson = System.Text.Json.JsonSerializer.Serialize(new[] { singlePngBase64 });
+
+            var result = await controller.Create(
+                ticket: ticket,
+                manualAsset: null,
+                initialMessage: "HIS system freeze upon patient admitting",
+                assignedTechId: null,
+                pcErrorLog: errorLogText,
+                pastedScreenshotsJson: screenshotsJson,
+                screenshotFiles: null
+            );
+
+            // Assert Redirect to Details
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirectResult.ActionName);
+
+            // Verify ticket fields
+            var savedTicket = await context.Tickets.FirstOrDefaultAsync(t => t.OpenedBy == 33);
+            Assert.NotNull(savedTicket);
+            Assert.Equal("HIS - Hospital Information System (EHR)", savedTicket.AffectedSoftware);
+            Assert.Equal("MED-WORKSTATION-07", savedTicket.PcName);
+
+            // Verify message content includes the error log
+            var savedMsg = await context.TicketMessages.FirstOrDefaultAsync(m => m.TicketId == savedTicket.Id);
+            Assert.NotNull(savedMsg);
+            Assert.Contains("[AFFECTED SOFTWARE]: HIS - Hospital Information System (EHR)", savedMsg.Msg);
+            Assert.Contains("[WORKSTATION PC]: MED-WORKSTATION-07", savedMsg.Msg);
+            Assert.Contains("[CLIENT WORKSTATION ERROR LOG]:", savedMsg.Msg);
+            Assert.Contains("Faulting application: his_client.exe", savedMsg.Msg);
+
+            // Verify screenshot attachment was created
+            var savedAttachment = await context.TicketAttachments.FirstOrDefaultAsync(a => a.TicketId == savedTicket.Id);
+            Assert.NotNull(savedAttachment);
+            Assert.Equal("image/png", savedAttachment.FileType);
+            Assert.Contains(".png", savedAttachment.FilePath);
+        }
+
+        [Fact]
+        public async Task TicketsController_AddMessage_SavesPastedScreenshots()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var user = new User { Id = 40, FullName = "Nurse Sarah", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(user);
+
+            var ticket = new Ticket
+            {
+                Id = 205,
+                OpenedBy = 40,
+                TargetTeam = MaintenanceTeams.IT,
+                Type = "OS & Software Crash",
+                StatusId = 1
+            };
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(40);
+            mockUserService.Setup(s => s.CanAccessTicket(It.IsAny<Ticket>())).Returns(true);
+
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            string singlePngBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+            string screenshotsJson = System.Text.Json.JsonSerializer.Serialize(new[] { singlePngBase64 });
+
+            var result = await controller.AddMessage(
+                ticketId: 205,
+                userId: 40,
+                msg: "Pasted screenshot of error dialog box",
+                pastedScreenshotsJson: screenshotsJson,
+                screenshotFiles: null
+            );
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirectResult.ActionName);
+
+            var attachment = await context.TicketAttachments.FirstOrDefaultAsync(a => a.TicketId == 205);
+            Assert.NotNull(attachment);
+            Assert.Equal(40, attachment.UploadedBy);
+            Assert.NotNull(attachment.MessageId);
+            Assert.Contains("/uploads/tickets/", attachment.FilePath);
+
+            var savedMsg = await context.TicketMessages.Include(m => m.Attachments).FirstOrDefaultAsync(m => m.TicketId == 205);
+            Assert.NotNull(savedMsg);
+            Assert.Single(savedMsg.Attachments);
+        }
+
+        [Fact]
+        public async Task AssetsController_UpdateInstalledSoftwares_UpdatesAndPersistsSoftwareCatalog()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var pcAsset = new Asset
+            {
+                Id = 15,
+                HospitalNo = "HOSP-PC-015",
+                Brand = "Dell",
+                Type = "Desktop Workstation",
+                MaintenanceTeam = MaintenanceTeams.IT,
+                InstalledSoftwares = "[]"
+            };
+            context.Assets.Add(pcAsset);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(1);
+            mockUserService.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
+
+            var controller = new AssetsController(context, mockUserService.Object);
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var selectedSoftwares = new[]
+            {
+                "HIS - Hospital Information System (EHR)",
+                "PACS - Radiology DICOM Viewer",
+                "Microsoft Office 365"
+            };
+
+            var result = await controller.UpdateInstalledSoftwares(15, selectedSoftwares);
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirectResult.ActionName);
+
+            var updatedAsset = await context.Assets.FindAsync(15);
+            Assert.NotNull(updatedAsset);
+            Assert.Equal(3, updatedAsset.InstalledSoftwaresList.Count);
+            Assert.Contains("HIS - Hospital Information System (EHR)", updatedAsset.InstalledSoftwaresList);
+            Assert.Contains("PACS - Radiology DICOM Viewer", updatedAsset.InstalledSoftwaresList);
+        }
+
+        // ==========================================================
+        // Task: Closed Tickets Management, Analytics & Multi-Tech Closure
+        // ==========================================================
+        [Fact]
+        public async Task TicketsController_CloseTicket_MultiTechnicians_PersistsAllParticipatingTechs()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var tech1 = new User { Id = 101, FullName = "Tech Alice", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            var tech2 = new User { Id = 102, FullName = "Tech Bob", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            var tech3 = new User { Id = 103, FullName = "Tech Charlie", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            context.Users.AddRange(tech1, tech2, tech3);
+
+            var ticket = new Ticket
+            {
+                Id = 301,
+                TargetTeam = "IT",
+                Type = "Hardware",
+                StatusId = 1,
+                OpenedDT = DateTime.Now.AddHours(-3)
+            };
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(101);
+            mockUserService.Setup(s => s.GetCurrentUser()).Returns(tech1);
+            mockUserService.Setup(s => s.CanManageTicket(It.IsAny<Ticket>())).Returns(true);
+
+            var mockNotifService = new Mock<INotificationService>();
+
+            var controller = new TicketsController(
+                context,
+                mockUserService.Object,
+                mockNotifService.Object
+            );
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var participatingTechIds = new[] { 101, 102, 103 };
+            var result = await controller.CloseTicket(301, "Replaced motherboard and updated BIOS firmware", participatingTechIds);
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirectResult.ActionName);
+
+            var updatedTicket = await context.Tickets.FindAsync(301);
+            Assert.NotNull(updatedTicket);
+            Assert.Equal(5, updatedTicket.StatusId);
+            Assert.NotNull(updatedTicket.ClosedDT);
+            Assert.Equal("Replaced motherboard and updated BIOS firmware", updatedTicket.ResolutionDetails);
+            Assert.Equal(3, updatedTicket.ClosedByUserIds.Count);
+            Assert.Contains(101, updatedTicket.ClosedByUserIds);
+            Assert.Contains(102, updatedTicket.ClosedByUserIds);
+            Assert.Contains(103, updatedTicket.ClosedByUserIds);
+
+            var timelineMsg = await context.TicketMessages.FirstOrDefaultAsync(m => m.TicketId == 301);
+            Assert.NotNull(timelineMsg);
+            Assert.Contains("Replaced motherboard and updated BIOS firmware", timelineMsg.Msg);
+            Assert.Contains("Tech Alice", timelineMsg.Msg);
+            Assert.Contains("Tech Bob", timelineMsg.Msg);
+            Assert.Contains("Tech Charlie", timelineMsg.Msg);
+        }
+
+        [Fact]
+        public void CurrentUserService_CanAccessDashboard_GrantsAccessToAdminAndAllMaintenanceTeams()
+        {
+            var httpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext();
+            var mockAccessor = new Mock<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+            mockAccessor.Setup(a => a.HttpContext).Returns(httpContext);
+
+            var service = new CurrentUserService(mockAccessor.Object);
+
+            // EndUser
+            var endUser = new User { Role = SystemRoles.EndUser };
+            httpContext.Items["CurrentUser"] = endUser;
+            Assert.False(service.CanAccessDashboard());
+
+            // Admin
+            var adminUser = new User { Role = SystemRoles.Admin };
+            httpContext.Items["CurrentUser"] = adminUser;
+            Assert.True(service.CanAccessDashboard());
+
+            // Maintenance (IT)
+            var maintIt = new User { Role = SystemRoles.Maintenance, MaintenanceTeam = "IT" };
+            httpContext.Items["CurrentUser"] = maintIt;
+            Assert.True(service.CanAccessDashboard());
+
+            // Maintenance (Biomedical)
+            var maintBio = new User { Role = SystemRoles.Maintenance, MaintenanceTeam = "BIOMEDICAL" };
+            httpContext.Items["CurrentUser"] = maintBio;
+            Assert.True(service.CanAccessDashboard());
+
+            // Maintenance (General)
+            var maintGen = new User { Role = SystemRoles.Maintenance, MaintenanceTeam = "GENERAL" };
+            httpContext.Items["CurrentUser"] = maintGen;
+            Assert.True(service.CanAccessDashboard());
+        }
+
+        [Fact]
+        public async Task HomeController_Index_MaintenanceAnalytics_CreditsAllCollaboratingTechnicians()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var tech1 = new User { Id = 201, FullName = "Lead Engineer Dave", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            var tech2 = new User { Id = 202, FullName = "Technician Eve", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            context.Users.AddRange(tech1, tech2);
+
+            var closedTicket = new Ticket
+            {
+                Id = 401,
+                TargetTeam = "IT",
+                Type = "Hardware",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddHours(2),
+                ClosedDT = DateTime.Today.AddHours(10),
+                ResolutionDetails = "Fixed PSU and replaced wiring",
+                ClosedByUsers = "[201,202]"
+            };
+            context.Tickets.Add(closedTicket);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(201);
+            mockUserService.Setup(s => s.CanAccessDashboard()).Returns(true);
+
+            var controller = new HomeController(context, mockUserService.Object);
+
+            var result = await controller.Index(datePreset: "today", tab: "analytics");
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            Assert.Equal("analytics", model.ActiveTab);
+            Assert.Equal(1, model.FilteredClosedTickets);
+
+            var daveStat = model.TechnicianStats.FirstOrDefault(s => s.UserId == 201);
+            var eveStat = model.TechnicianStats.FirstOrDefault(s => s.UserId == 202);
+
+            Assert.NotNull(daveStat);
+            Assert.NotNull(eveStat);
+            Assert.Equal(1, daveStat.ClosedTicketsCount);
+            Assert.Equal(1, eveStat.ClosedTicketsCount);
+            Assert.Equal(8.0, daveStat.AverageResolutionHours);
+            Assert.Equal(8.0, eveStat.AverageResolutionHours);
+
+            Assert.Single(model.FilteredClosedTicketsLog);
+            var logItem = model.FilteredClosedTicketsLog[0];
+            Assert.Equal(401, logItem.TicketId);
+            Assert.Equal(2, logItem.ResolvedByUsers.Count);
+        }
+
+        [Fact]
+        public async Task HomeController_Index_DateAndTeamFiltering_FiltersMetricsCorrectly()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var tech = new User { Id = 501, FullName = "Bio Engineer", Role = SystemRoles.Maintenance, MaintenanceTeam = "BIOMEDICAL", IsActive = true };
+            context.Users.Add(tech);
+
+            // Ticket 1: IT ticket closed 45 days ago (outside 30-day window)
+            context.Tickets.Add(new Ticket
+            {
+                Id = 501,
+                TargetTeam = "IT",
+                Type = "Hardware",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddDays(-50),
+                ClosedDT = DateTime.Today.AddDays(-45),
+                ClosedByUsers = "[501]"
+            });
+
+            // Ticket 2: Biomedical ticket closed 5 days ago (inside 30-day window)
+            context.Tickets.Add(new Ticket
+            {
+                Id = 502,
+                TargetTeam = "BIOMEDICAL",
+                Type = "Medical Device",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddDays(-6),
+                ClosedDT = DateTime.Today.AddDays(-5),
+                ClosedByUsers = "[501]"
+            });
+
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            var controller = new HomeController(context, mockUserService.Object);
+
+            // Query with datePreset = "30days" and teamFilter = "BIOMEDICAL"
+            var result = await controller.Index(teamFilter: "BIOMEDICAL", datePreset: "30days", tab: "analytics");
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            Assert.Equal(1, model.FilteredClosedTickets);
+            Assert.Single(model.FilteredClosedTicketsLog);
+            Assert.Equal(502, model.FilteredClosedTicketsLog[0].TicketId);
+            Assert.Equal("BIOMEDICAL", model.FilteredClosedTicketsLog[0].TargetTeam);
         }
     }
 }

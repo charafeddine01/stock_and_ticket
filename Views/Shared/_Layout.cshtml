@@ -34,12 +34,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     
     <!-- Custom Site Styles, Animations, RTL & Autohide Layout -->
-    <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     
-    <!-- Instant Theme Preloader (Task 4) -->
+    <!-- Instant Theme Preloader -->
     <script>
         (function() {
-            var savedTheme = localStorage.getItem('stockportal_theme') || 'clarity';
+            var savedTheme = localStorage.getItem('stockportal_theme') || 'light';
+            if (savedTheme === 'clarity' || savedTheme === 'navy') savedTheme = 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
         })();
     </script>
@@ -196,6 +197,12 @@
             {
                 <li class="nav-category">@Loc["Engineering Queue"]</li>
                 <li>
+                    <a href="@Url.Action("Index", "Home")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Home" ? "active" : "")">
+                        <i class="fa-solid fa-chart-pie text-primary"></i>
+                        <span>@Loc["Dashboard & Analytics"]</span>
+                    </a>
+                </li>
+                <li>
                     <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell text-warning"></i>
                         <span class="flex-grow-1">@Loc["Notifications"]</span>
@@ -338,37 +345,31 @@
                     </a>
                 }
 
-                <!-- Theme Switcher Dropdown (Task 4) -->
+                <!-- Theme Switcher Dropdown -->
                 <div class="dropdown">
                     <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-1 shadow-sm rounded-pill px-2 py-1" 
                             type="button" id="themeDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" title="@Loc["Change UI Theme"]">
                         <i class="fa-solid fa-palette text-primary"></i>
-                        <span id="currentThemeLabel" class="d-none d-sm-inline" style="font-size: 0.8rem;">@Loc["Clarity Pro"]</span>
+                        <span id="currentThemeLabel" class="d-none d-sm-inline" style="font-size: 0.8rem;">@Loc["Light"]</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 py-1" aria-labelledby="themeDropdownBtn" style="min-width: 210px;">
                         <li><h6 class="dropdown-header small text-uppercase fw-bold text-muted">@Loc["Select Theme"]</h6></li>
                         <li>
-                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('clarity')">
-                                <span class="small fw-semibold"><i class="fa-solid fa-sparkles text-primary me-2"></i> @Loc["Clarity Pro (Clean Light)"]</span>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('light')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-sun text-warning me-2"></i> @Loc["Light"]</span>
                                 <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #2563eb;"></span>
                             </button>
                         </li>
                         <li>
-                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('clinical')">
-                                <span class="small fw-semibold"><i class="fa-solid fa-heart-pulse me-2" style="color: #0d9488;"></i> @Loc["Clinical Healthcare"]</span>
-                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #0d9488;"></span>
-                            </button>
-                        </li>
-                        <li>
-                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('navy')">
-                                <span class="small fw-semibold"><i class="fa-solid fa-building-columns me-2" style="color: #1e3a8a;"></i> @Loc["Executive Navy"]</span>
-                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #1e3a8a;"></span>
-                            </button>
-                        </li>
-                        <li>
                             <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('dark')">
-                                <span class="small fw-semibold"><i class="fa-solid fa-moon text-warning me-2"></i> @Loc["Dark Clarity"]</span>
+                                <span class="small fw-semibold"><i class="fa-solid fa-moon text-secondary me-2"></i> @Loc["Dark"]</span>
                                 <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #111827;"></span>
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item d-flex align-items-center justify-content-between py-2" onclick="setAppTheme('clinical')">
+                                <span class="small fw-semibold"><i class="fa-solid fa-notes-medical text-success me-2"></i> @Loc["Clinical (Light Green)"]</span>
+                                <span class="badge rounded-circle p-1" style="width: 10px; height: 10px; background-color: #10b981;"></span>
                             </button>
                         </li>
                     </ul>
@@ -453,7 +454,7 @@
         <!-- Footer -->
         <footer class="portal-footer d-flex justify-content-between align-items-center">
             <div>
-                &copy; 2026 <strong>@Loc["Stock & Helpdesk Management System"]</strong> &bull; MariaDB Database: <code>stock</code>
+                &copy; 2026 by CES <strong>@Loc["Servis: Stock and Ticketing System"]</strong> &bull; MariaDB Database: <code>stock</code>
             </div>
             <div class="text-muted small">
                 @Loc["Windows Domain Authentication Active"] &bull; @Loc["Host"]: <code>@Environment.MachineName</code>
@@ -466,7 +467,7 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

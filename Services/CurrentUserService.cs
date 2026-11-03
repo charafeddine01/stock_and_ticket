@@ -31,6 +31,7 @@ namespace StockPortal.Services
         bool CanManageDeviceForms();
         bool CanManageDeviceForm(DeviceForm form);
         bool CanManageUsers();
+        bool CanAccessDashboard();
     }
 
     public class CurrentUserService : ICurrentUserService
@@ -228,6 +229,11 @@ namespace StockPortal.Services
         public bool CanManageUsers()
         {
             return IsAdmin();
+        }
+
+        public bool CanAccessDashboard()
+        {
+            return IsAdmin() || IsMaintenance();
         }
     }
 }

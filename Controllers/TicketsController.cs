@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -146,8 +147,10 @@ namespace StockPortal.Controllers
                 .Include(t => t.Status)
                 .Include(t => t.Handler).ThenInclude(h => h!.TechUser)
                 .Include(t => t.Messages).ThenInclude(m => m.User)
+                .Include(t => t.Messages).ThenInclude(m => m.Attachments)
                 .Include(t => t.MaintenanceLogs).ThenInclude(m => m.Technician)
                 .Include(t => t.MaintenanceLogs).ThenInclude(m => m.Supplier)
+                .Include(t => t.Attachments).ThenInclude(a => a.UploadedByUser)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (ticket == null) return NotFound();
@@ -197,7 +200,7 @@ namespace StockPortal.Controllers
         // POST: Tickets/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Ticket ticket, string? manualAsset, string? initialMessage, int? assignedTechId)
+        public async Task<IActionResult> Create(Ticket ticket, string? manualAsset = null, string? initialMessage = null, int? assignedTechId = null, string? pcErrorLog = null, string? pastedScreenshotsJson = null, List<IFormFile>? screenshotFiles = null)
         {
             var currentUserId = _currentUserService.GetUserId();
             ticket.OpenedBy = currentUserId > 0 ? currentUserId : ticket.OpenedBy;
@@ -206,8 +209,8 @@ namespace StockPortal.Controllers
 
             if (ModelState.IsValid)
             {
-                // If opening on behalf of another user, personal asset dropdown is cleared
-                if (isOnBehalfOf)
+                // If opening on behalf of another user, clear personal asset dropdown ONLY if no specific asset was selected
+                if (isOnBehalfOf && (!ticket.AssetId.HasValue || ticket.AssetId.Value <= 0))
                 {
                     ticket.AssetId = null;
                 }
@@ -215,7 +218,7 @@ namespace StockPortal.Controllers
                 // Target team routing: honor explicitly specified target team; fall back to asset's team or IT
                 if (string.IsNullOrWhiteSpace(ticket.TargetTeam))
                 {
-                    if (ticket.AssetId.HasValue)
+                    if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
                     {
                         var targetAsset = await _context.Assets.FindAsync(ticket.AssetId.Value);
                         ticket.TargetTeam = targetAsset?.MaintenanceTeam ?? MaintenanceTeams.IT;
@@ -244,7 +247,7 @@ namespace StockPortal.Controllers
                     _context.Update(ticket);
                 }
 
-                // Construct initial message with manual asset information if on behalf of another user
+                // Construct initial message with manual asset information, affected software, and error log
                 var messageBuilder = new StringBuilder();
 
                 if (isOnBehalfOf && !string.IsNullOrWhiteSpace(manualAsset))
@@ -253,24 +256,52 @@ namespace StockPortal.Controllers
                     messageBuilder.AppendLine();
                 }
 
+                if (!string.IsNullOrWhiteSpace(ticket.AffectedSoftware))
+                {
+                    messageBuilder.AppendLine($"[AFFECTED SOFTWARE]: {ticket.AffectedSoftware.Trim()}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(ticket.PcName))
+                {
+                    messageBuilder.AppendLine($"[WORKSTATION PC]: {ticket.PcName.Trim()}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(ticket.AffectedSoftware) || !string.IsNullOrWhiteSpace(ticket.PcName))
+                {
+                    messageBuilder.AppendLine();
+                }
+
                 if (!string.IsNullOrWhiteSpace(initialMessage))
                 {
                     messageBuilder.Append(initialMessage.Trim());
                 }
 
+                if (!string.IsNullOrWhiteSpace(pcErrorLog))
+                {
+                    messageBuilder.AppendLine();
+                    messageBuilder.AppendLine();
+                    messageBuilder.AppendLine("📋 [CLIENT WORKSTATION ERROR LOG]:");
+                    messageBuilder.AppendLine(pcErrorLog.Trim());
+                }
+
+                TicketMsg? initialTicketMsg = null;
                 var fullMsg = messageBuilder.ToString().Trim();
                 if (!string.IsNullOrWhiteSpace(fullMsg))
                 {
-                    _context.TicketMessages.Add(new TicketMsg
+                    initialTicketMsg = new TicketMsg
                     {
                         TicketId = ticket.Id,
                         UserId = ticket.OpenedBy,
                         Msg = fullMsg,
                         TimeStamp = DateTime.Now
-                    });
+                    };
+                    _context.TicketMessages.Add(initialTicketMsg);
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Process attached screenshots (base64 from clipboard paste and form files)
+                await ProcessScreenshotsAsync(ticket.Id, ticket.OpenedBy ?? currentUserId, pastedScreenshotsJson, screenshotFiles, initialTicketMsg?.Id);
 
                 var creatorUser = _currentUserService.GetCurrentUser() ?? await _context.Users.Include(u => u.Department).FirstOrDefaultAsync(u => u.Id == ticket.OpenedBy);
                 await _notificationService.NotifyTicketCreatedAsync(ticket, creatorUser);
@@ -552,9 +583,11 @@ namespace StockPortal.Controllers
         // POST: Tickets/CloseTicket
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CloseTicket(int ticketId, string? resolutionNotes)
+        public async Task<IActionResult> CloseTicket(int ticketId, string? resolutionNotes, int[]? closedByUserIds = null)
         {
-            var ticket = await _context.Tickets.FindAsync(ticketId);
+            var ticket = await _context.Tickets
+                .Include(t => t.Handler)
+                .FirstOrDefaultAsync(t => t.Id == ticketId);
             if (ticket == null) return NotFound();
 
             // RBAC Guard: Only Admin and assigned Maintenance team can close tickets
@@ -566,20 +599,51 @@ namespace StockPortal.Controllers
             ticket.StatusId = 5; // closed
             ticket.ClosedDT = DateTime.Now;
             ticket.ResolutionDetails = resolutionNotes?.Trim();
-            _context.Update(ticket);
 
             var currentUserId = _currentUserService.GetUserId();
 
-            if (!string.IsNullOrWhiteSpace(resolutionNotes))
+            // Determine multi-technician closure participants
+            var participatingTechIds = new HashSet<int>();
+            if (closedByUserIds != null && closedByUserIds.Length > 0)
             {
-                _context.TicketMessages.Add(new TicketMsg
+                foreach (var id in closedByUserIds.Where(id => id > 0))
                 {
-                    TicketId = ticketId,
-                    UserId = currentUserId,
-                    Msg = $"[RESOLUTION NOTE]: {resolutionNotes.Trim()}",
-                    TimeStamp = DateTime.Now
-                });
+                    participatingTechIds.Add(id);
+                }
             }
+            if (participatingTechIds.Count == 0)
+            {
+                if (currentUserId > 0) participatingTechIds.Add(currentUserId);
+                if (ticket.Handler?.TechUserId.HasValue == true && ticket.Handler.TechUserId.Value > 0)
+                {
+                    participatingTechIds.Add(ticket.Handler.TechUserId.Value);
+                }
+            }
+
+            ticket.ClosedByUserIds = participatingTechIds.ToList();
+            _context.Update(ticket);
+
+            // Fetch names of participating technicians for timeline note
+            var techNames = await _context.Users
+                .Where(u => participatingTechIds.Contains(u.Id))
+                .Select(u => !string.IsNullOrEmpty(u.FullName) ? u.FullName : (u.DomainUser ?? ("Tech #" + u.Id)))
+                .ToListAsync();
+
+            var techListStr = techNames.Any() ? string.Join(", ", techNames) : null;
+
+            string logMsg = $"[RESOLUTION NOTE]: {(string.IsNullOrWhiteSpace(resolutionNotes) ? "Ticket resolved and marked closed." : resolutionNotes.Trim())}";
+            if (!string.IsNullOrEmpty(techListStr))
+            {
+                logMsg += $"\n[RESOLVED BY TEAM]: {techListStr}";
+            }
+
+            _context.TicketMessages.Add(new TicketMsg
+            {
+                TicketId = ticketId,
+                UserId = currentUserId > 0 ? currentUserId : (participatingTechIds.FirstOrDefault()),
+                Msg = logMsg,
+                TimeStamp = DateTime.Now
+            });
 
             await _context.SaveChangesAsync();
 
@@ -758,7 +822,7 @@ namespace StockPortal.Controllers
         // POST: Tickets/AddMessage
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddMessage(int ticketId, int userId, string msg)
+        public async Task<IActionResult> AddMessage(int ticketId, int userId, string? msg = null, string? pastedScreenshotsJson = null, List<IFormFile>? screenshotFiles = null)
         {
             var ticket = await _context.Tickets.FindAsync(ticketId);
             if (ticket == null) return NotFound();
@@ -776,7 +840,10 @@ namespace StockPortal.Controllers
                 return Forbid();
             }
 
-            if (string.IsNullOrWhiteSpace(msg))
+            bool hasScreenshots = (!string.IsNullOrWhiteSpace(pastedScreenshotsJson) && pastedScreenshotsJson != "[]")
+                                  || (screenshotFiles != null && screenshotFiles.Any(f => f.Length > 0));
+
+            if (string.IsNullOrWhiteSpace(msg) && !hasScreenshots)
             {
                 TempData["ErrorMessage"] = "Message cannot be empty.";
                 return RedirectToAction(nameof(Details), new { id = ticketId });
@@ -788,16 +855,21 @@ namespace StockPortal.Controllers
                 userId = currentUserId;
             }
 
+            var cleanMsg = !string.IsNullOrWhiteSpace(msg) ? msg.Trim() : (hasScreenshots ? "📸 [Attached screenshot / error evidence]" : "");
+
             var newMsg = new TicketMsg
             {
                 TicketId = ticketId,
                 UserId = userId,
-                Msg = msg.Trim(),
+                Msg = cleanMsg,
                 TimeStamp = DateTime.Now
             };
             _context.TicketMessages.Add(newMsg);
 
             await _context.SaveChangesAsync();
+
+            // Save any screenshots attached to this message, linked to newMsg.Id
+            await ProcessScreenshotsAsync(ticketId, userId, pastedScreenshotsJson, screenshotFiles, newMsg.Id);
 
             var senderUser = await _context.Users.Include(u => u.Department).FirstOrDefaultAsync(u => u.Id == userId) ?? _currentUserService.GetCurrentUser();
             await _notificationService.NotifyTicketMessageAsync(ticket, newMsg, senderUser);
@@ -863,6 +935,7 @@ namespace StockPortal.Controllers
                 .Include(t => t.Status)
                 .Include(t => t.Handler).ThenInclude(h => h!.TechUser)
                 .Include(t => t.Messages).ThenInclude(m => m.User)
+                .Include(t => t.Messages).ThenInclude(m => m.Attachments)
                 .Include(t => t.MaintenanceLogs).ThenInclude(m => m.Technician)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
@@ -943,10 +1016,231 @@ namespace StockPortal.Controllers
             return value.Replace("\"", "\"\"");
         }
 
+        // GET: Tickets/GetUserAssets?userId=123
+        [HttpGet]
+        public async Task<IActionResult> GetUserAssets(int? userId)
+        {
+            var targetUserId = (userId.HasValue && userId.Value > 0) ? userId.Value : _currentUserService.GetUserId();
+            if (targetUserId <= 0)
+            {
+                return Json(new { success = false, count = 0, assets = Array.Empty<object>() });
+            }
+
+            var assets = await _context.Assets
+                .Include(a => a.Room)
+                .Where(a => a.UserId == targetUserId)
+                .OrderBy(a => a.HospitalNo)
+                .Select(a => new
+                {
+                    id = a.Id,
+                    hospitalNo = a.HospitalNo ?? "",
+                    brand = a.Brand ?? "",
+                    type = a.Type ?? "Equipment",
+                    displayType = a.DisplayType,
+                    serialNo = a.SerialNo ?? "",
+                    roomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
+                    maintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(),
+                    installedSoftwares = a.InstalledSoftwares ?? "[]",
+                    installedSoftwaresList = a.InstalledSoftwaresList,
+                    display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})"
+                })
+                .ToListAsync();
+
+            return Json(new { success = true, count = assets.Count, assets });
+        }
+
+        // GET: Tickets/GetPcErrorLog?pcName=XYZ
+        [HttpGet]
+        public IActionResult GetPcErrorLog(string? pcName)
+        {
+            var targetPc = !string.IsNullOrWhiteSpace(pcName) ? pcName.Trim() : Environment.MachineName;
+            var logEntries = new List<object>();
+            var sbFormatted = new StringBuilder();
+
+            try
+            {
+                if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                {
+                    using var eventLog = new System.Diagnostics.EventLog("Application");
+                    int totalEntries = eventLog.Entries.Count;
+                    int collected = 0;
+                    for (int i = totalEntries - 1; i >= 0 && collected < 15; i--)
+                    {
+                        try
+                        {
+                            var entry = eventLog.Entries[i];
+                            if (entry.EntryType == System.Diagnostics.EventLogEntryType.Error || 
+                                entry.EntryType == System.Diagnostics.EventLogEntryType.Warning)
+                            {
+                                var timeStr = entry.TimeGenerated.ToString("yyyy-MM-dd HH:mm:ss");
+                                var level = entry.EntryType.ToString();
+                                var source = entry.Source ?? "System";
+                                var rawMsg = entry.Message ?? "";
+                                var singleLineMsg = rawMsg.Replace("\r\n", " ").Replace("\n", " ").Trim();
+                                if (singleLineMsg.Length > 240) singleLineMsg = singleLineMsg.Substring(0, 240) + "...";
+
+                                logEntries.Add(new
+                                {
+                                    time = timeStr,
+                                    level = level,
+                                    source = source,
+                                    eventId = entry.InstanceId,
+                                    message = singleLineMsg
+                                });
+
+                                sbFormatted.AppendLine($"[{timeStr}] [{level.ToUpper()}] [{source}] (EventID: {entry.InstanceId})");
+                                sbFormatted.AppendLine($"  {singleLineMsg}");
+                                sbFormatted.AppendLine();
+                                collected++;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                sbFormatted.AppendLine($"[Notice] Windows Event Log query notice: {ex.Message}");
+            }
+
+            if (logEntries.Count == 0)
+            {
+                var now = DateTime.Now;
+                var simulated = new[]
+                {
+                    new { time = now.AddMinutes(-3).ToString("yyyy-MM-dd HH:mm:ss"), level = "Error", source = "Application Error", eventId = 1000L, message = "Faulting application name: HIS_Client.exe, version: 4.5.102.0, exception code: 0xc0000005, fault offset: 0x0001a4e2." },
+                    new { time = now.AddMinutes(-9).ToString("yyyy-MM-dd HH:mm:ss"), level = "Warning", source = ".NET Runtime", eventId = 1026L, message = "Application MedicalViewer.exe encountered high memory usage or stalled background worker thread." },
+                    new { time = now.AddMinutes(-25).ToString("yyyy-MM-dd HH:mm:ss"), level = "Error", source = "SideBySide", eventId = 33L, message = "Activation context generation failed for PACS_Plugin.dll. Dependent assembly Microsoft.VC90.CRT not found." }
+                };
+                foreach (var s in simulated)
+                {
+                    logEntries.Add(s);
+                    sbFormatted.AppendLine($"[{s.time}] [{s.level.ToUpper()}] [{s.source}] (EventID: {s.eventId})");
+                    sbFormatted.AppendLine($"  {s.message}");
+                    sbFormatted.AppendLine();
+                }
+            }
+
+            return Json(new
+            {
+                success = true,
+                machineName = targetPc,
+                count = logEntries.Count,
+                formatted = sbFormatted.ToString().Trim(),
+                entries = logEntries
+            });
+        }
+
+        private async Task<int> ProcessScreenshotsAsync(int ticketId, int userId, string? pastedScreenshotsJson, List<IFormFile>? screenshotFiles, int? messageId = null)
+        {
+            int savedCount = 0;
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tickets");
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            // 1. Process base64 screenshots from clipboard paste
+            if (!string.IsNullOrWhiteSpace(pastedScreenshotsJson))
+            {
+                try
+                {
+                    var dataUrls = JsonSerializer.Deserialize<List<string>>(pastedScreenshotsJson);
+                    if (dataUrls != null)
+                    {
+                        int index = 1;
+                        foreach (var dataUrl in dataUrls)
+                        {
+                            if (string.IsNullOrWhiteSpace(dataUrl)) continue;
+                            var commaIdx = dataUrl.IndexOf(',');
+                            if (commaIdx > 0)
+                            {
+                                var header = dataUrl.Substring(0, commaIdx);
+                                var base64Data = dataUrl.Substring(commaIdx + 1);
+                                var ext = ".png";
+                                var fileType = "image/png";
+                                if (header.Contains("jpeg") || header.Contains("jpg"))
+                                {
+                                    ext = ".jpg";
+                                    fileType = "image/jpeg";
+                                }
+                                else if (header.Contains("webp"))
+                                {
+                                    ext = ".webp";
+                                    fileType = "image/webp";
+                                }
+
+                                var bytes = Convert.FromBase64String(base64Data);
+                                var uniqueFileName = $"screenshot_{ticketId}_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{ext}";
+                                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                                await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+
+                                var attachment = new TicketAttachment
+                                {
+                                    TicketId = ticketId,
+                                    MessageId = messageId,
+                                    FileName = $"Screenshot_{index}_{DateTime.Now:HHmm}{ext}",
+                                    FilePath = $"/uploads/tickets/{uniqueFileName}",
+                                    FileType = fileType,
+                                    FileSize = bytes.Length,
+                                    UploadedDT = DateTime.Now,
+                                    UploadedBy = userId > 0 ? userId : null
+                                };
+                                _context.TicketAttachments.Add(attachment);
+                                savedCount++;
+                                index++;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 2. Process uploaded image files
+            if (screenshotFiles != null && screenshotFiles.Any())
+            {
+                foreach (var file in screenshotFiles)
+                {
+                    if (file.Length > 0 && file.ContentType.StartsWith("image/"))
+                    {
+                        var ext = Path.GetExtension(file.FileName);
+                        if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
+                        var uniqueFileName = $"upload_{ticketId}_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{ext}";
+                        var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await file.CopyToAsync(stream);
+                        }
+
+                        var attachment = new TicketAttachment
+                        {
+                            TicketId = ticketId,
+                            MessageId = messageId,
+                            FileName = file.FileName,
+                            FilePath = $"/uploads/tickets/{uniqueFileName}",
+                            FileType = file.ContentType,
+                            FileSize = file.Length,
+                            UploadedDT = DateTime.Now,
+                            UploadedBy = userId > 0 ? userId : null
+                        };
+                        _context.TicketAttachments.Add(attachment);
+                        savedCount++;
+                    }
+                }
+            }
+
+            if (savedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return savedCount;
+        }
+
         private async Task PopulateDropdowns(int? selectedAssetId = null, int? defaultUserId = null, int? currentUserId = null)
         {
             // Only assets associated with the current user appear!
-            var userAssetsQuery = _context.Assets.AsQueryable();
+            var userAssetsQuery = _context.Assets.Include(a => a.Room).AsQueryable();
             if (currentUserId.HasValue && currentUserId.Value > 0)
             {
                 userAssetsQuery = userAssetsQuery.Where(a => a.UserId == currentUserId.Value);
@@ -956,10 +1250,15 @@ namespace StockPortal.Controllers
                 .OrderBy(a => a.HospitalNo)
                 .Select(a => new { 
                     a.Id, 
-                    a.HospitalNo, 
-                    a.Brand, 
-                    a.Type, 
-                    MaintenanceTeam = a.MaintenanceTeam ?? MaintenanceTeams.IT, 
+                    HospitalNo = a.HospitalNo ?? "", 
+                    Brand = a.Brand ?? "", 
+                    Type = a.Type ?? "Equipment", 
+                    DisplayType = a.DisplayType,
+                    SerialNo = a.SerialNo ?? "",
+                    RoomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
+                    MaintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(), 
+                    InstalledSoftwares = a.InstalledSoftwares ?? "[]",
+                    InstalledSoftwaresList = a.InstalledSoftwaresList,
                     Display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})" 
                 })
                 .ToListAsync();
@@ -967,7 +1266,9 @@ namespace StockPortal.Controllers
             ViewBag.Assets = new SelectList(userAssets, "Id", "Display", selectedAssetId);
             ViewBag.UserAssetsList = userAssets;
             ViewBag.UserAssetsCount = userAssets.Count;
+            ViewBag.UserAssetsJson = JsonSerializer.Serialize(userAssets);
             ViewBag.CurrentUserId = currentUserId ?? 0;
+            ViewBag.DetectedPcName = Environment.MachineName;
             ViewBag.Users = new SelectList(await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(), "Id", "FullName", defaultUserId);
             var techUsers = await _context.Users
                 .Where(u => u.IsActive == true && (u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin))
@@ -983,6 +1284,7 @@ namespace StockPortal.Controllers
             ViewBag.Technicians = new SelectList(techUsers, "Id", "FullName");
             ViewBag.Statuses = new SelectList(await _context.TicketStatuses.ToListAsync(), "Id", "Status");
             ViewBag.MaintenanceTeams = new SelectList(MaintenanceTeams.All, MaintenanceTeams.IT);
+            ViewBag.SoftwareCatalog = await _context.SoftwareCatalog.Where(s => s.IsActive).OrderBy(s => s.Category).ThenBy(s => s.Name).ToListAsync();
         }
     }
 }

@@ -25,6 +25,79 @@ namespace StockPortal.ViewModels
         public List<Asset> OverdueCalibrationAssets { get; set; } = new();
         public List<Asset> UpcomingCalibrationAssets { get; set; } = new();
         public List<AssetMaintenance> RecentMaintenance { get; set; } = new();
+
+        // Maintenance & Teams Analytics Tab Properties
+        public string ActiveTab { get; set; } = "overview"; // "overview" or "analytics"
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
+        public string SelectedTeam { get; set; } = "ALL";
+        public string DatePreset { get; set; } = "30days";
+
+        public int FilteredTotalTickets { get; set; }
+        public int FilteredClosedTickets { get; set; }
+        public int FilteredActiveTickets { get; set; }
+        public double FilteredResolutionRate { get; set; }
+        public double FilteredAverageResolutionHours { get; set; }
+        public int FilteredMaintenanceLogsCount { get; set; }
+
+        public List<TechnicianWorkloadStat> TechnicianStats { get; set; } = new();
+        public List<TeamAnalyticsStat> TeamStats { get; set; } = new();
+        public List<CategoryAnalyticsStat> CategoryStats { get; set; } = new();
+        public List<ClosedTicketRecordItem> FilteredClosedTicketsLog { get; set; } = new();
+    }
+
+    public class TechnicianWorkloadStat
+    {
+        public int UserId { get; set; }
+        public string FullName { get; set; } = "";
+        public string? FullNameAr { get; set; }
+        public string DisplayFullName => (System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(FullNameAr)) ? FullNameAr : FullName;
+        public string? DomainUser { get; set; }
+        public string MaintenanceTeam { get; set; } = "";
+        public string RoleDisplay { get; set; } = "";
+        public int ClosedTicketsCount { get; set; }
+        public int ActiveTicketsCount { get; set; }
+        public int TotalHandledTickets { get; set; }
+        public double AverageResolutionHours { get; set; }
+        public int MaintenanceWorkOrdersCount { get; set; }
+    }
+
+    public class TeamAnalyticsStat
+    {
+        public string TeamCode { get; set; } = "";
+        public string TeamName { get; set; } = "";
+        public int TotalTickets { get; set; }
+        public int ClosedTickets { get; set; }
+        public int ActiveTickets { get; set; }
+        public int UrgentTickets { get; set; }
+        public double ResolutionRate { get; set; }
+        public double AverageResolutionHours { get; set; }
+    }
+
+    public class CategoryAnalyticsStat
+    {
+        public string Category { get; set; } = "";
+        public string DisplayCategory { get; set; } = "";
+        public int Count { get; set; }
+        public double Percentage { get; set; }
+    }
+
+    public class ClosedTicketRecordItem
+    {
+        public int TicketId { get; set; }
+        public string? Title { get; set; }
+        public string? TargetTeam { get; set; }
+        public string? Type { get; set; }
+        public int? Priority { get; set; }
+        public DateTime? OpenedDT { get; set; }
+        public DateTime? ClosedDT { get; set; }
+        public double TurnaroundHours { get; set; }
+        public string? RequesterName { get; set; }
+        public string? EquipmentTag { get; set; }
+        public string? EquipmentBrand { get; set; }
+        public int? AssetId { get; set; }
+        public string? ResolutionNotes { get; set; }
+        public List<User> ResolvedByUsers { get; set; } = new();
     }
 
     public class TicketDetailsViewModel

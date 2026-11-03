@@ -288,6 +288,17 @@ namespace StockPortal.Controllers
                     asset.NextCalibration = null;
                 }
 
+                // Process installed softwares configuration
+                var selectedSoftwares = formCollection["selectedSoftwares"].ToArray();
+                if (selectedSoftwares != null && selectedSoftwares.Length > 0)
+                {
+                    asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares);
+                }
+                else
+                {
+                    asset.InstalledSoftwares = "[]";
+                }
+
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
@@ -445,6 +456,17 @@ namespace StockPortal.Controllers
                     else if (asset.NeedsCalibration != true)
                     {
                         asset.NextCalibration = null;
+                    }
+
+                    // Process installed softwares configuration
+                    var selectedSoftwares = formCollection["selectedSoftwares"].ToArray();
+                    if (selectedSoftwares != null && selectedSoftwares.Length > 0)
+                    {
+                        asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares);
+                    }
+                    else
+                    {
+                        asset.InstalledSoftwares = "[]";
                     }
 
                     _context.Update(asset);
@@ -770,6 +792,31 @@ namespace StockPortal.Controllers
             ViewBag.Suppliers = new SelectList(filteredSuppliers, "Id", "Name", asset?.SupplierId);
             ViewBag.CustodyTypes = new SelectList(await _context.CustodyTypes.ToListAsync(), "Id", "Type", asset?.CustodyTypeId);
             ViewBag.MaintenanceTeams = new SelectList(MaintenanceTeams.All, asset?.MaintenanceTeam ?? MaintenanceTeams.IT);
+            ViewBag.SoftwareCatalog = await _context.SoftwareCatalog.Where(s => s.IsActive).OrderBy(s => s.Category).ThenBy(s => s.Name).ToListAsync();
+        }
+
+        // GET: Assets/GetInstalledSoftwares?assetId=123
+        [HttpGet]
+        public async Task<IActionResult> GetInstalledSoftwares(int assetId)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return Json(new { success = false, softwares = Array.Empty<string>() });
+            return Json(new { success = true, softwares = asset.InstalledSoftwaresList });
+        }
+
+        // POST: Assets/UpdateInstalledSoftwares
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateInstalledSoftwares(int assetId, string[]? selectedSoftwares)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares ?? Array.Empty<string>());
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = "Installed workstation software list updated successfully!";
+            return RedirectToAction(nameof(Details), new { id = assetId });
         }
     }
 }

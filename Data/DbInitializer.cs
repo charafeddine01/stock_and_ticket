@@ -652,6 +652,9 @@ namespace StockPortal.Data
 
             // Seed / Update Calibration data for products (Task 2)
             EnsureCalibrationSeedData(context);
+
+            // Seed / Ensure Software Catalog and Ticket Attachments
+            EnsureSoftwareAndAttachmentData(context);
         }
 
         private static void EnsureArabicSchema(StockDbContext context)
@@ -680,6 +683,35 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibrationCertNo TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibratedBy TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN calibrationNotes TEXT NULL;");
+
+                    // Workstation Software & Ticket Telemetry Schema
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN installed_softwares TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN affected_software TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN pc_name TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN closed_by_users TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE ticket_attachments ADD COLUMN messageID INTEGER NULL;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS software_catalog (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            category TEXT NULL,
+                            vendor TEXT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS ticket_attachments (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            ticketID INTEGER NOT NULL,
+                            messageID INTEGER NULL,
+                            fileName TEXT NOT NULL,
+                            filePath TEXT NOT NULL,
+                            fileType TEXT NULL,
+                            fileSize INTEGER NULL,
+                            uploadedDT TEXT NOT NULL,
+                            uploadedBy INTEGER NULL
+                        );");
                 }
                 else
                 {
@@ -702,6 +734,37 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibrationCertNo` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibratedBy` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `calibrationNotes` varchar(1024) NULL;");
+
+                    // Workstation Software & Ticket Telemetry Schema
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `installed_softwares` LONGTEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `affected_software` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `pc_name` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `closed_by_users` LONGTEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `ticket_attachments` ADD COLUMN IF NOT EXISTS `messageID` int NULL;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `software_catalog` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `category` varchar(100) NULL,
+                            `vendor` varchar(255) NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `ticket_attachments` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `ticketID` int NOT NULL,
+                            `messageID` int NULL,
+                            `fileName` varchar(255) NOT NULL,
+                            `filePath` varchar(500) NOT NULL,
+                            `fileType` varchar(50) NULL,
+                            `fileSize` bigint NULL,
+                            `uploadedDT` datetime NOT NULL,
+                            `uploadedBy` int NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
                 }
             }
             catch {}
@@ -890,6 +953,62 @@ namespace StockPortal.Data
                     }
                 }
                 context.SaveChanges();
+            }
+            catch {}
+        }
+
+        private static void EnsureSoftwareAndAttachmentData(StockDbContext context)
+        {
+            try
+            {
+                // Ensure upload directory exists
+                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "tickets");
+                if (!Directory.Exists(uploadsDir))
+                {
+                    Directory.CreateDirectory(uploadsDir);
+                }
+
+                // Seed Software Catalog
+                if (!context.SoftwareCatalog.Any())
+                {
+                    var softwares = new[]
+                    {
+                        new SoftwareCatalogItem { Name = "HIS - Hospital Information System (EHR)", Category = "Hospital Systems", Vendor = "Epic / Cerner / In-House" },
+                        new SoftwareCatalogItem { Name = "PACS - Radiology DICOM Viewer", Category = "Clinical Imaging", Vendor = "Philips / GE Healthcare" },
+                        new SoftwareCatalogItem { Name = "LIS - Laboratory Information System", Category = "Laboratory", Vendor = "Abbott / Roche" },
+                        new SoftwareCatalogItem { Name = "Clinical Pharmacy Dispensing", Category = "Pharmacy", Vendor = "Pyxis / Omnicell" },
+                        new SoftwareCatalogItem { Name = "Microsoft Office 365 (Word, Excel, Outlook)", Category = "Office Productivity", Vendor = "Microsoft Corporation" },
+                        new SoftwareCatalogItem { Name = "Pulse Secure / GlobalProtect VPN", Category = "Network & Security", Vendor = "Palo Alto / Ivanti" },
+                        new SoftwareCatalogItem { Name = "Telemetry & Patient Monitoring Suite", Category = "Clinical", Vendor = "Philips IntelliVue" },
+                        new SoftwareCatalogItem { Name = "SAP ERP / Finance & Supply", Category = "Enterprise ERP", Vendor = "SAP" },
+                        new SoftwareCatalogItem { Name = "Zebra Barcode Label Designer & Print", Category = "Utility", Vendor = "Zebra Technologies" },
+                        new SoftwareCatalogItem { Name = "Antivirus & Endpoint Security (EDR)", Category = "Security", Vendor = "CrowdStrike / Defender" },
+                        new SoftwareCatalogItem { Name = "Google Chrome Enterprise", Category = "Browser", Vendor = "Google LLC" },
+                        new SoftwareCatalogItem { Name = "Adobe Acrobat Reader DC", Category = "Document", Vendor = "Adobe Inc." },
+                        new SoftwareCatalogItem { Name = "Zoom & Teams Telehealth Suite", Category = "Communication", Vendor = "Zoom / Microsoft" },
+                        new SoftwareCatalogItem { Name = "IntelliSpace Critical Care & Anesthesia (ICCA)", Category = "Clinical", Vendor = "Philips Healthcare" }
+                    };
+                    context.SoftwareCatalog.AddRange(softwares);
+                    context.SaveChanges();
+                }
+
+                // Seed installed softwares on existing IT workstations if empty
+                var itAssets = context.Assets.Where(a => a.MaintenanceTeam == MaintenanceTeams.IT && (a.InstalledSoftwares == null || a.InstalledSoftwares == "" || a.InstalledSoftwares == "[]")).ToList();
+                if (itAssets.Any())
+                {
+                    var defaultSoftwares = System.Text.Json.JsonSerializer.Serialize(new[]
+                    {
+                        "HIS - Hospital Information System (EHR)",
+                        "Microsoft Office 365 (Word, Excel, Outlook)",
+                        "PACS - Radiology DICOM Viewer",
+                        "Google Chrome Enterprise"
+                    });
+                    foreach (var asset in itAssets)
+                    {
+                        asset.InstalledSoftwares = defaultSoftwares;
+                    }
+                    context.SaveChanges();
+                }
             }
             catch {}
         }

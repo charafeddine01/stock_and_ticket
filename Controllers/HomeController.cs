@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StockPortal.Data;
+using StockPortal.Models;
+using StockPortal.Services;
 using StockPortal.ViewModels;
 
 namespace StockPortal.Controllers
@@ -11,16 +15,24 @@ namespace StockPortal.Controllers
     public class HomeController : Controller
     {
         private readonly StockDbContext _context;
+        private readonly ICurrentUserService _currentUserService;
 
-        public HomeController(StockDbContext context)
+        public HomeController(StockDbContext context, ICurrentUserService currentUserService)
         {
             _context = context;
+            _currentUserService = currentUserService;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            DateTime? fromDate = null,
+            DateTime? toDate = null,
+            string? teamFilter = "ALL",
+            string? datePreset = "30days",
+            string? tab = "overview")
         {
-            var now = DateTime.Now.Date;
-            var thirtyDaysFromNow = now.AddDays(30);
+            var now = DateTime.Now;
+            var today = DateTime.Today;
+            var thirtyDaysFromNow = today.AddDays(30);
 
             var assets = await _context.Assets
                 .Include(a => a.User)
@@ -44,6 +56,281 @@ namespace StockPortal.Controllers
                 .Take(5)
                 .ToListAsync();
 
+            // ----------------------------------------------------
+            // Date Filter Computation for Maintenance Analytics Tab
+            // ----------------------------------------------------
+            DateTime rangeStart;
+            DateTime rangeEnd;
+
+            string selectedPreset = datePreset?.ToLowerInvariant() ?? "30days";
+
+            if (fromDate.HasValue || toDate.HasValue)
+            {
+                selectedPreset = "custom";
+                rangeStart = fromDate ?? today.AddDays(-30);
+                rangeEnd = toDate.HasValue ? toDate.Value.Date.AddDays(1).AddTicks(-1) : now;
+            }
+            else
+            {
+                switch (selectedPreset)
+                {
+                    case "today":
+                        rangeStart = today;
+                        rangeEnd = today.AddDays(1).AddTicks(-1);
+                        break;
+                    case "7days":
+                        rangeStart = today.AddDays(-7);
+                        rangeEnd = now;
+                        break;
+                    case "month":
+                        rangeStart = new DateTime(today.Year, today.Month, 1);
+                        rangeEnd = now;
+                        break;
+                    case "quarter":
+                        int currentQuarter = (today.Month - 1) / 3 + 1;
+                        rangeStart = new DateTime(today.Year, (currentQuarter - 1) * 3 + 1, 1);
+                        rangeEnd = now;
+                        break;
+                    case "year":
+                        rangeStart = new DateTime(today.Year, 1, 1);
+                        rangeEnd = now;
+                        break;
+                    case "all":
+                        rangeStart = new DateTime(2000, 1, 1);
+                        rangeEnd = now.AddDays(1);
+                        break;
+                    case "30days":
+                    default:
+                        selectedPreset = "30days";
+                        rangeStart = today.AddDays(-30);
+                        rangeEnd = now;
+                        break;
+                }
+            }
+
+            // Target Team Scope Filtering
+            string normalizedTeam = string.IsNullOrWhiteSpace(teamFilter) ? "ALL" : teamFilter.Trim().ToUpperInvariant();
+            var scopedTickets = tickets.Where(t =>
+                normalizedTeam == "ALL" ||
+                string.Equals(t.TargetTeam, normalizedTeam, StringComparison.OrdinalIgnoreCase) ||
+                (t.Asset != null && string.Equals(t.Asset.MaintenanceTeam, normalizedTeam, StringComparison.OrdinalIgnoreCase))
+            ).ToList();
+
+            // Tickets closed within date range
+            var closedTickets = scopedTickets.Where(t =>
+                t.StatusId == 5 &&
+                (
+                    (t.ClosedDT.HasValue && t.ClosedDT.Value >= rangeStart && t.ClosedDT.Value <= rangeEnd) ||
+                    (!t.ClosedDT.HasValue && t.OpenedDT.HasValue && t.OpenedDT.Value >= rangeStart && t.OpenedDT.Value <= rangeEnd)
+                )
+            ).ToList();
+
+            // Active (Open/Pending/Delayed) tickets in scope
+            var activeTickets = scopedTickets.Where(t => t.StatusId != 5 && t.StatusId != 4).ToList();
+
+            int filteredTotal = closedTickets.Count + activeTickets.Count;
+            double filteredResRate = filteredTotal > 0
+                ? Math.Round(((double)closedTickets.Count / filteredTotal) * 100.0, 1)
+                : 100.0;
+
+            var resolutionDurations = closedTickets
+                .Where(t => t.OpenedDT.HasValue && t.ClosedDT.HasValue && t.ClosedDT.Value >= t.OpenedDT.Value)
+                .Select(t => (t.ClosedDT!.Value - t.OpenedDT!.Value).TotalHours)
+                .ToList();
+
+            double avgResHours = resolutionDurations.Any()
+                ? Math.Round(resolutionDurations.Average(), 1)
+                : 0.0;
+
+            // Maintenance logs in the period
+            var allMaintenanceLogs = await _context.AssetMaintenances
+                .Include(m => m.Asset)
+                .Include(m => m.Technician)
+                .ToListAsync();
+
+            var periodMaintenanceLogs = allMaintenanceLogs.Where(m =>
+                m.TimStamp.HasValue &&
+                m.TimStamp.Value >= rangeStart &&
+                m.TimStamp.Value <= rangeEnd &&
+                (normalizedTeam == "ALL" || (m.Asset != null && string.Equals(m.Asset.MaintenanceTeam, normalizedTeam, StringComparison.OrdinalIgnoreCase)))
+            ).ToList();
+
+            // ----------------------------------------------------
+            // Technician & Specialist Workload Scorecard ("Who managed what")
+            // ----------------------------------------------------
+            var allUsers = await _context.Users.ToListAsync();
+            var techUserLookup = allUsers.ToDictionary(u => u.Id);
+
+            // Technicians to include: Maintenance or Admin users, or any user that has handled/closed a ticket
+            var candidateTechIds = new HashSet<int>(
+                allUsers.Where(u => u.IsActive == true && (u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin || string.Equals(u.Role, "Technician", StringComparison.OrdinalIgnoreCase)))
+                        .Select(u => u.Id)
+            );
+
+            foreach (var t in closedTickets)
+            {
+                foreach (var uid in t.ClosedByUserIds) candidateTechIds.Add(uid);
+                if (t.Handler?.TechUserId.HasValue == true) candidateTechIds.Add(t.Handler.TechUserId.Value);
+            }
+
+            var techStats = new List<TechnicianWorkloadStat>();
+
+            foreach (var techId in candidateTechIds)
+            {
+                if (!techUserLookup.TryGetValue(techId, out var user)) continue;
+
+                // Closed tickets where user was either assigned tech or included in ClosedByUserIds
+                var techClosed = closedTickets.Where(t =>
+                    t.ClosedByUserIds.Contains(techId) ||
+                    (t.Handler?.TechUserId == techId)
+                ).ToList();
+
+                // Active tickets currently assigned to this user
+                var techActive = scopedTickets.Where(t =>
+                    t.StatusId != 5 && t.StatusId != 4 &&
+                    t.Handler?.TechUserId == techId
+                ).ToList();
+
+                var techMaintCount = periodMaintenanceLogs.Count(m => m.UserId == techId);
+
+                var techDurations = techClosed
+                    .Where(t => t.OpenedDT.HasValue && t.ClosedDT.HasValue && t.ClosedDT.Value >= t.OpenedDT.Value)
+                    .Select(t => (t.ClosedDT!.Value - t.OpenedDT!.Value).TotalHours)
+                    .ToList();
+
+                double techAvgHours = techDurations.Any() ? Math.Round(techDurations.Average(), 1) : 0.0;
+
+                techStats.Add(new TechnicianWorkloadStat
+                {
+                    UserId = user.Id,
+                    FullName = user.FullName ?? user.DomainUser ?? $"User #{user.Id}",
+                    FullNameAr = user.FullNameAr,
+                    DomainUser = user.DomainUser,
+                    MaintenanceTeam = user.MaintenanceTeam ?? (user.Role == SystemRoles.Admin ? "ADMIN" : "GENERAL"),
+                    RoleDisplay = user.RoleDisplay,
+                    ClosedTicketsCount = techClosed.Count,
+                    ActiveTicketsCount = techActive.Count,
+                    TotalHandledTickets = techClosed.Count + techActive.Count,
+                    AverageResolutionHours = techAvgHours,
+                    MaintenanceWorkOrdersCount = techMaintCount
+                });
+            }
+
+            // Order technicians by most closed tickets, then active tickets
+            techStats = techStats
+                .OrderByDescending(s => s.ClosedTicketsCount)
+                .ThenByDescending(s => s.ActiveTicketsCount)
+                .ThenBy(s => s.FullName)
+                .ToList();
+
+            // ----------------------------------------------------
+            // Team Performance Comparison (IT vs BIOMEDICAL vs GENERAL)
+            // ----------------------------------------------------
+            var teamCodes = new[] { MaintenanceTeams.IT, MaintenanceTeams.Biomedical, MaintenanceTeams.General };
+            var teamStats = new List<TeamAnalyticsStat>();
+
+            foreach (var code in teamCodes)
+            {
+                var teamTickets = tickets.Where(t =>
+                    string.Equals(t.TargetTeam, code, StringComparison.OrdinalIgnoreCase) ||
+                    (t.Asset != null && string.Equals(t.Asset.MaintenanceTeam, code, StringComparison.OrdinalIgnoreCase))
+                ).ToList();
+
+                var teamClosed = teamTickets.Where(t =>
+                    t.StatusId == 5 &&
+                    (
+                        (t.ClosedDT.HasValue && t.ClosedDT.Value >= rangeStart && t.ClosedDT.Value <= rangeEnd) ||
+                        (!t.ClosedDT.HasValue && t.OpenedDT.HasValue && t.OpenedDT.Value >= rangeStart && t.OpenedDT.Value <= rangeEnd)
+                    )
+                ).ToList();
+
+                var teamActive = teamTickets.Where(t => t.StatusId != 5 && t.StatusId != 4).ToList();
+                var teamUrgent = teamActive.Count(t => t.Priority >= 3);
+
+                int teamTotalHandled = teamClosed.Count + teamActive.Count;
+                double teamRate = teamTotalHandled > 0
+                    ? Math.Round(((double)teamClosed.Count / teamTotalHandled) * 100.0, 1)
+                    : 100.0;
+
+                var teamDurations = teamClosed
+                    .Where(t => t.OpenedDT.HasValue && t.ClosedDT.HasValue && t.ClosedDT.Value >= t.OpenedDT.Value)
+                    .Select(t => (t.ClosedDT!.Value - t.OpenedDT!.Value).TotalHours)
+                    .ToList();
+
+                double teamAvgHours = teamDurations.Any() ? Math.Round(teamDurations.Average(), 1) : 0.0;
+
+                teamStats.Add(new TeamAnalyticsStat
+                {
+                    TeamCode = code,
+                    TeamName = LocHelper.TranslateTargetTeam(code),
+                    TotalTickets = teamTickets.Count,
+                    ClosedTickets = teamClosed.Count,
+                    ActiveTickets = teamActive.Count,
+                    UrgentTickets = teamUrgent,
+                    ResolutionRate = teamRate,
+                    AverageResolutionHours = teamAvgHours
+                });
+            }
+
+            // ----------------------------------------------------
+            // Issue Category Breakdown
+            // ----------------------------------------------------
+            var categoryStats = scopedTickets
+                .GroupBy(t => string.IsNullOrWhiteSpace(t.Type) ? "General" : t.Type)
+                .Select(g => new CategoryAnalyticsStat
+                {
+                    Category = g.Key,
+                    DisplayCategory = LocHelper.TranslateTicketType(g.Key),
+                    Count = g.Count(),
+                    Percentage = scopedTickets.Count > 0 ? Math.Round(((double)g.Count() / scopedTickets.Count) * 100.0, 1) : 0.0
+                })
+                .OrderByDescending(c => c.Count)
+                .ToList();
+
+            // ----------------------------------------------------
+            // Closed Tickets Management & Audit Log
+            // ----------------------------------------------------
+            var closedTicketsLog = closedTickets
+                .OrderByDescending(t => t.ClosedDT ?? t.OpenedDT)
+                .Select(t =>
+                {
+                    var resolvedUsers = new List<User>();
+                    if (t.ClosedByUserIds.Any())
+                    {
+                        foreach (var uid in t.ClosedByUserIds)
+                        {
+                            if (techUserLookup.TryGetValue(uid, out var u)) resolvedUsers.Add(u);
+                        }
+                    }
+                    else if (t.Handler?.TechUser != null)
+                    {
+                        resolvedUsers.Add(t.Handler.TechUser);
+                    }
+
+                    double turnaround = (t.ClosedDT.HasValue && t.OpenedDT.HasValue && t.ClosedDT >= t.OpenedDT)
+                        ? Math.Round((t.ClosedDT.Value - t.OpenedDT.Value).TotalHours, 1)
+                        : 0.0;
+
+                    return new ClosedTicketRecordItem
+                    {
+                        TicketId = t.Id,
+                        Title = t.ResolutionDetails,
+                        TargetTeam = t.TargetTeam ?? "IT",
+                        Type = t.Type,
+                        Priority = t.Priority,
+                        OpenedDT = t.OpenedDT,
+                        ClosedDT = t.ClosedDT,
+                        TurnaroundHours = turnaround,
+                        RequesterName = t.OpenedByUser?.FullName ?? t.OpenedByUser?.DomainUser ?? "Unknown",
+                        EquipmentTag = t.Asset?.HospitalNo ?? (t.PcName ?? "N/A"),
+                        EquipmentBrand = t.Asset?.Brand,
+                        AssetId = t.AssetId,
+                        ResolutionNotes = t.ResolutionDetails,
+                        ResolvedByUsers = resolvedUsers
+                    };
+                })
+                .ToList();
+
             var vm = new DashboardViewModel
             {
                 TotalAssets = assets.Count,
@@ -66,26 +353,43 @@ namespace StockPortal.Controllers
                 RecentTickets = tickets.Take(6).ToList(),
 
                 OverduePeriodicAssets = assets
-                    .Where(a => a.NeedsPeriodic == true && a.NextPeriodic.HasValue && a.NextPeriodic.Value < now)
+                    .Where(a => a.NeedsPeriodic == true && a.NextPeriodic.HasValue && a.NextPeriodic.Value < today)
                     .OrderBy(a => a.NextPeriodic)
                     .ToList(),
 
                 UpcomingPeriodicAssets = assets
-                    .Where(a => a.NeedsPeriodic == true && a.NextPeriodic.HasValue && a.NextPeriodic.Value >= now && a.NextPeriodic.Value <= thirtyDaysFromNow)
+                    .Where(a => a.NeedsPeriodic == true && a.NextPeriodic.HasValue && a.NextPeriodic.Value >= today && a.NextPeriodic.Value <= thirtyDaysFromNow)
                     .OrderBy(a => a.NextPeriodic)
                     .ToList(),
 
                 OverdueCalibrationAssets = assets
-                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < now)
+                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < today)
                     .OrderBy(a => a.NextCalibration)
                     .ToList(),
 
                 UpcomingCalibrationAssets = assets
-                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= thirtyDaysFromNow)
+                    .Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= today && a.NextCalibration.Value <= thirtyDaysFromNow)
                     .OrderBy(a => a.NextCalibration)
                     .ToList(),
 
-                RecentMaintenance = recentMaintenance
+                RecentMaintenance = recentMaintenance,
+
+                // Analytics Tab Data
+                ActiveTab = string.Equals(tab, "analytics", StringComparison.OrdinalIgnoreCase) ? "analytics" : "overview",
+                FromDate = rangeStart,
+                ToDate = rangeEnd,
+                SelectedTeam = normalizedTeam,
+                DatePreset = selectedPreset,
+                FilteredTotalTickets = filteredTotal,
+                FilteredClosedTickets = closedTickets.Count,
+                FilteredActiveTickets = activeTickets.Count,
+                FilteredResolutionRate = filteredResRate,
+                FilteredAverageResolutionHours = avgResHours,
+                FilteredMaintenanceLogsCount = periodMaintenanceLogs.Count,
+                TechnicianStats = techStats,
+                TeamStats = teamStats,
+                CategoryStats = categoryStats,
+                FilteredClosedTicketsLog = closedTicketsLog
             };
 
             return View(vm);

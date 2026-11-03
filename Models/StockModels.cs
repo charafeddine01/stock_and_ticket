@@ -480,6 +480,31 @@ namespace StockPortal.Models
             IsCalibrationDueSoon ? "Due Soon" :
             NextCalibration.HasValue ? "Calibrated & Valid" : "Pending Calibration";
 
+        [Column("installed_softwares")]
+        [Display(Name = "Installed Software Packages")]
+        public string? InstalledSoftwares { get; set; } = "[]";
+
+        [NotMapped]
+        public List<string> InstalledSoftwaresList
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(InstalledSoftwares)) return new List<string>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<string>>(InstalledSoftwares) ?? new List<string>();
+                }
+                catch
+                {
+                    return new List<string>();
+                }
+            }
+            set
+            {
+                InstalledSoftwares = JsonSerializer.Serialize(value ?? new List<string>());
+            }
+        }
+
         public virtual ICollection<AssetHistory> History { get; set; } = new List<AssetHistory>();
         public virtual ICollection<AssetMaintenance> MaintenanceRecords { get; set; } = new List<AssetMaintenance>();
         public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
@@ -593,12 +618,48 @@ namespace StockPortal.Models
         [StringLength(255)]
         public string? TitleAr { get; set; }
 
+        [Column("affected_software")]
+        [StringLength(255)]
+        [Display(Name = "Affected Software / Application")]
+        public string? AffectedSoftware { get; set; }
+
+        [Column("pc_name")]
+        [StringLength(255)]
+        [Display(Name = "Client PC Name")]
+        public string? PcName { get; set; }
+
+        [Column("closed_by_users")]
+        [Display(Name = "Technicians Who Resolved / Closed")]
+        public string? ClosedByUsers { get; set; } = "[]";
+
+        [NotMapped]
+        public List<int> ClosedByUserIds
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ClosedByUsers)) return new List<int>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<int>>(ClosedByUsers) ?? new List<int>();
+                }
+                catch
+                {
+                    return new List<int>();
+                }
+            }
+            set
+            {
+                ClosedByUsers = JsonSerializer.Serialize(value ?? new List<int>());
+            }
+        }
+
         [NotMapped]
         public int? CreatedBy => OpenedBy;
 
         public virtual TicketHandler? Handler { get; set; }
         public virtual ICollection<TicketMsg> Messages { get; set; } = new List<TicketMsg>();
         public virtual ICollection<AssetMaintenance> MaintenanceLogs { get; set; } = new List<AssetMaintenance>();
+        public virtual ICollection<TicketAttachment> Attachments { get; set; } = new List<TicketAttachment>();
 
         [NotMapped]
         public string PriorityName => Priority switch
@@ -671,6 +732,8 @@ namespace StockPortal.Models
 
         [Column("timeStamp")]
         public DateTime? TimeStamp { get; set; } = DateTime.Now;
+
+        public virtual ICollection<TicketAttachment> Attachments { get; set; } = new List<TicketAttachment>();
     }
 
     [Table("asset_maintenance")]
@@ -919,5 +982,77 @@ namespace StockPortal.Models
 
         [Column("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+    }
+
+    [Table("software_catalog")]
+    public class SoftwareCatalogItem
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [StringLength(255)]
+        [Display(Name = "Software Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("category")]
+        [StringLength(100)]
+        [Display(Name = "Category")]
+        public string? Category { get; set; } = "General"; // Clinical, Imaging, Laboratory, Office, Security, System
+
+        [Column("vendor")]
+        [StringLength(255)]
+        [Display(Name = "Vendor / Developer")]
+        public string? Vendor { get; set; }
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+    }
+
+    [Table("ticket_attachments")]
+    public class TicketAttachment
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("ticketID")]
+        public int TicketId { get; set; }
+
+        [ForeignKey("TicketId")]
+        public virtual Ticket? Ticket { get; set; }
+
+        [Column("messageID")]
+        public int? MessageId { get; set; }
+
+        [ForeignKey("MessageId")]
+        public virtual TicketMsg? Message { get; set; }
+
+        [Column("fileName")]
+        [StringLength(255)]
+        public string FileName { get; set; } = string.Empty;
+
+        [Column("filePath")]
+        [StringLength(500)]
+        public string FilePath { get; set; } = string.Empty;
+
+        [Column("fileType")]
+        [StringLength(50)]
+        public string? FileType { get; set; }
+
+        [Column("fileSize")]
+        public long? FileSize { get; set; }
+
+        [Column("uploadedDT")]
+        public DateTime UploadedDT { get; set; } = DateTime.Now;
+
+        [Column("uploadedBy")]
+        public int? UploadedBy { get; set; }
+
+        [ForeignKey("UploadedBy")]
+        public virtual User? UploadedByUser { get; set; }
     }
 }

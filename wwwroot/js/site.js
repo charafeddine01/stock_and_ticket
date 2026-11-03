@@ -477,18 +477,18 @@
     };
 
     /* ==========================================================================
-       4. THEME CONTROLLER & PERSISTENCE (TASK 4)
+       4. THEME CONTROLLER & PERSISTENCE
        ========================================================================== */
     const THEME_STORAGE_KEY = "stockportal_theme";
     const THEME_LABELS = {
-        "clarity": isArabic ? "كلاريتي لايت (واضح)" : "Clarity Pro",
-        "clinical": isArabic ? "الرعاية الطبية (مينت)" : "Clinical Healthcare",
-        "navy": isArabic ? "الكحلي التنفيذي" : "Executive Navy",
-        "dark": isArabic ? "الداكن النقي" : "Dark Clarity"
+        "light": isArabic ? "فاتح" : "Light",
+        "dark": isArabic ? "داكن" : "Dark",
+        "clinical": isArabic ? "طبي (أخضر فاتح)" : "Clinical (Light Green)"
     };
 
     window.setAppTheme = function (themeName) {
-        if (!themeName || !THEME_LABELS[themeName]) themeName = "clarity";
+        if (themeName === "clarity" || themeName === "navy") themeName = "light";
+        if (!themeName || !THEME_LABELS[themeName]) themeName = "light";
         document.documentElement.setAttribute("data-theme", themeName);
         try {
             localStorage.setItem(THEME_STORAGE_KEY, themeName);
@@ -501,22 +501,43 @@
     };
 
     function initTheme() {
-        let savedTheme = "clarity";
+        let savedTheme = "light";
         try {
-            savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "clarity";
+            savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || "light";
+            if (savedTheme === "clarity" || savedTheme === "navy") savedTheme = "light";
         } catch (e) { }
         window.setAppTheme(savedTheme);
     }
 
     /* ==========================================================================
-       5. INITIALIZATION ON DOM READY
+       5. BOOTSTRAP MODAL VIEWPORT HOISTING & STACKING FIX
+       ========================================================================== */
+    function initModalFixes() {
+        // Automatically hoist any Bootstrap modal to document.body when opening.
+        // This completely prevents stacking context traps, containing-block clipping,
+        // and backdrop overlay interception when modals are declared inside table cells
+        // (td/tr), cards, or layout containers with CSS animations/transforms.
+        document.addEventListener("show.bs.modal", function (e) {
+            const modal = e.target;
+            if (modal && modal.parentElement && modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
+    }
+
+    /* ==========================================================================
+       6. INITIALIZATION ON DOM READY
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", function () {
+        initModalFixes();
         initTheme();
         initSidebar();
         initPageTransitions();
         checkUnreadNotifications();
         setInterval(checkUnreadNotifications, 8000);
     });
+
+    // Also register modal fix immediately in case modals are initialized early
+    initModalFixes();
 
 })();

@@ -23,6 +23,8 @@ namespace StockPortal.Data
         public DbSet<User> Users { get; set; } = null!;
         public DbSet<DeviceForm> DeviceForms { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
+        public DbSet<SoftwareCatalogItem> SoftwareCatalog { get; set; } = null!;
+        public DbSet<TicketAttachment> TicketAttachments { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -180,6 +182,25 @@ namespace StockPortal.Data
                     .WithMany()
                     .HasForeignKey(n => n.TicketId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // TicketAttachment relationships
+            modelBuilder.Entity<TicketAttachment>(entity =>
+            {
+                entity.HasOne(a => a.Ticket)
+                    .WithMany(t => t.Attachments)
+                    .HasForeignKey(a => a.TicketId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(a => a.Message)
+                    .WithMany(m => m.Attachments)
+                    .HasForeignKey(a => a.MessageId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(a => a.UploadedByUser)
+                    .WithMany()
+                    .HasForeignKey(a => a.UploadedBy)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
         }
     }

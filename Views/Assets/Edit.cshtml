@@ -217,6 +217,71 @@
                         </div>
                     </div>
 
+                    <!-- 5. Installed Workstation Software Packages (Pre-configured by Maintenance) -->
+                    @{
+                        var softwareCatalog = ViewBag.SoftwareCatalog as List<StockPortal.Models.SoftwareCatalogItem> ?? new List<StockPortal.Models.SoftwareCatalogItem>();
+                        var installedList = Model.InstalledSoftwaresList;
+                    }
+                    <div class="card shadow-sm border mb-4">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">
+                                    <i class="fa-solid fa-cube text-primary me-2"></i>
+                                    @(Loc.IsArabic ? "البرامج المثبتة على محطة العمل (تهيئة مسبقة من قسم الصيانة)" : "Installed Workstation Software Packages (Pre-configured by Maintenance)")
+                                </h6>
+                                <div class="small text-muted mt-1">
+                                    @(Loc.IsArabic ? "حدد حزم البرامج والأنظمة المثبتة على هذا الجهاز ليتمكن المستخدم من اختيارها عند فتح بلاغ عطل فني." : "Select the software suites installed on this PC so users can select them when submitting support tickets.")
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAllSw">
+                                    @(Loc.IsArabic ? "تحديد الكل" : "Select All")
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
+                                    @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            @if (softwareCatalog.Any())
+                            {
+                                var groupedCatalog = softwareCatalog.GroupBy(s => s.Category ?? "General").OrderBy(g => g.Key);
+                                <div class="row g-4">
+                                    @foreach (var group in groupedCatalog)
+                                    {
+                                        <div class="col-md-6 col-lg-6">
+                                            <div class="border rounded p-3 h-100 bg-light bg-opacity-50">
+                                                <div class="fw-bold text-primary small text-uppercase mb-2 pb-1 border-bottom">
+                                                    <i class="fa-solid fa-folder-tree me-1"></i> @group.Key
+                                                </div>
+                                                <div class="d-flex flex-column gap-2">
+                                                    @foreach (var sw in group)
+                                                    {
+                                                        bool isChecked = installedList.Contains(sw.Name);
+                                                        <div class="form-check">
+                                                            <input class="form-check-input sw-checkbox" type="checkbox" name="selectedSoftwares" value="@sw.Name" id="sw_@sw.Id" @(isChecked ? "checked" : "") />
+                                                            <label class="form-check-label small fw-semibold text-dark" for="sw_@sw.Id">
+                                                                @sw.Name
+                                                                @if (!string.IsNullOrWhiteSpace(sw.Vendor))
+                                                                {
+                                                                    <span class="text-muted fw-normal d-block" style="font-size: 0.72rem;">@sw.Vendor</span>
+                                                                }
+                                                            </label>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="text-muted fst-italic">@(Loc.IsArabic ? "لا توجد برامج مسجلة في دليل برامج المستشفى." : "No software items found in software catalog.")</div>
+                            }
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
                         <a href="@Url.Action("Details", new { id = Model.Id })" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
                         <button type="submit" class="btn btn-primary px-4 fw-bold">
@@ -246,6 +311,19 @@
         if (chkCalib && calibBox) {
             chkCalib.addEventListener("change", function () {
                 calibBox.style.display = chkCalib.checked ? "block" : "none";
+            });
+        }
+
+        const btnSelectAllSw = document.getElementById("btnSelectAllSw");
+        const btnClearSw = document.getElementById("btnClearSw");
+        if (btnSelectAllSw) {
+            btnSelectAllSw.addEventListener("click", function () {
+                document.querySelectorAll(".sw-checkbox").forEach(cb => cb.checked = true);
+            });
+        }
+        if (btnClearSw) {
+            btnClearSw.addEventListener("click", function () {
+                document.querySelectorAll(".sw-checkbox").forEach(cb => cb.checked = false);
             });
         }
     });
