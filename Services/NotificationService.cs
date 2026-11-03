@@ -225,6 +225,50 @@ namespace StockPortal.Services
             }
         }
 
+        public async Task NotifyLowReserveStockAsync(SparePart part)
+        {
+            try
+            {
+                var recipients = new HashSet<int>();
+
+                // 1. All Active Admins
+                var adminIds = await _context.Users
+                    .Where(u => u.Role == SystemRoles.Admin && u.IsActive == true)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+                foreach (var id in adminIds) recipients.Add(id);
+
+                // 2. Department Maintenance Engineers
+                var teamUserIds = await _context.Users
+                    .Where(u => u.MaintenanceTeam == part.Department && u.IsActive == true)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+                foreach (var id in teamUserIds) recipients.Add(id);
+
+                var notifications = recipients.Select(userId => new Notification
+                {
+                    UserId = userId,
+                    TicketId = null,
+                    Title = $"⚠️ Low Reserve Stock: {part.Name}",
+                    Message = $"{part.Department} reserve stock for '{part.Name}' (SKU: {part.PartNumber ?? "N/A"}) is at {part.Quantity} {part.Unit ?? "Piece"} (Min threshold: {part.MinReserveQuantity}). Replenishment required.",
+                    Type = "LowStockAlert",
+                    LinkUrl = $"/SpareParts?department={part.Department}&lowStock=true",
+                    IsRead = false,
+                    CreatedAt = DateTime.Now
+                }).ToList();
+
+                if (notifications.Any())
+                {
+                    _context.Notifications.AddRange(notifications);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch
+            {
+                // Graceful fallback
+            }
+        }
+
         public async Task<int> GetUnreadCountAsync(int userId)
         {
             if (userId <= 0) return 0;

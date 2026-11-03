@@ -58,8 +58,19 @@
 
     <!-- Sidebar -->
     <aside class="sidebar">
+        @{
+            string userDashboardUrl = Url.Action("Index", "Home")!;
+            if (CurrentUser.IsMaintenance())
+            {
+                userDashboardUrl = Url.Action("Index", "Home", new { tab = "analytics" })!;
+            }
+            else if (CurrentUser.IsEndUser())
+            {
+                userDashboardUrl = Url.Action("Index", "Tickets")!;
+            }
+        }
         <div class="sidebar-brand">
-            <a href="@Url.Action("Index", "Home")" class="d-flex align-items-center gap-2 text-decoration-none text-white flex-grow-1 overflow-hidden">
+            <a href="@userDashboardUrl" class="d-flex align-items-center gap-2 text-decoration-none text-white flex-grow-1 overflow-hidden">
                 <i class="fa-solid fa-server"></i>
                 <div class="text-truncate">
                     <div>@Loc["Stock & Helpdesk"]</div>
@@ -79,6 +90,8 @@
             int openTicketsCount = 0;
             int overdueMaintCount = 0;
             int unreadNotifsCount = 0;
+            int lowStockCount = 0;
+            List<StockPortal.Models.Notification> recentTopNotifications = new();
             try
             {
                 var today = DateTime.Now.Date;
@@ -117,10 +130,25 @@
                 openTicketsCount = ticketsQuery.Count();
                 overdueMaintCount = DbContext.Assets.Count(a => a.NeedsPeriodic == true && a.NextPeriodic.HasValue && a.NextPeriodic.Value < today);
 
+                if (CurrentUser.IsAdmin())
+                {
+                    lowStockCount = DbContext.SpareParts.Count(p => p.IsActive && p.Quantity <= p.MinReserveQuantity);
+                }
+                else if (CurrentUser.IsMaintenance())
+                {
+                    var myTeam = CurrentUser.GetMaintenanceTeam();
+                    lowStockCount = DbContext.SpareParts.Count(p => p.IsActive && p.Department == myTeam && p.Quantity <= p.MinReserveQuantity);
+                }
+
                 int currentUid = CurrentUser.GetUserId();
                 if (currentUid > 0)
                 {
                     unreadNotifsCount = DbContext.Notifications.Count(n => n.UserId == currentUid && !n.IsRead);
+                    recentTopNotifications = DbContext.Notifications
+                        .Where(n => n.UserId == currentUid)
+                        .OrderByDescending(n => n.CreatedAt)
+                        .Take(6)
+                        .ToList();
                 }
             }
             catch {}
@@ -150,6 +178,16 @@
                     <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
                         <span>@Loc["Stock & Assets"]</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SpareParts" ? "active" : "")">
+                        <i class="fa-solid fa-layer-group text-warning"></i>
+                        <span class="flex-grow-1">@Loc["Reserve Stock & Spare Parts"]</span>
+                        @if (lowStockCount > 0)
+                        {
+                            <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;" title="@Loc["Low Reserve Alerts"]">@lowStockCount</span>
+                        }
                     </a>
                 </li>
                 <li>
@@ -226,6 +264,16 @@
                     <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
                         <span>@Loc["Hospital Assets"]</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SpareParts" ? "active" : "")">
+                        <i class="fa-solid fa-layer-group text-warning"></i>
+                        <span class="flex-grow-1">@Loc["Reserve Stock & Spare Parts"]</span>
+                        @if (lowStockCount > 0)
+                        {
+                            <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;" title="@Loc["Low Reserve Alerts"]">@lowStockCount</span>
+                        }
                     </a>
                 </li>
                 <li>
@@ -375,16 +423,79 @@
                     </ul>
                 </div>
 
-                <!-- Notifications Bell Icon -->
-                <a href="@Url.Action("Index", "Notifications")" id="navNotificationsLink" class="btn btn-sm btn-light border position-relative" title="@Loc["Notifications"]">
-                    <i class="fa-solid fa-bell text-secondary"></i>
-                    @if (unreadNotifsCount > 0)
-                    {
-                        <span id="navUnreadBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger badge-pulse" style="font-size: 0.65rem;">
-                            @unreadNotifsCount
-                        </span>
-                    }
-                </a>
+                <!-- Notifications Bell Dropdown -->
+                <div class="dropdown" id="navNotificationsDropdown">
+                    <button class="btn btn-sm btn-light border position-relative" type="button" id="notifDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" title="@Loc["Notifications"]">
+                        <i class="fa-solid fa-bell text-secondary"></i>
+                        @if (unreadNotifsCount > 0)
+                        {
+                            <span id="navUnreadBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger badge-pulse" style="font-size: 0.65rem;">
+                                @unreadNotifsCount
+                            </span>
+                        }
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0" aria-labelledby="notifDropdownBtn" style="width: 350px; max-width: 90vw;">
+                        <div class="d-flex align-items-center justify-content-between p-3 border-bottom bg-light rounded-top">
+                            <h6 class="mb-0 fw-bold"><i class="fa-solid fa-bell text-warning me-1"></i> @Loc["Notifications"]</h6>
+                            @if (unreadNotifsCount > 0)
+                            {
+                                <span class="badge bg-danger rounded-pill">@unreadNotifsCount @(isArabic ? "جديدة" : "new")</span>
+                            }
+                        </div>
+                        <div class="list-group list-group-flush" style="max-height: 340px; overflow-y: auto;">
+                            @if (!recentTopNotifications.Any())
+                            {
+                                <div class="p-4 text-center text-muted small">
+                                    <i class="fa-solid fa-bell-slash text-secondary fs-4 d-block mb-2"></i>
+                                    @Loc["No notifications found"]
+                                </div>
+                            }
+                            else
+                            {
+                                @foreach (var notif in recentTopNotifications)
+                                {
+                                    string notifUrl = !string.IsNullOrWhiteSpace(notif.LinkUrl) ? notif.LinkUrl : (notif.TicketId.HasValue ? Url.Action("Details", "Tickets", new { id = notif.TicketId }) : Url.Action("Index", "Notifications"));
+                                    <a href="@notifUrl" class="list-group-item list-group-item-action p-2 @(!notif.IsRead ? "bg-light" : "") d-flex align-items-start gap-2">
+                                        <div class="mt-1">
+                                            @if (!notif.IsRead)
+                                            {
+                                                <span class="badge bg-primary rounded-circle p-1" style="width: 8px; height: 8px; display: inline-block;"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="fa-solid fa-circle-check text-muted" style="font-size: 0.75rem;"></i>
+                                            }
+                                        </div>
+                                        <div class="flex-grow-1 overflow-hidden">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="fw-semibold text-truncate small text-dark" style="max-width: 220px;">@notif.Title</div>
+                                                <small class="text-muted" style="font-size: 0.7rem;">@notif.CreatedAt.ToString("HH:mm")</small>
+                                            </div>
+                                            <p class="small text-muted mb-0 text-truncate" title="@notif.Message" style="font-size: 0.78rem;">
+                                                @notif.Message
+                                            </p>
+                                        </div>
+                                    </a>
+                                }
+                            }
+                        </div>
+                        <div class="p-2 border-top bg-light text-center rounded-bottom d-flex justify-content-between align-items-center">
+                            @if (unreadNotifsCount > 0)
+                            {
+                                <form asp-controller="Notifications" asp-action="MarkAllAsRead" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="returnUrl" value="@Context.Request.Path@Context.Request.QueryString" />
+                                    <button type="submit" class="btn btn-link btn-sm text-decoration-none p-0 text-muted small">
+                                        <i class="fa-solid fa-check-double me-1"></i> @Loc["Mark All as Read"]
+                                    </button>
+                                </form>
+                            }
+                            <a href="@Url.Action("Index", "Notifications")" class="btn btn-link btn-sm text-decoration-none fw-semibold ms-auto">
+                                @(isArabic ? "عرض كل الإشعارات" : "View All Notifications") &rarr;
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Domain User Pill -->
                 <div class="dropdown">

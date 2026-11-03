@@ -655,6 +655,9 @@ namespace StockPortal.Data
 
             // Seed / Ensure Software Catalog and Ticket Attachments
             EnsureSoftwareAndAttachmentData(context);
+
+            // Seed Reserve Stock, Consumables & Spare Parts (Task 5)
+            EnsureSparePartsSeedData(context);
         }
 
         private static void EnsureArabicSchema(StockDbContext context)
@@ -712,6 +715,41 @@ namespace StockPortal.Data
                             uploadedDT TEXT NOT NULL,
                             uploadedBy INTEGER NULL
                         );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS spare_parts (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            name_ar TEXT NULL,
+                            part_number TEXT NULL,
+                            department TEXT NOT NULL,
+                            category TEXT NULL,
+                            quantity INTEGER NOT NULL DEFAULT 0,
+                            min_reserve_quantity INTEGER NOT NULL DEFAULT 2,
+                            unit TEXT NULL DEFAULT 'Piece',
+                            unit_cost REAL NULL,
+                            storage_location TEXT NULL,
+                            can_function_as_asset INTEGER NOT NULL DEFAULT 0,
+                            compatible_equipment TEXT NULL,
+                            notes TEXT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL,
+                            updated_at TEXT NULL
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS spare_part_transactions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            spare_part_id INTEGER NOT NULL,
+                            ticket_id INTEGER NULL,
+                            asset_id INTEGER NULL,
+                            user_id INTEGER NULL,
+                            transaction_type TEXT NOT NULL,
+                            quantity_changed INTEGER NOT NULL,
+                            quantity_after INTEGER NOT NULL,
+                            notes TEXT NULL,
+                            timestamp TEXT NOT NULL
+                        );");
                 }
                 else
                 {
@@ -763,6 +801,43 @@ namespace StockPortal.Data
                             `fileSize` bigint NULL,
                             `uploadedDT` datetime NOT NULL,
                             `uploadedBy` int NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `spare_parts` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `name_ar` varchar(255) NULL,
+                            `part_number` varchar(100) NULL,
+                            `department` varchar(50) NOT NULL,
+                            `category` varchar(50) NULL,
+                            `quantity` int NOT NULL DEFAULT 0,
+                            `min_reserve_quantity` int NOT NULL DEFAULT 2,
+                            `unit` varchar(50) NULL DEFAULT 'Piece',
+                            `unit_cost` decimal(18,2) NULL,
+                            `storage_location` varchar(255) NULL,
+                            `can_function_as_asset` tinyint(1) NOT NULL DEFAULT 0,
+                            `compatible_equipment` varchar(500) NULL,
+                            `notes` varchar(1024) NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            `created_at` datetime NOT NULL,
+                            `updated_at` datetime NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `spare_part_transactions` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `spare_part_id` int NOT NULL,
+                            `ticket_id` int NULL,
+                            `asset_id` int NULL,
+                            `user_id` int NULL,
+                            `transaction_type` varchar(50) NOT NULL,
+                            `quantity_changed` int NOT NULL,
+                            `quantity_after` int NOT NULL,
+                            `notes` varchar(1024) NULL,
+                            `timestamp` datetime NOT NULL,
                             PRIMARY KEY (`id`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
                 }
@@ -1006,6 +1081,285 @@ namespace StockPortal.Data
                     foreach (var asset in itAssets)
                     {
                         asset.InstalledSoftwares = defaultSoftwares;
+                    }
+                    context.SaveChanges();
+                }
+            }
+            catch {}
+        }
+
+        private static void EnsureSparePartsSeedData(StockDbContext context)
+        {
+            try
+            {
+                if (!context.SpareParts.Any())
+                {
+                    var parts = new[]
+                    {
+                        // IT Reserve Stock
+                        new SparePart
+                        {
+                            Name = "500GB NVMe M.2 SSD",
+                            NameAr = "قرص تخزين فائق السرعة 500 جيجابايت NVMe M.2",
+                            PartNumber = "SSD-NVME-500GB",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Spare Part",
+                            Quantity = 8,
+                            MinReserveQuantity = 3,
+                            Unit = "Piece",
+                            UnitCost = 45.00m,
+                            StorageLocation = "IT Store - Shelf B2",
+                            CanFunctionAsAsset = true, // Dual nature: internal PC spare or commissioned as external backup SSD
+                            CompatibleEquipment = "Dell OptiPlex Desktops, HP Workstations, Hospital Laptops",
+                            Notes = "Dual-purpose: Can be used as replacement internal drive or mounted in enclosure as external backup drive."
+                        },
+                        new SparePart
+                        {
+                            Name = "1TB SATA 2.5\" SSD",
+                            NameAr = "قرص تخزين صلب 1 تيرابايت SATA 2.5 بوصة",
+                            PartNumber = "SSD-SATA-1TB",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Spare Part",
+                            Quantity = 5,
+                            MinReserveQuantity = 2,
+                            Unit = "Piece",
+                            UnitCost = 68.00m,
+                            StorageLocation = "IT Store - Shelf B3",
+                            CanFunctionAsAsset = true, // Dual nature: replacement or standalone backup disk
+                            CompatibleEquipment = "All Server & Desktop SATA bays, USB 3.0 external enclosures",
+                            Notes = "High reliability 3D NAND SSD for workstation refresh or emergency backup storage."
+                        },
+                        new SparePart
+                        {
+                            Name = "16GB DDR4 3200MHz RAM",
+                            NameAr = "ذاكرة وصول عشوائي 16 جيجابايت DDR4",
+                            PartNumber = "RAM-DDR4-16GB",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Spare Part",
+                            Quantity = 12,
+                            MinReserveQuantity = 4,
+                            Unit = "Piece",
+                            UnitCost = 35.00m,
+                            StorageLocation = "IT Store - Shelf B1",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Dell & HP Clinic Workstations",
+                            Notes = "Replacement memory module for diagnostic workstations."
+                        },
+                        new SparePart
+                        {
+                            Name = "Cat6 UTP Patch Cable 3M",
+                            NameAr = "سلك شبكة Cat6 بطول 3 أمتار عالي الجودة",
+                            PartNumber = "CAB-CAT6-3M",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Consumable",
+                            Quantity = 45,
+                            MinReserveQuantity = 15,
+                            Unit = "Piece",
+                            UnitCost = 3.50m,
+                            StorageLocation = "IT Store - Bin C1",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "All Network Data Points, IP Phones, Wall Jacks",
+                            Notes = "Molded strain relief snagless Gigabit patch leads."
+                        },
+                        new SparePart
+                        {
+                            Name = "Thermal Paste Syringe 4g",
+                            NameAr = "معجون تبريد حراري للمعالجات 4 جرام",
+                            PartNumber = "THM-PST-4G",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Periodic Maintenance Reserve",
+                            Quantity = 6,
+                            MinReserveQuantity = 2,
+                            Unit = "Piece",
+                            UnitCost = 7.50m,
+                            StorageLocation = "IT Store - Shelf A1",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "CPU Heatsinks, Server Processors, GPU Coolers",
+                            Notes = "Used during semi-annual periodic workstation cleanups."
+                        },
+                        new SparePart
+                        {
+                            Name = "24-inch FHD IPS Monitor",
+                            NameAr = "شاشة عرض 24 بوصة FHD IPS متوافقة",
+                            PartNumber = "MON-24-DELL",
+                            Department = MaintenanceTeams.IT,
+                            Category = "Spare Part",
+                            Quantity = 4,
+                            MinReserveQuantity = 2,
+                            Unit = "Piece",
+                            UnitCost = 135.00m,
+                            StorageLocation = "IT Store - Rack D",
+                            CanFunctionAsAsset = true, // Can replace broken monitor or be commissioned as independent asset
+                            CompatibleEquipment = "All Reception Desks, Nurse Stations, Doctor Clinics",
+                            Notes = "Dual-purpose: replacement panel or new workstation commission."
+                        },
+
+                        // BIOMEDICAL Reserve Stock
+                        new SparePart
+                        {
+                            Name = "Patient Monitor 5-Lead ECG Trunk Cable",
+                            NameAr = "كابل تخطيط القلب الرئيسي 5 أطراف لأجهزة المراقبة",
+                            PartNumber = "BIO-ECG-CAB5",
+                            Department = MaintenanceTeams.Biomedical,
+                            Category = "Spare Part",
+                            Quantity = 7,
+                            MinReserveQuantity = 3,
+                            Unit = "Piece",
+                            UnitCost = 115.00m,
+                            StorageLocation = "Biomedical Lab - Drawer 1",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Philips IntelliVue MX450/MX700, Mindray BeneView",
+                            Notes = "Defibrillator-protected trunk cable."
+                        },
+                        new SparePart
+                        {
+                            Name = "Defibrillator Rechargeable Lithium Battery",
+                            NameAr = "بطارية ليثيوم قابلة للشحن لجهاز الصدمات الكهربائية",
+                            PartNumber = "BIO-BATT-DFB",
+                            Department = MaintenanceTeams.Biomedical,
+                            Category = "Periodic Maintenance Reserve",
+                            Quantity = 3,
+                            MinReserveQuantity = 2,
+                            Unit = "Piece",
+                            UnitCost = 280.00m,
+                            StorageLocation = "Biomedical Lab - Cabinet Safe",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Zoll R Series, Philips HeartStart XL+",
+                            Notes = "Scheduled annual replacement battery packs."
+                        },
+                        new SparePart
+                        {
+                            Name = "Adult Reusable SpO2 Sensor Probe",
+                            NameAr = "مجس قياس نسبة الأكسجين بالدم قابل لإعادة الاستخدام",
+                            PartNumber = "BIO-SPO2-ADL",
+                            Department = MaintenanceTeams.Biomedical,
+                            Category = "Consumable",
+                            Quantity = 18,
+                            MinReserveQuantity = 6,
+                            Unit = "Piece",
+                            UnitCost = 42.00m,
+                            StorageLocation = "Biomedical Lab - Drawer 2",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "ICU Multi-parameter Monitors, Pulse Oximeters",
+                            Notes = "Durable silicone finger clip sensor."
+                        },
+                        new SparePart
+                        {
+                            Name = "Medical Diagnostic Tablet Display 10\"",
+                            NameAr = "جهاز لوحي طبي محمول 10 بوصة للمعاينة والتشخيص",
+                            PartNumber = "BIO-TAB-MED10",
+                            Department = MaintenanceTeams.Biomedical,
+                            Category = "Spare Part",
+                            Quantity = 3,
+                            MinReserveQuantity = 1,
+                            Unit = "Piece",
+                            UnitCost = 690.00m,
+                            StorageLocation = "Biomedical Lab - Safe B",
+                            CanFunctionAsAsset = true, // Can replace broken display or be commissioned as standalone asset
+                            CompatibleEquipment = "Mobile Ultrasound Consoles, Portable Telemetry Stations",
+                            Notes = "Dual-purpose: Can replace modular tablet screen or be commissioned as portable clinical asset."
+                        },
+                        new SparePart
+                        {
+                            Name = "Ventilator Expiratory Filter & Water Trap",
+                            NameAr = "فلتر زفير ومصيدة مياه لجهاز التنفس الاصطناعي",
+                            PartNumber = "BIO-VENT-FLT",
+                            Department = MaintenanceTeams.Biomedical,
+                            Category = "Consumable",
+                            Quantity = 25,
+                            MinReserveQuantity = 10,
+                            Unit = "Piece",
+                            UnitCost = 24.00m,
+                            StorageLocation = "Biomedical Lab - Shelf C",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Hamilton-G5, Dräger Evita Infinity V500",
+                            Notes = "Autoclavable bacterial/viral filter set."
+                        },
+
+                        // GENERAL / FACILITIES Reserve Stock
+                        new SparePart
+                        {
+                            Name = "HVAC Antimicrobial Air Filter 24x24x2",
+                            NameAr = "فلتر هواء مكيفات مركزي مضاد للميكروبات 24x24x2",
+                            PartNumber = "FAC-HVAC-FLT24",
+                            Department = MaintenanceTeams.General,
+                            Category = "Periodic Maintenance Reserve",
+                            Quantity = 32,
+                            MinReserveQuantity = 12,
+                            Unit = "Piece",
+                            UnitCost = 16.50m,
+                            StorageLocation = "Facilities Store - Bay 4",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Hospital Central AHU Systems & Clinic HVAC",
+                            Notes = "Quarterly periodic maintenance replacement filters."
+                        },
+                        new SparePart
+                        {
+                            Name = "T8 LED Tube Light 40W 120cm",
+                            NameAr = "أنبوب إضاءة ليد T8 موفر للطاقة 40 واط 120 سم",
+                            PartNumber = "FAC-LED-T8-40W",
+                            Department = MaintenanceTeams.General,
+                            Category = "Consumable",
+                            Quantity = 50,
+                            MinReserveQuantity = 20,
+                            Unit = "Piece",
+                            UnitCost = 4.25m,
+                            StorageLocation = "Facilities Store - Bay 2",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Wards, Corridors, Nursing Stations Fixtures",
+                            Notes = "Daylight 6500K energy-efficient tubes."
+                        },
+                        new SparePart
+                        {
+                            Name = "Commercial Water Pump Mechanical Seal",
+                            NameAr = "مانع تسرب ميكانيكي لمضخات المياه المركزية",
+                            PartNumber = "FAC-PMP-SEAL",
+                            Department = MaintenanceTeams.General,
+                            Category = "Spare Part",
+                            Quantity = 4,
+                            MinReserveQuantity = 2,
+                            Unit = "Piece",
+                            UnitCost = 88.00m,
+                            StorageLocation = "Facilities Workshop - Shelf M1",
+                            CanFunctionAsAsset = false,
+                            CompatibleEquipment = "Grundfos Hydro MPC Booster Pumps",
+                            Notes = "Silicon Carbide shaft seal for domestic booster pumps."
+                        },
+                        new SparePart
+                        {
+                            Name = "Portable Industrial Dehumidifier 50L/D",
+                            NameAr = "جهاز إزالة رطوبة وتجفيف صناعي متنقل 50 لتر/يوم",
+                            PartNumber = "FAC-AIR-DEHUM50",
+                            Department = MaintenanceTeams.General,
+                            Category = "Spare Part",
+                            Quantity = 2,
+                            MinReserveQuantity = 1,
+                            Unit = "Piece",
+                            UnitCost = 410.00m,
+                            StorageLocation = "Facilities Workshop - Ground",
+                            CanFunctionAsAsset = true, // Can be used as facility equipment or commissioned as asset
+                            CompatibleEquipment = "Clean Rooms, Server Rooms, Operating Suites",
+                            Notes = "Dual-purpose: Can be deployed for emergency maintenance or commissioned as hospital asset."
+                        }
+                    };
+
+                    context.SpareParts.AddRange(parts);
+                    context.SaveChanges();
+
+                    // Create initial replenishment transactions for audit trail
+                    var initialAdmin = context.Users.FirstOrDefault(u => u.Role == "Admin" || u.Role == "IT Manager & Lead SysAdmin") ?? context.Users.FirstOrDefault();
+                    foreach (var part in parts)
+                    {
+                        context.SparePartTransactions.Add(new SparePartTransaction
+                        {
+                            SparePartId = part.Id,
+                            UserId = initialAdmin?.Id,
+                            TransactionType = "Replenishment",
+                            QuantityChanged = part.Quantity,
+                            QuantityAfter = part.Quantity,
+                            Notes = $"Initial reserve stock configuration for {part.Department} maintenance department.",
+                            Timestamp = DateTime.Now
+                        });
                     }
                     context.SaveChanges();
                 }

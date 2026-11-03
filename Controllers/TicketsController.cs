@@ -54,17 +54,21 @@ namespace StockPortal.Controllers
             }
             // ADMIN has unrestricted access across all tickets
 
-            if (statusId.HasValue)
+            // Default status filter is "Not Closed" (-1) unless explicitly specified
+            int effectiveStatusId = statusId ?? -1;
+            if (statusId == 0)
             {
-                if (statusId.Value == -1)
-                {
-                    // Not Closed tickets (Status != 5 and ClosedDT is null)
-                    query = query.Where(t => t.StatusId != 5 && t.ClosedDT == null);
-                }
-                else if (statusId.Value > 0)
-                {
-                    query = query.Where(t => t.StatusId == statusId.Value);
-                }
+                effectiveStatusId = 0; // 0 explicitly represents "All Statuses"
+            }
+
+            if (effectiveStatusId == -1)
+            {
+                // Not Closed tickets (Status != 5 and ClosedDT is null)
+                query = query.Where(t => t.StatusId != 5 && t.ClosedDT == null);
+            }
+            else if (effectiveStatusId > 0)
+            {
+                query = query.Where(t => t.StatusId == effectiveStatusId);
             }
 
             if (priority.HasValue && priority.Value > 0)
@@ -110,7 +114,7 @@ namespace StockPortal.Controllers
                 );
             }
 
-            ViewBag.SelectedStatusId = statusId;
+            ViewBag.SelectedStatusId = effectiveStatusId;
             ViewBag.SelectedPriority = priority;
             ViewBag.SelectedType = type;
             ViewBag.Search = search;
@@ -164,12 +168,45 @@ namespace StockPortal.Controllers
             var allSuppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
             var targetSuppliers = allSuppliers.Where(s => s.SupportsDepartment(ticket.TargetTeam)).ToList();
 
+            var availableSpareParts = await _context.SpareParts
+                .Where(p => p.IsActive && p.Department == ticket.TargetTeam && p.Quantity > 0)
+                .OrderBy(p => p.Name)
+                .ToListAsync();
+
+            var usedSpareParts = await _context.SparePartTransactions
+                .Include(t => t.SparePart)
+                .Include(t => t.User)
+                .Where(t => t.TicketId == id)
+                .OrderByDescending(t => t.Timestamp)
+                .ToListAsync();
+
+            var allUsers = await _context.Users
+                .Include(u => u.Department)
+                .Where(u => u.IsActive == true)
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+
+            // Filter for responsible department employees (e.g. IT, BIOMEDICAL, GENERAL)
+            var departmentEmployees = allUsers
+                .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam) || (ticket.Handler?.TechUserId.HasValue == true && u.Id == ticket.Handler.TechUserId.Value))
+                .ToList();
+
+            if (!departmentEmployees.Any())
+            {
+                departmentEmployees = allUsers
+                    .Where(u => u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin)
+                    .ToList();
+            }
+
             var vm = new TicketDetailsViewModel
             {
                 Ticket = ticket,
                 Statuses = await _context.TicketStatuses.ToListAsync(),
-                Technicians = await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(),
+                Technicians = allUsers,
+                DepartmentEmployees = departmentEmployees,
                 Suppliers = targetSuppliers,
+                AvailableSpareParts = availableSpareParts,
+                UsedSpareParts = usedSpareParts,
                 NewStatusId = ticket.StatusId,
                 NewTechUserId = ticket.Handler?.TechUserId
             };
@@ -602,11 +639,21 @@ namespace StockPortal.Controllers
 
             var currentUserId = _currentUserService.GetUserId();
 
-            // Determine multi-technician closure participants
+            // Determine multi-technician closure participants: only responsible department employees
             var participatingTechIds = new HashSet<int>();
             if (closedByUserIds != null && closedByUserIds.Length > 0)
             {
-                foreach (var id in closedByUserIds.Where(id => id > 0))
+                var candidateUsers = await _context.Users
+                    .Include(u => u.Department)
+                    .Where(u => u.IsActive == true)
+                    .ToListAsync();
+
+                var allowedIds = candidateUsers
+                    .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam) || u.Id == ticket.Handler?.TechUserId || u.Id == currentUserId)
+                    .Select(u => u.Id)
+                    .ToHashSet();
+
+                foreach (var id in closedByUserIds.Where(id => id > 0 && allowedIds.Contains(id)))
                 {
                     participatingTechIds.Add(id);
                 }
@@ -922,6 +969,94 @@ namespace StockPortal.Controllers
             return RedirectToAction(nameof(Details), new { id = ticketId });
         }
 
+        // POST: Tickets/LogSparePartUsage
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LogSparePartUsage(int ticketId, int sparePartId, int quantity, string? notes)
+        {
+            var ticket = await _context.Tickets
+                .Include(t => t.Asset)
+                .FirstOrDefaultAsync(t => t.Id == ticketId);
+
+            if (ticket == null) return NotFound();
+
+            // RBAC Guard: Only Admin and assigned Maintenance team can manage ticket reserve parts
+            if (!_currentUserService.CanManageTicket(ticket))
+            {
+                return Forbid();
+            }
+
+            if (quantity <= 0)
+            {
+                TempData["ErrorMessage"] = "Quantity must be greater than zero.";
+                return RedirectToAction(nameof(Details), new { id = ticketId });
+            }
+
+            var part = await _context.SpareParts.FindAsync(sparePartId);
+            if (part == null || !part.IsActive)
+            {
+                TempData["ErrorMessage"] = "Spare part not found or inactive.";
+                return RedirectToAction(nameof(Details), new { id = ticketId });
+            }
+
+            // Role isolation check: Technicians can only consume parts from their target team department
+            if (!_currentUserService.IsAdmin() && !string.Equals(part.Department, ticket.TargetTeam, StringComparison.OrdinalIgnoreCase))
+            {
+                TempData["ErrorMessage"] = $"Selected spare part does not belong to the {ticket.TargetTeam} reserve stock.";
+                return RedirectToAction(nameof(Details), new { id = ticketId });
+            }
+
+            if (part.Quantity < quantity)
+            {
+                TempData["ErrorMessage"] = $"Insufficient reserve stock for '{part.Name}'. Requested: {quantity}, Available: {part.Quantity}.";
+                return RedirectToAction(nameof(Details), new { id = ticketId });
+            }
+
+            int currentUserId = _currentUserService.GetUserId();
+
+            // Decrement inventory
+            part.Quantity -= quantity;
+            part.UpdatedAt = DateTime.Now;
+
+            // Record transaction audit log
+            var transaction = new SparePartTransaction
+            {
+                SparePartId = part.Id,
+                TicketId = ticket.Id,
+                AssetId = ticket.AssetId,
+                UserId = currentUserId,
+                TransactionType = "Usage in Ticket",
+                QuantityChanged = -quantity,
+                QuantityAfter = part.Quantity,
+                Notes = string.IsNullOrWhiteSpace(notes) ? $"Used in Ticket #{ticket.Id}" : notes.Trim(),
+                Timestamp = DateTime.Now
+            };
+            _context.SparePartTransactions.Add(transaction);
+
+            // Record in ticket timeline
+            var skuText = !string.IsNullOrWhiteSpace(part.PartNumber) ? $" (SKU: {part.PartNumber})" : "";
+            var noteText = !string.IsNullOrWhiteSpace(notes) ? $" - Note: {notes.Trim()}" : "";
+            var timelineMsg = new TicketMsg
+            {
+                TicketId = ticket.Id,
+                UserId = currentUserId,
+                Msg = $"🔧 [RESERVE STOCK / SPARE PART USED]: {quantity}x {part.Name}{skuText} from {part.Department} Reserve Stock{noteText}",
+                TimeStamp = DateTime.Now
+            };
+            _context.TicketMessages.Add(timelineMsg);
+
+            await _context.SaveChangesAsync();
+
+            // Notify low stock if threshold reached
+            if (part.IsLowStock)
+            {
+                await _notificationService.NotifyLowReserveStockAsync(part);
+            }
+
+            TempData["SuccessMessage"] = $"Successfully issued {quantity}x '{part.Name}' from {part.Department} reserve stock and recorded in ticket.";
+            return RedirectToAction(nameof(Details), new { id = ticketId });
+        }
+
         // GET: Tickets/PrintTicket/5
         public async Task<IActionResult> PrintTicket(int? id)
         {
@@ -974,7 +1109,11 @@ namespace StockPortal.Controllers
                 query = query.Where(t => t.TargetTeam == myTeam);
             }
 
-            if (statusId.HasValue && statusId.Value > 0) query = query.Where(t => t.StatusId == statusId.Value);
+            if (statusId.HasValue)
+            {
+                if (statusId.Value == -1) query = query.Where(t => t.StatusId != 5 && t.ClosedDT == null);
+                else if (statusId.Value > 0) query = query.Where(t => t.StatusId == statusId.Value);
+            }
             if (priority.HasValue && priority.Value > 0) query = query.Where(t => t.Priority == priority.Value);
             if (!string.IsNullOrWhiteSpace(type)) query = query.Where(t => t.Type == type);
 

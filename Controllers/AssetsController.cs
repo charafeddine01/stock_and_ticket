@@ -630,7 +630,14 @@ namespace StockPortal.Controllers
         }
 
         // GET: Assets/PrintBulkTags
-        public async Task<IActionResult> PrintBulkTags(string? search = null, string? status = null, string? type = null, int? roomId = null, string? ids = null)
+        public async Task<IActionResult> PrintBulkTags(
+            string? search = null, 
+            string? status = null, 
+            string? type = null, 
+            int? roomId = null, 
+            string? warranty = null, 
+            string? calibration = null, 
+            string? ids = null)
         {
             var query = _context.Assets
                 .Include(a => a.User)
@@ -647,18 +654,29 @@ namespace StockPortal.Controllers
             else if (_currentUserService.IsMaintenance())
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
-                query = query.Where(a => a.MaintenanceTeam == myTeam || a.MaintenanceTeam == null);
+                query = query.Where(a => a.MaintenanceTeam == myTeam);
             }
 
             if (!string.IsNullOrWhiteSpace(ids))
             {
-                var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                                .Select(s => int.TryParse(s, out var v) ? v : 0)
-                                .Where(v => v > 0)
-                                .ToList();
-                if (idList.Any())
+                if (string.Equals(ids.Trim(), "none", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(a => idList.Contains(a.Id));
+                    query = query.Where(a => false);
+                }
+                else
+                {
+                    var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                    .Select(s => int.TryParse(s, out var v) ? v : 0)
+                                    .Where(v => v > 0)
+                                    .ToList();
+                    if (idList.Any())
+                    {
+                        query = query.Where(a => idList.Contains(a.Id));
+                    }
+                    else
+                    {
+                        query = query.Where(a => false);
+                    }
                 }
             }
             else
@@ -666,14 +684,59 @@ namespace StockPortal.Controllers
                 if (!string.IsNullOrWhiteSpace(search))
                 {
                     var s = search.Trim().ToLower();
-                    query = query.Where(a => (a.HospitalNo != null && a.HospitalNo.ToLower().Contains(s)) ||
-                                             (a.SerialNo != null && a.SerialNo.ToLower().Contains(s)) ||
-                                             (a.Brand != null && a.Brand.ToLower().Contains(s)) ||
-                                             (a.Type != null && a.Type.ToLower().Contains(s)));
+                    query = query.Where(a =>
+                        (a.HospitalNo != null && a.HospitalNo.ToLower().Contains(s)) ||
+                        (a.SerialNo != null && a.SerialNo.ToLower().Contains(s)) ||
+                        (a.Brand != null && a.Brand.ToLower().Contains(s)) ||
+                        (a.Type != null && a.Type.ToLower().Contains(s)) ||
+                        (a.User != null && a.User.FullName != null && a.User.FullName.ToLower().Contains(s))
+                    );
                 }
+
                 if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
                 if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
-                if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId);
+                if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId.Value);
+
+                if (!string.IsNullOrWhiteSpace(warranty))
+                {
+                    var now = DateTime.Now.Date;
+                    if (warranty == "expired")
+                    {
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value < now);
+                    }
+                    else if (warranty == "expiring30")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value >= now && a.WarrantyTill.Value <= future30);
+                    }
+                    else if (warranty == "active")
+                    {
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value >= now);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(calibration))
+                {
+                    var now = DateTime.Now.Date;
+                    if (calibration == "required")
+                    {
+                        query = query.Where(a => a.NeedsCalibration == true);
+                    }
+                    else if (calibration == "overdue")
+                    {
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < now);
+                    }
+                    else if (calibration == "due30")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= future30);
+                    }
+                    else if (calibration == "valid")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value > future30);
+                    }
+                }
             }
 
             var assets = await query.OrderBy(a => a.HospitalNo ?? a.Id.ToString()).ToListAsync();
@@ -718,7 +781,14 @@ namespace StockPortal.Controllers
         }
 
         // GET: Assets/ExportCsv
-        public async Task<IActionResult> ExportCsv(string? search, string? status, string? type, int? roomId)
+        public async Task<IActionResult> ExportCsv(
+            string? search = null, 
+            string? status = null, 
+            string? type = null, 
+            int? roomId = null, 
+            string? warranty = null, 
+            string? calibration = null, 
+            string? ids = null)
         {
             var query = _context.Assets
                 .Include(a => a.User)
@@ -738,21 +808,87 @@ namespace StockPortal.Controllers
                 query = query.Where(a => a.MaintenanceTeam == myTeam);
             }
 
-            if (!string.IsNullOrWhiteSpace(search))
+            if (!string.IsNullOrWhiteSpace(ids))
             {
-                var s = search.Trim().ToLower();
-                query = query.Where(a =>
-                    (a.HospitalNo != null && a.HospitalNo.ToLower().Contains(s)) ||
-                    (a.SerialNo != null && a.SerialNo.ToLower().Contains(s)) ||
-                    (a.Brand != null && a.Brand.ToLower().Contains(s)) ||
-                    (a.Type != null && a.Type.ToLower().Contains(s)) ||
-                    (a.User != null && a.User.FullName != null && a.User.FullName.ToLower().Contains(s))
-                );
+                if (string.Equals(ids.Trim(), "none", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(a => false);
+                }
+                else
+                {
+                    var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                    .Select(s => int.TryParse(s, out var v) ? v : 0)
+                                    .Where(v => v > 0)
+                                    .ToList();
+                    if (idList.Any())
+                    {
+                        query = query.Where(a => idList.Contains(a.Id));
+                    }
+                    else
+                    {
+                        query = query.Where(a => false);
+                    }
+                }
             }
+            else
+            {
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var s = search.Trim().ToLower();
+                    query = query.Where(a =>
+                        (a.HospitalNo != null && a.HospitalNo.ToLower().Contains(s)) ||
+                        (a.SerialNo != null && a.SerialNo.ToLower().Contains(s)) ||
+                        (a.Brand != null && a.Brand.ToLower().Contains(s)) ||
+                        (a.Type != null && a.Type.ToLower().Contains(s)) ||
+                        (a.User != null && a.User.FullName != null && a.User.FullName.ToLower().Contains(s))
+                    );
+                }
 
-            if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
-            if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
-            if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId.Value);
+                if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
+                if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
+                if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId.Value);
+
+                if (!string.IsNullOrWhiteSpace(warranty))
+                {
+                    var now = DateTime.Now.Date;
+                    if (warranty == "expired")
+                    {
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value < now);
+                    }
+                    else if (warranty == "expiring30")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value >= now && a.WarrantyTill.Value <= future30);
+                    }
+                    else if (warranty == "active")
+                    {
+                        query = query.Where(a => a.WarrantyTill.HasValue && a.WarrantyTill.Value >= now);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(calibration))
+                {
+                    var now = DateTime.Now.Date;
+                    if (calibration == "required")
+                    {
+                        query = query.Where(a => a.NeedsCalibration == true);
+                    }
+                    else if (calibration == "overdue")
+                    {
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value < now);
+                    }
+                    else if (calibration == "due30")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value >= now && a.NextCalibration.Value <= future30);
+                    }
+                    else if (calibration == "valid")
+                    {
+                        var future30 = now.AddDays(30);
+                        query = query.Where(a => a.NeedsCalibration == true && a.NextCalibration.HasValue && a.NextCalibration.Value > future30);
+                    }
+                }
+            }
 
             var assets = await query.OrderBy(a => a.Id).ToListAsync();
 

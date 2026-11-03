@@ -25,6 +25,8 @@ namespace StockPortal.Data
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<SoftwareCatalogItem> SoftwareCatalog { get; set; } = null!;
         public DbSet<TicketAttachment> TicketAttachments { get; set; } = null!;
+        public DbSet<SparePart> SpareParts { get; set; } = null!;
+        public DbSet<SparePartTransaction> SparePartTransactions { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -200,6 +202,30 @@ namespace StockPortal.Data
                 entity.HasOne(a => a.UploadedByUser)
                     .WithMany()
                     .HasForeignKey(a => a.UploadedBy)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // SparePart & SparePartTransaction relationships
+            modelBuilder.Entity<SparePartTransaction>(entity =>
+            {
+                entity.HasOne(t => t.SparePart)
+                    .WithMany(p => p.Transactions)
+                    .HasForeignKey(t => t.SparePartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(t => t.Ticket)
+                    .WithMany()
+                    .HasForeignKey(t => t.TicketId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(t => t.Asset)
+                    .WithMany()
+                    .HasForeignKey(t => t.AssetId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(t => t.User)
+                    .WithMany()
+                    .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
         }

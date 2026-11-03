@@ -848,5 +848,600 @@ namespace StockPortal.Tests
             Assert.Equal(502, model.FilteredClosedTicketsLog[0].TicketId);
             Assert.Equal("BIOMEDICAL", model.FilteredClosedTicketsLog[0].TargetTeam);
         }
+
+        [Fact]
+        public async Task HomeController_Index_MaintenanceTeamUser_IsStrictlyIsolatedToTheirOwnTeam()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var itTech = new User { Id = 601, FullName = "IT Specialist", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            var bioTech = new User { Id = 602, FullName = "Biomedical Specialist", Role = SystemRoles.Maintenance, MaintenanceTeam = "BIOMEDICAL", IsActive = true };
+            context.Users.AddRange(itTech, bioTech);
+
+            // IT ticket
+            context.Tickets.Add(new Ticket
+            {
+                Id = 601,
+                TargetTeam = "IT",
+                Type = "Hardware",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddDays(-2),
+                ClosedDT = DateTime.Today.AddDays(-1),
+                ClosedByUsers = "[601]"
+            });
+
+            // Biomedical ticket (private to biomedical team)
+            context.Tickets.Add(new Ticket
+            {
+                Id = 602,
+                TargetTeam = "BIOMEDICAL",
+                Type = "Ventilator",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddDays(-2),
+                ClosedDT = DateTime.Today.AddDays(-1),
+                ClosedByUsers = "[602]"
+            });
+
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(false);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUserService.Setup(s => s.GetUserId()).Returns(601);
+
+            var controller = new HomeController(context, mockUserService.Object);
+
+            // IT tech attempts to pass teamFilter = "BIOMEDICAL" or "ALL"
+            var result = await controller.Index(teamFilter: "BIOMEDICAL", datePreset: "30days", tab: "analytics");
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            // Must be locked to IT
+            Assert.Equal("IT", model.SelectedTeam);
+            Assert.False(model.CanFilterTeam);
+            Assert.Single(model.TeamStats);
+            Assert.Equal("IT", model.TeamStats[0].TeamCode);
+
+            // Must only see IT closed tickets, NOT biomedical
+            Assert.Single(model.FilteredClosedTicketsLog);
+            Assert.Equal(601, model.FilteredClosedTicketsLog[0].TicketId);
+            Assert.Equal("IT", model.FilteredClosedTicketsLog[0].TargetTeam);
+
+            // Technicians available must only be IT techs
+            Assert.All(model.AvailableTechnicians, t => Assert.Equal("IT", t.MaintenanceTeam));
+        }
+
+        [Fact]
+        public async Task HomeController_Index_PerPersonFilter_FiltersDashboardToSpecificTechnician()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var techA = new User { Id = 701, FullName = "Tech Alice", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            var techB = new User { Id = 702, FullName = "Tech Bob", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            context.Users.AddRange(techA, techB);
+
+            // Ticket resolved by Alice
+            context.Tickets.Add(new Ticket
+            {
+                Id = 701,
+                TargetTeam = "IT",
+                Type = "Hardware",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddHours(1),
+                ClosedDT = DateTime.Today.AddHours(5),
+                ClosedByUsers = "[701]"
+            });
+
+            // Ticket resolved by Bob
+            context.Tickets.Add(new Ticket
+            {
+                Id = 702,
+                TargetTeam = "IT",
+                Type = "Network",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddHours(1),
+                ClosedDT = DateTime.Today.AddHours(3),
+                ClosedByUsers = "[702]"
+            });
+
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+
+            var controller = new HomeController(context, mockUserService.Object);
+
+            // Filter specifically by Alice (techId = 701)
+            var result = await controller.Index(techId: 701, datePreset: "today", tab: "analytics");
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<DashboardViewModel>(viewResult.Model);
+
+            Assert.Equal(701, model.SelectedTechUserId);
+            Assert.Equal(1, model.FilteredClosedTickets);
+            Assert.Single(model.FilteredClosedTicketsLog);
+            Assert.Equal(701, model.FilteredClosedTicketsLog[0].TicketId);
+            Assert.Equal(4.0, model.FilteredAverageResolutionHours);
+        }
+
+        [Fact]
+        public async Task HomeController_PrintMemberReport_ReturnsPrintableReportWithTechnicianActivity()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var tech = new User { Id = 801, FullName = "Specialist Sarah", Role = SystemRoles.Maintenance, MaintenanceTeam = "IT", IsActive = true };
+            context.Users.Add(tech);
+
+            var ticket = new Ticket
+            {
+                Id = 801,
+                TargetTeam = "IT",
+                Type = "Software",
+                StatusId = 5,
+                OpenedDT = DateTime.Today.AddHours(2),
+                ClosedDT = DateTime.Today.AddHours(6),
+                ResolutionDetails = "Patched application bug",
+                ClosedByUsers = "[801]"
+            };
+            context.Tickets.Add(ticket);
+
+            var asset = new Asset { Id = 801, HospitalNo = "HOSP-IT-801", Brand = "Dell" };
+            context.Assets.Add(asset);
+
+            var maintLog = new AssetMaintenance
+            {
+                Id = 801,
+                AssetId = 801,
+                UserId = 801,
+                MaintenanceType = 2,
+                TimStamp = DateTime.Today.AddHours(4),
+                Description = "Routine inspection"
+            };
+            context.AssetMaintenances.Add(maintLog);
+
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanAccessDashboard()).Returns(true);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+
+            var controller = new HomeController(context, mockUserService.Object);
+
+            var result = await controller.PrintMemberReport(801, datePreset: "today");
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<TechnicianReportViewModel>(viewResult.Model);
+
+            Assert.Equal(801, model.Technician.Id);
+            Assert.Equal("Specialist Sarah", model.Technician.FullName);
+            Assert.Equal(1, model.ClosedTicketsCount);
+            Assert.Equal(4.0, model.AverageResolutionHours);
+            Assert.Equal(1, model.WorkOrdersCount);
+            Assert.Single(model.ResolvedTickets);
+            Assert.Equal("Patched application bug", model.ResolvedTickets[0].ResolutionNotes);
+            Assert.Single(model.MaintenanceLogs);
+        }
+
+        [Fact]
+        public async Task HomeController_PrintMemberReport_ForbidsCrossTeamAccessForMaintenanceUser()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var bioTech = new User { Id = 901, FullName = "Bio Tech Sam", Role = SystemRoles.Maintenance, MaintenanceTeam = "BIOMEDICAL", IsActive = true };
+            context.Users.Add(bioTech);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanAccessDashboard()).Returns(true);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT"); // IT user attempting to inspect Biomedical tech!
+            mockUserService.Setup(s => s.GetUserId()).Returns(999);
+
+            var controller = new HomeController(context, mockUserService.Object);
+
+            var result = await controller.PrintMemberReport(901);
+            Assert.IsType<ForbidResult>(result);
+        }
+
+        // ==========================================
+        // Task 1: Logo & Responsibility Dashboard Routing
+        // ==========================================
+        [Fact]
+        public async Task HomeController_Index_RedirectsEndUser_ToTicketsIndex()
+        {
+            using var context = CreateInMemoryDbContext();
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsEndUser()).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(101);
+
+            var controller = new HomeController(context, mockUserService.Object);
+            var result = await controller.Index();
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Index", redirect.ActionName);
+            Assert.Equal("Tickets", redirect.ControllerName);
+        }
+
+        // ==========================================
+        // Task 2: Default "Not Closed" Ticket Filter
+        // ==========================================
+        [Fact]
+        public async Task TicketsController_Index_DefaultsToNotClosed_WhenStatusIdOmitted()
+        {
+            using var context = CreateInMemoryDbContext();
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(1);
+
+            var openedStatus = new TicketStatus { Id = 1, Status = "opened" };
+            var closedStatus = new TicketStatus { Id = 5, Status = "closed" };
+            context.TicketStatuses.AddRange(openedStatus, closedStatus);
+
+            var t1 = new Ticket { Id = 101, StatusId = 1, Status = openedStatus, Type = "Hardware", Priority = 2 };
+            var t2 = new Ticket { Id = 102, StatusId = 5, Status = closedStatus, Type = "Hardware", Priority = 2 };
+            context.Tickets.AddRange(t1, t2);
+            await context.SaveChangesAsync();
+
+            var controller = new TicketsController(context, mockUserService.Object, new NotificationService(context));
+            var result = await controller.Index(statusId: null, priority: null, type: null, search: null, filter: null);
+
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsAssignableFrom<List<Ticket>>(viewResult.Model);
+            Assert.Single(model);
+            Assert.Equal(101, model[0].Id);
+            Assert.Equal(-1, (int)controller.ViewBag.SelectedStatusId);
+        }
+
+        // ==========================================
+        // Task 5: Reserve Stock, Consumables & Spare Parts Tests
+        // ==========================================
+        [Fact]
+        public async Task TicketsController_LogSparePartUsage_DeductsReserveStock_LogsTransactionAndTimelineMsg()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var part = new SparePart
+            {
+                Id = 1,
+                Name = "500GB NVMe M.2 SSD",
+                PartNumber = "SSD-NVME-500",
+                Department = MaintenanceTeams.IT,
+                Category = "Spare Part",
+                Quantity = 10,
+                MinReserveQuantity = 2,
+                Unit = "Piece",
+                IsActive = true
+            };
+            context.SpareParts.Add(part);
+
+            var ticket = new Ticket
+            {
+                Id = 201,
+                TargetTeam = MaintenanceTeams.IT,
+                StatusId = 1,
+                Type = "Hardware"
+            };
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanManageTicket(It.IsAny<Ticket>())).Returns(true);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(42);
+
+            var mockNotifService = new Mock<INotificationService>();
+
+            var controller = new TicketsController(context, mockUserService.Object, mockNotifService.Object);
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var result = await controller.LogSparePartUsage(ticketId: 201, sparePartId: 1, quantity: 2, notes: "Replaced faulty boot disk");
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirect.ActionName);
+            Assert.Equal(201, redirect.RouteValues?["id"]);
+
+            // Verify stock deduction
+            var updatedPart = await context.SpareParts.FindAsync(1);
+            Assert.NotNull(updatedPart);
+            Assert.Equal(8, updatedPart.Quantity);
+
+            // Verify transaction
+            var tr = await context.SparePartTransactions.FirstOrDefaultAsync(t => t.TicketId == 201);
+            Assert.NotNull(tr);
+            Assert.Equal(-2, tr.QuantityChanged);
+            Assert.Equal(8, tr.QuantityAfter);
+            Assert.Equal("Usage in Ticket", tr.TransactionType);
+            Assert.Equal(42, tr.UserId);
+
+            // Verify timeline message
+            var msg = await context.TicketMessages.FirstOrDefaultAsync(m => m.TicketId == 201);
+            Assert.NotNull(msg);
+            Assert.Contains("500GB NVMe M.2 SSD", msg.Msg);
+            Assert.Contains("Replaced faulty boot disk", msg.Msg);
+        }
+
+        [Fact]
+        public async Task TicketsController_LogSparePartUsage_PreventsUsage_WhenInsufficientStock()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var part = new SparePart
+            {
+                Id = 2,
+                Name = "RAM DDR4 16GB",
+                Department = MaintenanceTeams.IT,
+                Quantity = 1,
+                IsActive = true
+            };
+            context.SpareParts.Add(part);
+
+            var ticket = new Ticket { Id = 202, TargetTeam = MaintenanceTeams.IT, StatusId = 1 };
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanManageTicket(It.IsAny<Ticket>())).Returns(true);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(42);
+
+            var controller = new TicketsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            // Requesting 5 when only 1 is available
+            var result = await controller.LogSparePartUsage(ticketId: 202, sparePartId: 2, quantity: 5, notes: null);
+
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.True(controller.TempData.ContainsKey("ErrorMessage"));
+
+            // Stock must remain unchanged
+            var unchangedPart = await context.SpareParts.FindAsync(2);
+            Assert.NotNull(unchangedPart);
+            Assert.Equal(1, unchangedPart.Quantity);
+        }
+
+        [Fact]
+        public async Task SparePartsController_CommissionAsAsset_CreatesAsset_DecrementsStock_AndLogsTransaction()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var ssdPart = new SparePart
+            {
+                Id = 10,
+                Name = "1TB Portable SSD",
+                PartNumber = "SSD-1TB-PORT",
+                Department = MaintenanceTeams.IT,
+                Category = "Spare Part",
+                Quantity = 3,
+                MinReserveQuantity = 1,
+                UnitCost = 75.00m,
+                CanFunctionAsAsset = true, // Dual nature
+                IsActive = true
+            };
+            context.SpareParts.Add(ssdPart);
+
+            var user = new User { Id = 77, FullName = "Dr. Robert Chen", Role = "Cardiologist", IsActive = true };
+            var room = new Room { Id = 12, RoomNo = 204, Floor = 2 };
+            context.Users.Add(user);
+            context.Rooms.Add(room);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsEndUser()).Returns(false);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(5);
+
+            var mockNotifService = new Mock<INotificationService>();
+
+            var controller = new SparePartsController(context, mockUserService.Object, mockNotifService.Object);
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var result = await controller.CommissionAsAsset(
+                id: 10,
+                hospitalNo: "HOSP-SSD-999",
+                brand: "Samsung T7",
+                modelNo: "External Backup Drive",
+                serialNo: "SN-SAM-99912",
+                roomId: 12,
+                custodianUserId: 77,
+                notes: "Commissioned for Dr. Robert Chen clinical ultrasound backup"
+            );
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirect.ActionName);
+            Assert.Equal("Assets", redirect.ControllerName);
+
+            // 1. Reserve stock decremented by 1
+            var updatedPart = await context.SpareParts.FindAsync(10);
+            Assert.NotNull(updatedPart);
+            Assert.Equal(2, updatedPart.Quantity);
+
+            // 2. Asset registered
+            var createdAsset = await context.Assets.FirstOrDefaultAsync(a => a.HospitalNo == "HOSP-SSD-999");
+            Assert.NotNull(createdAsset);
+            Assert.Equal("Samsung T7", createdAsset.Brand);
+            Assert.Equal("In Service", createdAsset.Status);
+            Assert.Equal(MaintenanceTeams.IT, createdAsset.MaintenanceTeam);
+            Assert.Equal(77, createdAsset.UserId);
+            Assert.Equal(12, createdAsset.RoomId);
+
+            // 3. Transaction logged
+            var tr = await context.SparePartTransactions.FirstOrDefaultAsync(t => t.AssetId == createdAsset.Id);
+            Assert.NotNull(tr);
+            Assert.Equal(10, tr.SparePartId);
+            Assert.Equal("Commissioned as Asset", tr.TransactionType);
+            Assert.Equal(-1, tr.QuantityChanged);
+            Assert.Equal(2, tr.QuantityAfter);
+        }
+
+        [Fact]
+        public async Task SparePartsController_Restock_IncreasesQuantity_AndLogsTransaction()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var part = new SparePart
+            {
+                Id = 20,
+                Name = "ECG Trunk Cable",
+                Department = MaintenanceTeams.Biomedical,
+                Quantity = 2,
+                MinReserveQuantity = 3,
+                Unit = "Piece",
+                IsActive = true
+            };
+            context.SpareParts.Add(part);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsEndUser()).Returns(false);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns(MaintenanceTeams.Biomedical);
+            mockUserService.Setup(s => s.GetUserId()).Returns(88);
+
+            var controller = new SparePartsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var result = await controller.Restock(id: 20, addedQuantity: 5, notes: "Received new shipment PO-9011");
+
+            Assert.IsType<RedirectToActionResult>(result);
+
+            var updated = await context.SpareParts.FindAsync(20);
+            Assert.NotNull(updated);
+            Assert.Equal(7, updated.Quantity);
+
+            var tr = await context.SparePartTransactions.FirstOrDefaultAsync(t => t.SparePartId == 20);
+            Assert.NotNull(tr);
+            Assert.Equal("Replenishment", tr.TransactionType);
+            Assert.Equal(5, tr.QuantityChanged);
+            Assert.Equal(7, tr.QuantityAfter);
+        }
+
+        [Fact]
+        public async Task SparePartsController_Index_EnforcesTeamIsolation_ForMaintenanceUsers()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            context.SpareParts.AddRange(
+                new SparePart { Id = 31, Name = "Cat6 Cable", Department = MaintenanceTeams.IT, Quantity = 20, IsActive = true },
+                new SparePart { Id = 32, Name = "SpO2 Sensor", Department = MaintenanceTeams.Biomedical, Quantity = 10, IsActive = true },
+                new SparePart { Id = 33, Name = "Air Filter", Department = MaintenanceTeams.General, Quantity = 15, IsActive = true }
+            );
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.IsEndUser()).Returns(false);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns(MaintenanceTeams.Biomedical); // Biomedical user!
+
+            var controller = new SparePartsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+
+            // Even if requested department is "IT", controller forces isolation to "BIOMEDICAL"
+            var result = await controller.Index(department: "IT", category: null, search: null, lowStock: null);
+
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var vm = Assert.IsType<SparePartsIndexViewModel>(viewResult.Model);
+
+            Assert.Single(vm.Items);
+            Assert.Equal("SpO2 Sensor", vm.Items[0].Name);
+            Assert.Equal(MaintenanceTeams.Biomedical, vm.CurrentDepartment);
+        }
+
+        // ==========================================
+        // Task 2: Only Responsible Department Employees Visible on Ticket Close
+        // ==========================================
+        [Fact]
+        public async Task TicketsController_Details_DepartmentEmployees_OnlyShowsResponsibleDepartmentUsers()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            // Biomedical Ticket
+            var ticket = new Ticket
+            {
+                Id = 550,
+                TargetTeam = MaintenanceTeams.Biomedical,
+                StatusId = 1,
+                Type = "Hardware"
+            };
+            context.Tickets.Add(ticket);
+
+            // Users from various departments
+            var bioUser = new User { Id = 1, FullName = "Bio Tech Tariq", MaintenanceTeam = "BIOMEDICAL", Role = SystemRoles.Maintenance, IsActive = true };
+            var itUser = new User { Id = 2, FullName = "IT Support Ahmed", MaintenanceTeam = "IT", Role = SystemRoles.Maintenance, IsActive = true };
+            var genUser = new User { Id = 3, FullName = "Facilities Sam", MaintenanceTeam = "GENERAL", Role = SystemRoles.Maintenance, IsActive = true };
+            var endUser = new User { Id = 4, FullName = "Dr. Elena (Doctor)", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.AddRange(bioUser, itUser, genUser, endUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanAccessTicket(It.IsAny<Ticket>())).Returns(true);
+            mockUserService.Setup(s => s.CanManageTicket(It.IsAny<Ticket>())).Returns(true);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("BIOMEDICAL");
+            mockUserService.Setup(s => s.GetUserId()).Returns(1);
+
+            var controller = new TicketsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+            var result = await controller.Details(550);
+
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var vm = Assert.IsType<TicketDetailsViewModel>(viewResult.Model);
+
+            // DepartmentEmployees must only contain Biomedical tech (not IT, Facilities, or Doctor)
+            Assert.Single(vm.DepartmentEmployees);
+            Assert.Equal(1, vm.DepartmentEmployees[0].Id);
+            Assert.Equal("Bio Tech Tariq", vm.DepartmentEmployees[0].FullName);
+        }
+
+        [Fact]
+        public async Task TicketsController_CloseTicket_FiltersClosureParticipants_ToResponsibleDepartment()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var ticket = new Ticket
+            {
+                Id = 551,
+                TargetTeam = MaintenanceTeams.Biomedical,
+                StatusId = 1,
+                Type = "Hardware"
+            };
+            context.Tickets.Add(ticket);
+
+            var bioUser = new User { Id = 10, FullName = "Bio Tech Tariq", MaintenanceTeam = "BIOMEDICAL", Role = SystemRoles.Maintenance, IsActive = true };
+            var itUser = new User { Id = 20, FullName = "IT Support Ahmed", MaintenanceTeam = "IT", Role = SystemRoles.Maintenance, IsActive = true };
+            var endUser = new User { Id = 30, FullName = "Doctor Bob", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.AddRange(bioUser, itUser, endUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanManageTicket(It.IsAny<Ticket>())).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(10);
+
+            var controller = new TicketsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            // Attempt to pass both bioUser (10) and itUser (20) and endUser (30) as having worked on closing this Biomedical ticket
+            var result = await controller.CloseTicket(ticketId: 551, resolutionNotes: "Calibrated ultrasound probe", closedByUserIds: new[] { 10, 20, 30 });
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Details", redirect.ActionName);
+
+            var closedTicket = await context.Tickets.FindAsync(551);
+            Assert.NotNull(closedTicket);
+            Assert.Equal(5, closedTicket.StatusId);
+
+            // Only the Biomedical technician (10) should be included in ClosedByUserIds; foreign departments (20, 30) are filtered out
+            Assert.Single(closedTicket.ClosedByUserIds);
+            Assert.Contains(10, closedTicket.ClosedByUserIds);
+            Assert.DoesNotContain(20, closedTicket.ClosedByUserIds);
+            Assert.DoesNotContain(30, closedTicket.ClosedByUserIds);
+        }
     }
 }

@@ -526,13 +526,345 @@
     }
 
     /* ==========================================================================
-       6. INITIALIZATION ON DOM READY
+       6. UNIVERSAL DATA TABLE COLUMN SORTING
+       ========================================================================== */
+    const PRIORITY_MAP = {
+        "urgent": 4, "عاجل": 4, "طارئ": 4, "critical": 4, "حرج": 4,
+        "high": 3, "مرتفع": 3, "عالي": 3,
+        "medium": 2, "متوسط": 2,
+        "low": 1, "منخفض": 1
+    };
+
+    function tryParsePriority(str) {
+        if (!str) return null;
+        const lower = str.toLowerCase().trim();
+        if (PRIORITY_MAP[lower] !== undefined) return PRIORITY_MAP[lower];
+        for (const key in PRIORITY_MAP) {
+            if (lower === key || lower.indexOf(" " + key) >= 0 || lower.indexOf(key + " ") >= 0) {
+                return PRIORITY_MAP[key];
+            }
+        }
+        return null;
+    }
+
+    function tryParseDuration(str) {
+        if (!str) return null;
+        const match = str.match(/^(\d+(?:\.\d+)?)\s*(days?|day|d|أيام|يوم|hours?|hour|hrs?|h|ساعات|ساعة|mins?|minute|minutes?|m|دقائق|دقيقة)$/i);
+        if (match) {
+            const val = parseFloat(match[1]);
+            const unit = match[2].toLowerCase();
+            if (unit.startsWith("d") || unit === "يوم" || unit === "أيام") {
+                return val * 1440;
+            }
+            if (unit.startsWith("h") || unit === "ساعة" || unit === "ساعات") {
+                return val * 60;
+            }
+            return val;
+        }
+        return null;
+    }
+
+    function tryParseNumber(str) {
+        if (!str) return null;
+        let s = str.replace(/[$,€£¥SARر.س%\s]/gi, "").replace(/,/g, "");
+        if (s.startsWith("#")) s = s.substring(1);
+        if (/^-?\d+(\.\d+)?$/.test(s)) {
+            const val = parseFloat(s);
+            if (!isNaN(val)) return val;
+        }
+        return null;
+    }
+
+    function tryParseDate(str) {
+        if (!str || str.length < 6) return null;
+        if (/^\d+$/.test(str.trim())) return null;
+
+        // ISO format YYYY-MM-DD or YYYY/MM/DD
+        const isoMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (isoMatch) {
+            const year = parseInt(isoMatch[1], 10);
+            const month = parseInt(isoMatch[2], 10) - 1;
+            const day = parseInt(isoMatch[3], 10);
+            const hour = isoMatch[4] ? parseInt(isoMatch[4], 10) : 0;
+            const min = isoMatch[5] ? parseInt(isoMatch[5], 10) : 0;
+            const sec = isoMatch[6] ? parseInt(isoMatch[6], 10) : 0;
+            const d = new Date(year, month, day, hour, min, sec);
+            if (!isNaN(d.getTime())) return d.getTime();
+        }
+
+        if (/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i.test(str)) {
+            const t = Date.parse(str);
+            if (!isNaN(t)) return t;
+        }
+
+        const t = Date.parse(str);
+        if (!isNaN(t) && isNaN(str)) {
+            return t;
+        }
+        return null;
+    }
+
+    function getCellValue(tr, colIndex) {
+        const cell = tr.children[colIndex];
+        if (!cell) return "";
+
+        if (cell.hasAttribute("data-sort-value")) return cell.getAttribute("data-sort-value").trim();
+        if (cell.hasAttribute("data-order")) return cell.getAttribute("data-order").trim();
+        if (cell.hasAttribute("data-value")) return cell.getAttribute("data-value").trim();
+
+        const input = cell.querySelector("input:not([type=checkbox]):not([type=hidden]), select");
+        if (input) return (input.value || "").trim();
+
+        return (cell.innerText || cell.textContent || "").trim();
+    }
+
+    function compareCells(a, b, colIndex, dir) {
+        const rawA = getCellValue(a, colIndex);
+        const rawB = getCellValue(b, colIndex);
+
+        const isEmptyA = rawA === "" || rawA === "-" || rawA === "N/A" || rawA === "n/a";
+        const isEmptyB = rawB === "" || rawB === "-" || rawB === "N/A" || rawB === "n/a";
+        if (isEmptyA && isEmptyB) return 0;
+        if (isEmptyA) return 1;
+        if (isEmptyB) return -1;
+
+        const prioA = tryParsePriority(rawA);
+        const prioB = tryParsePriority(rawB);
+        if (prioA !== null && prioB !== null) {
+            return dir === "asc" ? prioA - prioB : prioB - prioA;
+        }
+
+        const durA = tryParseDuration(rawA);
+        const durB = tryParseDuration(rawB);
+        if (durA !== null && durB !== null) {
+            return dir === "asc" ? durA - durB : durB - durA;
+        }
+
+        const numA = tryParseNumber(rawA);
+        const numB = tryParseNumber(rawB);
+        if (numA !== null && numB !== null) {
+            return dir === "asc" ? numA - numB : numB - numA;
+        }
+
+        const dateA = tryParseDate(rawA);
+        const dateB = tryParseDate(rawB);
+        if (dateA !== null && dateB !== null) {
+            return dir === "asc" ? dateA - dateB : dateB - dateA;
+        }
+
+        const cmp = rawA.localeCompare(rawB, undefined, { numeric: true, sensitivity: "base" });
+        return dir === "asc" ? cmp : -cmp;
+    }
+
+    function isIgnoredRow(row, totalCols) {
+        if (!row) return true;
+        if (row.classList.contains("no-sort-row") || row.classList.contains("table-summary") || row.classList.contains("total-row")) {
+            return true;
+        }
+        const tdColspan = row.querySelector("td[colspan]");
+        if (tdColspan) {
+            const span = parseInt(tdColspan.getAttribute("colspan"), 10);
+            if (span >= 3 || (totalCols && span >= Math.ceil(totalCols / 2))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function isActionsHeader(th) {
+        if (th.classList.contains("no-sort") || th.classList.contains("col-actions") || th.hasAttribute("data-no-sort") || th.getAttribute("data-sort") === "false") {
+            return true;
+        }
+        const text = (th.innerText || th.textContent || "").trim().toLowerCase();
+        if (text === "actions" || text === "action" || text === "إجراءات" || text === "إجراء" || text === "عمليات") {
+            return true;
+        }
+        if (th.querySelector("input[type=checkbox]") && text === "") {
+            return true;
+        }
+        return false;
+    }
+
+    function decorateTableHeaders(container) {
+        const root = container || document;
+        const tables = root.querySelectorAll("table.table");
+        tables.forEach(table => {
+            if (table.classList.contains("no-sort") || table.hasAttribute("data-no-sort") || table.id === "fieldsTable" || table.id === "partsTable") {
+                return;
+            }
+            const thead = table.querySelector("thead");
+            if (!thead) return;
+
+            const thList = thead.querySelectorAll("tr:last-child th");
+            thList.forEach(th => {
+                if (isActionsHeader(th)) return;
+
+                if (!th.classList.contains("sortable-th")) {
+                    th.classList.add("sortable-th");
+                    th.setAttribute("role", "columnheader");
+                    th.setAttribute("tabindex", "0");
+                    if (!th.hasAttribute("aria-sort")) {
+                        th.setAttribute("aria-sort", "none");
+                    }
+                    if (!th.getAttribute("title")) {
+                        th.setAttribute("title", isArabic ? "اضغط للترتيب" : "Click to sort");
+                    }
+                }
+
+                if (!th.querySelector(".sort-icon-box")) {
+                    const iconBox = document.createElement("span");
+                    iconBox.className = "sort-icon-box";
+                    iconBox.innerHTML = '<i class="fa-solid fa-sort"></i>';
+                    th.appendChild(iconBox);
+                }
+            });
+        });
+    }
+
+    function sortTableByColumn(th) {
+        const table = th.closest("table");
+        if (!table) return;
+        const tbody = table.querySelector("tbody");
+        if (!tbody) return;
+
+        const headerRow = th.closest("tr");
+        const allThs = Array.from(headerRow.children);
+        const colIndex = allThs.indexOf(th);
+        if (colIndex === -1) return;
+
+        const currentDir = th.getAttribute("data-sort-order");
+        const nextDir = currentDir === "asc" ? "desc" : "asc";
+
+        // Update headers visual state
+        allThs.forEach(otherTh => {
+            if (otherTh === th) {
+                otherTh.setAttribute("data-sort-order", nextDir);
+                otherTh.setAttribute("aria-sort", nextDir === "asc" ? "ascending" : "descending");
+                otherTh.setAttribute("title", nextDir === "asc"
+                    ? (isArabic ? "مرتب تصاعدياً (اضغط للترتيب تنازلياً)" : "Sorted ascending (click to sort descending)")
+                    : (isArabic ? "مرتب تنازلياً (اضغط للترتيب تصاعدياً)" : "Sorted descending (click to sort ascending)"));
+                const icon = otherTh.querySelector(".sort-icon-box i");
+                if (icon) {
+                    icon.className = nextDir === "asc"
+                        ? "fa-solid fa-sort-up text-primary"
+                        : "fa-solid fa-sort-down text-primary";
+                }
+            } else if (otherTh.classList.contains("sortable-th")) {
+                otherTh.removeAttribute("data-sort-order");
+                otherTh.setAttribute("aria-sort", "none");
+                otherTh.setAttribute("title", isArabic ? "اضغط للترتيب" : "Click to sort");
+                const icon = otherTh.querySelector(".sort-icon-box i");
+                if (icon) {
+                    icon.className = "fa-solid fa-sort text-muted opacity-25";
+                }
+            }
+        });
+
+        // Filter data rows vs ignored rows (e.g. empty states, footers)
+        const allRows = Array.from(tbody.querySelectorAll(":scope > tr"));
+        const dataRows = [];
+        const ignoredRows = [];
+
+        allRows.forEach(row => {
+            if (isIgnoredRow(row, allThs.length)) {
+                ignoredRows.push(row);
+            } else {
+                dataRows.push(row);
+            }
+        });
+
+        if (dataRows.length <= 1) return;
+
+        // Assign stable index
+        dataRows.forEach((r, idx) => {
+            if (r.dataset.initialIndex === undefined) {
+                r.dataset.initialIndex = idx;
+            }
+        });
+
+        // Sort rows
+        dataRows.sort((a, b) => {
+            const res = compareCells(a, b, colIndex, nextDir);
+            if (res !== 0) return res;
+            return parseInt(a.dataset.initialIndex, 10) - parseInt(b.dataset.initialIndex, 10);
+        });
+
+        // Re-append to tbody with DocumentFragment for performance
+        const frag = document.createDocumentFragment();
+        dataRows.forEach(r => frag.appendChild(r));
+        ignoredRows.forEach(r => frag.appendChild(r));
+        tbody.appendChild(frag);
+
+        table.dispatchEvent(new CustomEvent("tablesorted", {
+            bubbles: true,
+            detail: { column: colIndex, direction: nextDir }
+        }));
+    }
+
+    function initTableSorting() {
+        decorateTableHeaders(document);
+
+        // Click handler with event delegation
+        document.addEventListener("click", function (e) {
+            const th = e.target.closest("th");
+            if (!th || !th.classList.contains("sortable-th")) return;
+
+            // Ignore clicks directly inside interactive elements (checkboxes, inputs, links, buttons)
+            if (e.target.closest("input, button, a, select, .dropdown-menu, label")) {
+                return;
+            }
+
+            e.preventDefault();
+            sortTableByColumn(th);
+        });
+
+        // Keyboard accessibility: Enter or Space on focused header
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+                const th = document.activeElement;
+                if (th && th.tagName === "TH" && th.classList.contains("sortable-th")) {
+                    e.preventDefault();
+                    sortTableByColumn(th);
+                }
+            }
+        });
+
+        // Dynamic decoration on tab switch
+        document.addEventListener("shown.bs.tab", function (e) {
+            const targetSelector = e.target.getAttribute("data-bs-target");
+            if (targetSelector) {
+                const pane = document.querySelector(targetSelector);
+                if (pane) decorateTableHeaders(pane);
+            }
+        });
+
+        // MutationObserver to decorate dynamically injected tables
+        if (window.MutationObserver) {
+            let debounceTimer = null;
+            const observer = new MutationObserver(function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function () {
+                    decorateTableHeaders(document);
+                }, 100);
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        }
+    }
+
+    // Expose sort helper globally
+    window.sortPortalTable = function (thElement) {
+        if (thElement) sortTableByColumn(thElement);
+    };
+
+    /* ==========================================================================
+       7. INITIALIZATION ON DOM READY
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", function () {
         initModalFixes();
         initTheme();
         initSidebar();
         initPageTransitions();
+        initTableSorting();
         checkUnreadNotifications();
         setInterval(checkUnreadNotifications, 8000);
     });

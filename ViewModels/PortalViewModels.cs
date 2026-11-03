@@ -32,6 +32,10 @@ namespace StockPortal.ViewModels
         public DateTime? ToDate { get; set; }
         public string SelectedTeam { get; set; } = "ALL";
         public string DatePreset { get; set; } = "30days";
+        public int? SelectedTechUserId { get; set; }
+        public bool CanFilterTeam { get; set; } = true;
+        public string? UserMaintenanceTeam { get; set; }
+        public List<User> AvailableTechnicians { get; set; } = new();
 
         public int FilteredTotalTickets { get; set; }
         public int FilteredClosedTickets { get; set; }
@@ -100,12 +104,36 @@ namespace StockPortal.ViewModels
         public List<User> ResolvedByUsers { get; set; } = new();
     }
 
+    public class TechnicianReportViewModel
+    {
+        public User Technician { get; set; } = null!;
+        public DateTime FromDate { get; set; }
+        public DateTime ToDate { get; set; }
+        public string DatePreset { get; set; } = "30days";
+
+        public int ClosedTicketsCount { get; set; }
+        public int ActiveTicketsCount { get; set; }
+        public int TotalHandledTickets { get; set; }
+        public double AverageResolutionHours { get; set; }
+        public int WorkOrdersCount { get; set; }
+
+        public List<ClosedTicketRecordItem> ResolvedTickets { get; set; } = new();
+        public List<Ticket> ActiveTickets { get; set; } = new();
+        public List<AssetMaintenance> MaintenanceLogs { get; set; } = new();
+        public List<CategoryAnalyticsStat> CategoryBreakdown { get; set; } = new();
+    }
+
     public class TicketDetailsViewModel
     {
         public Ticket Ticket { get; set; } = null!;
         public List<TicketStatus> Statuses { get; set; } = new();
         public List<User> Technicians { get; set; } = new();
+        public List<User> DepartmentEmployees { get; set; } = new();
         public List<Supplier> Suppliers { get; set; } = new();
+
+        // Reserve Stock & Spare Parts
+        public List<SparePart> AvailableSpareParts { get; set; } = new();
+        public List<SparePartTransaction> UsedSpareParts { get; set; } = new();
 
         // Forms inside Details view
         public string? NewMessage { get; set; }
@@ -170,5 +198,29 @@ namespace StockPortal.ViewModels
         public int Id { get; set; }
         public string Display { get; set; } = string.Empty;
         public string MaintenanceTeam { get; set; } = string.Empty;
+    }
+
+    public class SparePartsIndexViewModel
+    {
+        public List<SparePart> Items { get; set; } = new();
+        public string? CurrentDepartment { get; set; }
+        public string? SelectedCategory { get; set; }
+        public string? Search { get; set; }
+        public bool OnlyLowStock { get; set; }
+        public int TotalItems { get; set; }
+        public int TotalQuantity { get; set; }
+        public int LowStockCount { get; set; }
+        public int DualNatureCount { get; set; }
+        public List<string> AvailableDepartments { get; set; } = new();
+        public List<User> Users { get; set; } = new();
+        public List<Room> Rooms { get; set; } = new();
+    }
+
+    public class SparePartTransactionsViewModel
+    {
+        public List<SparePartTransaction> Transactions { get; set; } = new();
+        public SparePart? FilterPart { get; set; }
+        public int? TicketId { get; set; }
+        public string? Department { get; set; }
     }
 }

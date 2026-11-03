@@ -1,0 +1,716 @@
+@model StockPortal.ViewModels.SparePartsIndexViewModel
+@using System.Text.Encodings.Web
+@inject StockPortal.Services.ILocalizationService Loc
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+
+@{
+    ViewData["Title"] = Loc["Reserve Stock & Spare Parts"];
+    var isArabic = Loc.IsArabic;
+    var isAdmin = CurrentUser.IsAdmin();
+    var userTeam = CurrentUser.GetMaintenanceTeam();
+}
+
+<div class="container-fluid py-3">
+    <!-- Header Section -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-layer-group text-warning"></i>
+                @Loc["Reserve Stock & Spare Parts"]
+            </h3>
+            <p class="text-muted small mb-0">
+                @(isArabic 
+                    ? "إدارة المخزون الاحتياطي لفرق الصيانة: المستهلكات، قطع الغيار، ومخزون الصيانة الدورية، والقطع مزدوجة الاستخدام القابلة للتخصيص كأصول مستقلة." 
+                    : "Manage department reserve stock for periodic maintenance, consumables, spare parts, and dual-function items convertible to hospital assets.")
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="@Url.Action("Transactions", "SpareParts", new { department = Model.CurrentDepartment })" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>@Loc["Stock Transactions"]</span>
+            </a>
+            <button type="button" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm" data-bs-toggle="modal" data-bs-target="#addPartModal">
+                <i class="fa-solid fa-plus"></i>
+                <span>@Loc["Add Reserve Item"]</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Summary Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="@Url.Action("Index", "SpareParts", new { department = Model.CurrentDepartment })" class="text-decoration-none">
+                <div class="card border-0 shadow-sm rounded-3 h-100 kpi-card-hover border-start border-4 border-primary">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small fw-semibold">@(isArabic ? "إجمالي الأصناف" : "Total Reserve Items")</div>
+                                <div class="fs-4 fw-bold text-dark mt-1">@Model.TotalItems</div>
+                            </div>
+                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                <i class="fa-solid fa-boxes-stacked fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 border-start border-4 border-info">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small fw-semibold">@(isArabic ? "إجمالي الوحدات بالمخزن" : "Total Stock Quantity")</div>
+                            <div class="fs-4 fw-bold text-dark mt-1">@Model.TotalQuantity</div>
+                        </div>
+                        <div class="bg-info bg-opacity-10 text-info rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                            <i class="fa-solid fa-cubes fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <a href="@Url.Action("Index", "SpareParts", new { department = Model.CurrentDepartment, lowStock = true })" class="text-decoration-none">
+                <div class="card border-0 shadow-sm rounded-3 h-100 kpi-card-hover border-start border-4 @(Model.LowStockCount > 0 ? "border-danger" : "border-success")">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="text-muted small fw-semibold">@Loc["Low Reserve Alerts"]</div>
+                                <div class="fs-4 fw-bold @(Model.LowStockCount > 0 ? "text-danger" : "text-success") mt-1">
+                                    @Model.LowStockCount
+                                </div>
+                            </div>
+                            <div class="@(Model.LowStockCount > 0 ? "bg-danger bg-opacity-10 text-danger" : "bg-success bg-opacity-10 text-success") rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                                <i class="fa-solid fa-triangle-exclamation fs-5"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 border-start border-4 border-warning">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small fw-semibold">@Loc["Dual-Nature Items"]</div>
+                            <div class="fs-4 fw-bold text-dark mt-1">@Model.DualNatureCount</div>
+                            <div class="small text-muted" style="font-size: 0.72rem;">@(isArabic ? "قابلة للتحويل لأصل مستقل" : "Can function as Asset")</div>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                            <i class="fa-solid fa-microchip fs-5"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4">
+        <div class="card-body p-3">
+            @if (isAdmin)
+            {
+                <!-- Department Navigation Tabs for Admin -->
+                <ul class="nav nav-pills mb-3 border-bottom pb-2">
+                    <li class="nav-item">
+                        <a class="nav-link py-1 px-3 @(string.IsNullOrWhiteSpace(Model.CurrentDepartment) || Model.CurrentDepartment == "ALL" ? "active" : "")" 
+                           href="@Url.Action("Index", "SpareParts", new { department = "ALL", category = Model.SelectedCategory, lowStock = Model.OnlyLowStock })">
+                            <i class="fa-solid fa-border-all me-1"></i> @(isArabic ? "جميع الأقسام" : "All Departments")
+                        </a>
+                    </li>
+                    @foreach (var dept in Model.AvailableDepartments)
+                    {
+                        <li class="nav-item">
+                            <a class="nav-link py-1 px-3 @(string.Equals(Model.CurrentDepartment, dept, StringComparison.OrdinalIgnoreCase) ? "active" : "")" 
+                               href="@Url.Action("Index", "SpareParts", new { department = dept, category = Model.SelectedCategory, lowStock = Model.OnlyLowStock })">
+                                <i class="fa-solid fa-screwdriver-wrench me-1"></i> @Loc.TargetTeam(dept)
+                            </a>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-primary fs-6 px-3 py-2">
+                        <i class="fa-solid fa-users-gear me-1"></i> @(isArabic ? $"قسم الصيانة: {Loc.TargetTeam(userTeam)}" : $"{userTeam} Department Reserve Stock")
+                    </span>
+                    <span class="text-muted small">@(isArabic ? "(معزول لصلاحيات فريقك فقط)" : "(Isolated to your department)")</span>
+                </div>
+            }
+
+            <form method="get" asp-action="Index" class="row g-2 align-items-center">
+                <input type="hidden" name="department" value="@Model.CurrentDepartment" />
+
+                <div class="col-md-4">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                        <input type="text" name="search" class="form-control form-control-sm border-start-0" placeholder="@(isArabic ? "بحث بالاسم، رقم القطعة، الأجهزة المتوافقة..." : "Search name, SKU, compatible devices...")" value="@Model.Search" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <select name="category" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">-- @(isArabic ? "جميع التصنيفات" : "All Stock Categories") --</option>
+                        <option value="Spare Part" selected="@(Model.SelectedCategory == "Spare Part")">@(isArabic ? "قطع غيار" : "Spare Part")</option>
+                        <option value="Consumable" selected="@(Model.SelectedCategory == "Consumable")">@(isArabic ? "مستهلكات" : "Consumable")</option>
+                        <option value="Periodic Maintenance Reserve" selected="@(Model.SelectedCategory == "Periodic Maintenance Reserve")">@(isArabic ? "مخزون صيانة دورية" : "Periodic Maintenance Reserve")</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="form-check form-switch pt-1">
+                        <input class="form-check-input" type="checkbox" name="lowStock" value="true" id="lowStockCheck" @(Model.OnlyLowStock ? "checked" : "") onchange="this.form.submit()">
+                        <label class="form-check-label small fw-semibold text-danger" for="lowStockCheck">
+                            <i class="fa-solid fa-triangle-exclamation me-1"></i> @(isArabic ? "الأصناف منخفضة الرصيد فقط" : "Low Stock Only")
+                        </label>
+                    </div>
+                </div>
+
+                <div class="col-md-2 d-flex gap-2 justify-content-end">
+                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">@Loc["Filter"]</button>
+                    @if (!string.IsNullOrWhiteSpace(Model.Search) || !string.IsNullOrWhiteSpace(Model.SelectedCategory) || Model.OnlyLowStock)
+                    {
+                        <a href="@Url.Action("Index", "SpareParts", new { department = Model.CurrentDepartment })" class="btn btn-sm btn-outline-secondary" title="@Loc["Reset Filters"]">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </a>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            @if (Model.Items.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th class="ps-3">@Loc["Part / Item Name"]</th>
+                                @if (isAdmin)
+                                {
+                                    <th>@Loc["Department"]</th>
+                                }
+                                <th>@Loc["Stock Category"]</th>
+                                <th class="text-center">@Loc["Quantity in Stock"]</th>
+                                <th>@Loc["Unit Cost"]</th>
+                                <th>@Loc["Shelf / Storage Location"]</th>
+                                <th>@Loc["Compatible Devices / Equipment"]</th>
+                                <th class="text-end pe-3">@Loc["Actions"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr class="@(item.IsLowStock ? "table-danger bg-opacity-25" : "")">
+                                    <td class="ps-3">
+                                        <div class="fw-bold text-dark">
+                                            @item.DisplayName
+                                            @if (item.CanFunctionAsAsset)
+                                            {
+                                                <span class="badge bg-warning text-dark border border-warning ms-1" title="@Loc["Can Function as Independent Asset"]">
+                                                    <i class="fa-solid fa-microchip me-1"></i>@(isArabic ? "مزدوج الوظيفة" : "Dual-Nature")
+                                                </span>
+                                            }
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(item.PartNumber))
+                                        {
+                                            <div class="small text-muted font-monospace"><i class="fa-solid fa-barcode me-1"></i>@item.PartNumber</div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                        {
+                                            <div class="small text-muted fst-italic text-truncate" style="max-width: 280px;" title="@item.Notes">@item.Notes</div>
+                                        }
+                                    </td>
+                                    @if (isAdmin)
+                                    {
+                                        <td>
+                                            <span class="badge @(item.Department == "IT" ? "bg-primary" : item.Department == "BIOMEDICAL" ? "bg-info text-dark" : "bg-secondary")">
+                                                @Loc.TargetTeam(item.Department)
+                                            </span>
+                                        </td>
+                                    }
+                                    <td>
+                                        <span class="badge bg-light text-dark border">
+                                            @item.DisplayCategory
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="fw-bold fs-6 @(item.IsLowStock ? "text-danger" : "text-dark")">
+                                            @item.Quantity <small class="fw-normal text-muted">@item.Unit</small>
+                                        </div>
+                                        @if (item.IsLowStock)
+                                        {
+                                            <span class="badge bg-danger rounded-pill px-2 py-0" style="font-size: 0.65rem;">
+                                                @(isArabic ? $"منخفض (الحد: {item.MinReserveQuantity})" : $"Low (Min: {item.MinReserveQuantity})")
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <div class="text-muted" style="font-size: 0.7rem;">@(isArabic ? $"الحد: {item.MinReserveQuantity}" : $"Min: {item.MinReserveQuantity}")</div>
+                                        }
+                                    </td>
+                                    <td class="small fw-semibold text-muted">
+                                        @(item.UnitCost.HasValue ? $"${item.UnitCost:N2}" : "--")
+                                    </td>
+                                    <td class="small">
+                                        <i class="fa-solid fa-location-dot text-secondary me-1"></i>
+                                        @(item.StorageLocation ?? "--")
+                                    </td>
+                                    <td class="small text-muted" style="max-width: 200px;">
+                                        @(item.CompatibleEquipment ?? "--")
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-success" title="@Loc["Restock Item"]" 
+                                                    onclick="openRestockModal(@item.Id, '@Html.Raw(JavaScriptEncoder.Default.Encode(item.DisplayName))', @item.Quantity, '@item.Unit')">
+                                                <i class="fa-solid fa-cart-plus me-1"></i> @Loc["Restock"]
+                                            </button>
+
+                                            @if (item.CanFunctionAsAsset && item.Quantity > 0)
+                                            {
+                                                <button type="button" class="btn btn-warning text-dark fw-semibold" title="@Loc["Commission as Independent Asset"]"
+                                                        onclick="openCommissionModal(@item.Id, '@Html.Raw(JavaScriptEncoder.Default.Encode(item.DisplayName))', '@item.Department', '@item.PartNumber')">
+                                                    <i class="fa-solid fa-wand-magic-sparkles me-1"></i> @Loc["Commission as Asset"]
+                                                </button>
+                                            }
+
+                                            <button type="button" class="btn btn-outline-secondary" title="@Loc["Edit"]"
+                                                    onclick="openEditModal(@item.Id, '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Name))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.NameAr ?? ""))', '@item.PartNumber', '@item.Department', '@item.Category', @item.MinReserveQuantity, '@item.Unit', '@(item.UnitCost?.ToString() ?? "")', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.StorageLocation ?? ""))', @item.CanFunctionAsAsset.ToString().ToLower(), '@Html.Raw(JavaScriptEncoder.Default.Encode(item.CompatibleEquipment ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Notes ?? ""))')">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-boxes-stacked fs-1 mb-3 opacity-25"></i>
+                    <h5 class="fw-semibold">@(isArabic ? "لا توجد أصناف في المخزون الاحتياطي مطابقة للمعايير" : "No reserve items match current filters")</h5>
+                    <p class="small mb-3">@(isArabic ? "يمكنك إضافة صنف جديد أو تعديل معايير البحث والتصفية." : "You can add a new reserve item or clear your search filters.")</p>
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addPartModal">
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Add Reserve Item"]
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add Reserve Item -->
+<div class="modal fade" id="addPartModal" tabindex="-1" aria-labelledby="addPartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="Create" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="addPartModalLabel">
+                        <i class="fa-solid fa-plus-circle text-primary me-2"></i> @Loc["Add Reserve Item"]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Part / Item Name"] (English) *</label>
+                            <input type="text" name="Name" class="form-control" required placeholder="e.g. 500GB NVMe SSD" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Part / Item Name"] (العربية)</label>
+                            <input type="text" name="NameAr" class="form-control" placeholder="مثال: قرص صلب 500 جيجابايت" dir="rtl" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Part Number / SKU"]</label>
+                            <input type="text" name="PartNumber" class="form-control font-monospace" placeholder="e.g. SSD-NVME-500" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Maintenance Department"] *</label>
+                            @if (isAdmin)
+                            {
+                                <select name="Department" class="form-select" required>
+                                    @foreach (var dept in Model.AvailableDepartments)
+                                    {
+                                        <option value="@dept" selected="@(dept == Model.CurrentDepartment)">@Loc.TargetTeam(dept)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control bg-light" value="@Loc.TargetTeam(userTeam)" readonly />
+                                <input type="hidden" name="Department" value="@userTeam" />
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Stock Category"] *</label>
+                            <select name="Category" class="form-select" required>
+                                <option value="Spare Part">@(isArabic ? "قطعة غيار (Spare Part)" : "Spare Part")</option>
+                                <option value="Consumable">@(isArabic ? "مستهلكات (Consumable)" : "Consumable")</option>
+                                <option value="Periodic Maintenance Reserve">@(isArabic ? "مخزون صيانة دورية (Periodic Reserve)" : "Periodic Maintenance Reserve")</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">@Loc["Quantity in Stock"]</label>
+                            <input type="number" name="Quantity" class="form-control" value="1" min="0" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">@Loc["Minimum Reserve Level"]</label>
+                            <input type="number" name="MinReserveQuantity" class="form-control" value="2" min="1" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">@Loc["Unit of Measure"]</label>
+                            <input type="text" name="Unit" class="form-control" value="Piece" placeholder="Piece, Box, Meter..." />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">@Loc["Unit Cost"] ($)</label>
+                            <input type="number" step="0.01" name="UnitCost" class="form-control" placeholder="0.00" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Shelf / Storage Location"]</label>
+                            <input type="text" name="StorageLocation" class="form-control" placeholder="e.g. IT Store - Shelf B2" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Compatible Devices / Equipment"]</label>
+                            <input type="text" name="CompatibleEquipment" class="form-control" placeholder="e.g. Dell OptiPlex, HP Workstations" />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border">
+                                <div class="form-check form-switch mb-1">
+                                    <input class="form-check-input" type="checkbox" name="CanFunctionAsAsset" value="true" id="addCanAssetCheck">
+                                    <label class="form-check-label fw-bold text-dark" for="addCanAssetCheck">
+                                        <i class="fa-solid fa-microchip text-warning me-1"></i> @Loc["Can Function as Independent Asset"]
+                                    </label>
+                                </div>
+                                <div class="small text-muted ms-4 ps-1">
+                                    @(isArabic 
+                                        ? "حدد هذا الخيار للقطع متعددة الوظائف (مثل أقراص SSD التي يمكن أن تكون قطعة غيار لجهاز، أو يتم تخصيصها كقرص نسخ احتياطي مستقل كأصل في النظام، والشاشات، والأجهزة اللوحية، والمجففات)." 
+                                        : "Check this for dual-nature parts (e.g. SSDs that can replace a broken drive or be commissioned as a standalone external backup drive asset, monitors, tablets, etc.).")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">@Loc["Notes"]</label>
+                            <textarea name="Notes" class="form-control" rows="2" placeholder="@(isArabic ? "ملاحظات إضافية، مواصفات فنية، أو تعليمات الاستخدام..." : "Technical specifications, usage instructions, or supplier notes...")"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save"]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Restock Item -->
+<div class="modal fade" id="restockModal" tabindex="-1" aria-labelledby="restockModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="Restock" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="restockPartId" />
+
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="restockModalLabel">
+                        <i class="fa-solid fa-cart-plus text-success me-2"></i> @Loc["Restock Item"]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="p-2 bg-light rounded mb-3">
+                        <div class="fw-bold text-dark fs-6" id="restockPartName">Item Name</div>
+                        <div class="small text-muted">
+                            @(isArabic ? "الرصيد الحالي:" : "Current Stock:") <strong class="text-primary" id="restockCurrentStock">0</strong> <span id="restockUnit">Piece</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">@(isArabic ? "الكمية المضافة للتوريد" : "Added Quantity to Restock") *</label>
+                        <input type="number" name="addedQuantity" class="form-control form-control-lg fw-bold text-success" value="5" min="1" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">@(isArabic ? "رقم التذكرة المرتبطة (اختياري)" : "Linked Ticket # (Optional)")</label>
+                        <input type="number" name="ticketId" class="form-control" placeholder="e.g. 104" />
+                        <div class="form-text small text-muted">@(isArabic ? "إذا كان التوريد تم بناءً على طلب شراء في تذكرة محددة." : "If this restock fulfills a specific ticket purchase order.")</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">@Loc["Notes"]</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="@(isArabic ? "رقم إذن الاستلام، المورد، أو الفاتورة..." : "Delivery note, vendor PO, or shipment invoice...")"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fa-solid fa-check me-1"></i> @Loc["Restock"]
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Commission as Independent Hospital Asset -->
+<div class="modal fade" id="commissionModal" tabindex="-1" aria-labelledby="commissionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="CommissionAsAsset" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="commissionPartId" />
+
+                <div class="modal-header bg-warning bg-opacity-10 border-bottom border-warning">
+                    <h5 class="modal-title fw-bold text-dark" id="commissionModalLabel">
+                        <i class="fa-solid fa-wand-magic-sparkles text-warning me-2"></i> @Loc["Commission as Independent Asset"]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning border border-warning py-2 small mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        @(isArabic 
+                            ? "تحويل هذه القطعة المزدوجة (مثل قرص SSD أو شاشة أو جهاز لوحي) من مخزون قطع الغيار إلى أصل مستقل مسجل في عهد المستشفى. سيتم خصم 1 وحدة من المخزون الاحتياطي وتسجيل حركة التخصيص في الأرشيف." 
+                            : "Commissioning converts 1 unit of this dual-nature spare part into an independent registered hospital asset with custody, barcode, and warranty tracking.")
+                    </div>
+
+                    <div class="p-2 bg-light rounded mb-3">
+                        <div class="small text-muted">@(isArabic ? "القطعة المصدر في المخزون:" : "Source Reserve Part:")</div>
+                        <div class="fw-bold text-dark fs-6" id="commissionPartName">Part Name</div>
+                        <div class="small text-muted font-monospace" id="commissionPartSku">SKU: N/A</div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@(isArabic ? "رقم الباركود / الأصل بالمستشفى (Hospital Tag) *" : "Hospital Asset Tag / Barcode *")</label>
+                            <input type="text" name="hospitalNo" id="commissionHospitalNo" class="form-control fw-bold font-monospace text-primary text-uppercase" placeholder="e.g. HOSP-SSD-012" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Serial Number"]</label>
+                            <input type="text" name="serialNo" class="form-control font-monospace" placeholder="e.g. SN-WDC-99210-BK" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Brand / Manufacturer"]</label>
+                            <input type="text" name="brand" class="form-control" placeholder="e.g. Western Digital / Samsung / Dell" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@(isArabic ? "الموديل / الوظيفة المستقلة" : "Model / Dedicated Function")</label>
+                            <input type="text" name="modelNo" class="form-control" placeholder="e.g. External Backup SSD 1TB / Clinic Display" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@(isArabic ? "الموقع / الغرفة المخصصة" : "Target Room / Location")</label>
+                            <select name="roomId" class="form-select">
+                                <option value="">-- @(isArabic ? "غير محدد (المستودع الرئيسي)" : "Unassigned / IT Store") --</option>
+                                @foreach (var room in Model.Rooms)
+                                {
+                                    <option value="@room.Id">@room.DisplayName (Room #@room.RoomNo)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@(isArabic ? "الموظف المستلم للعهدة (Custodian User)" : "Custodian Staff / Assigned User")</label>
+                            <select name="custodianUserId" class="form-select">
+                                <option value="">-- @(isArabic ? "عهدة مشتركة / قسم" : "Shared / Department Custody") --</option>
+                                @foreach (var user in Model.Users)
+                                {
+                                    <option value="@user.Id">@user.DisplayFullName (@user.DisplayRole)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@(isArabic ? "رقم التذكرة المرتبطة (اختياري)" : "Linked Ticket # (Optional)")</label>
+                            <input type="number" name="ticketId" class="form-control" placeholder="e.g. 102" />
+                            <div class="form-text small text-muted">@(isArabic ? "إذا كان التخصيص تم تلبيةً لتذكرة طلب جهاز/قرص." : "If commissioned in response to a ticket request.")</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Notes"]</label>
+                            <input type="text" name="notes" class="form-control" placeholder="@(isArabic ? "ملاحظات التخصيص، كود الحافظة الخارجية..." : "Commissioning purpose, enclosure serial, etc.")" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-warning text-dark fw-bold">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i> @Loc["Commission as Asset"]
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Reserve Item -->
+<div class="modal fade" id="editPartModal" tabindex="-1" aria-labelledby="editPartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="Edit" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="Id" id="editPartId" />
+
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="editPartModalLabel">
+                        <i class="fa-solid fa-pen-to-square text-secondary me-2"></i> @Loc["Edit"]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Part / Item Name"] (English) *</label>
+                            <input type="text" name="Name" id="editPartName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Part / Item Name"] (العربية)</label>
+                            <input type="text" name="NameAr" id="editPartNameAr" class="form-control" dir="rtl" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Part Number / SKU"]</label>
+                            <input type="text" name="PartNumber" id="editPartNumber" class="form-control font-monospace" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Maintenance Department"] *</label>
+                            @if (isAdmin)
+                            {
+                                <select name="Department" id="editDepartment" class="form-select" required>
+                                    @foreach (var dept in Model.AvailableDepartments)
+                                    {
+                                        <option value="@dept">@Loc.TargetTeam(dept)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control bg-light" id="editDepartmentDisplay" readonly />
+                                <input type="hidden" name="Department" id="editDepartment" />
+                            }
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Stock Category"] *</label>
+                            <select name="Category" id="editCategory" class="form-select" required>
+                                <option value="Spare Part">@(isArabic ? "قطعة غيار (Spare Part)" : "Spare Part")</option>
+                                <option value="Consumable">@(isArabic ? "مستهلكات (Consumable)" : "Consumable")</option>
+                                <option value="Periodic Maintenance Reserve">@(isArabic ? "مخزون صيانة دورية (Periodic Reserve)" : "Periodic Maintenance Reserve")</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Minimum Reserve Level"]</label>
+                            <input type="number" name="MinReserveQuantity" id="editMinReserve" class="form-control" min="1" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Unit of Measure"]</label>
+                            <input type="text" name="Unit" id="editUnit" class="form-control" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">@Loc["Unit Cost"] ($)</label>
+                            <input type="number" step="0.01" name="UnitCost" id="editUnitCost" class="form-control" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Shelf / Storage Location"]</label>
+                            <input type="text" name="StorageLocation" id="editStorageLocation" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">@Loc["Compatible Devices / Equipment"]</label>
+                            <input type="text" name="CompatibleEquipment" id="editCompatibleEquipment" class="form-control" />
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded border">
+                                <div class="form-check form-switch mb-1">
+                                    <input class="form-check-input" type="checkbox" name="CanFunctionAsAsset" value="true" id="editCanAssetCheck">
+                                    <label class="form-check-label fw-bold text-dark" for="editCanAssetCheck">
+                                        <i class="fa-solid fa-microchip text-warning me-1"></i> @Loc["Can Function as Independent Asset"]
+                                    </label>
+                                </div>
+                                <div class="small text-muted ms-4 ps-1">
+                                    @(isArabic ? "تمكين تحويل وتخصيص هذه القطعة كأصل مستقل في النظام." : "Allow commissioning this item as a standalone registered hospital asset.")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">@Loc["Notes"]</label>
+                            <textarea name="Notes" id="editNotes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary">@Loc["Save Changes"]</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function openRestockModal(id, name, currentStock, unit) {
+            document.getElementById('restockPartId').value = id;
+            document.getElementById('restockPartName').textContent = name;
+            document.getElementById('restockCurrentStock').textContent = currentStock;
+            document.getElementById('restockUnit').textContent = unit || 'Piece';
+            var modal = new bootstrap.Modal(document.getElementById('restockModal'));
+            modal.show();
+        }
+
+        function openCommissionModal(id, name, dept, sku) {
+            document.getElementById('commissionPartId').value = id;
+            document.getElementById('commissionPartName').textContent = name;
+            document.getElementById('commissionPartSku').textContent = 'SKU / Part #: ' + (sku || 'N/A') + ' | Department: ' + dept;
+            
+            // Suggest unique Hospital Tag prefix
+            var prefix = 'HOSP-' + (dept ? dept.substring(0, 3) : 'AST') + '-';
+            var randomSuffix = Math.floor(100 + Math.random() * 900);
+            document.getElementById('commissionHospitalNo').value = prefix + randomSuffix;
+
+            var modal = new bootstrap.Modal(document.getElementById('commissionModal'));
+            modal.show();
+        }
+
+        function openEditModal(id, name, nameAr, sku, dept, category, minReserve, unit, unitCost, storage, canAsset, compat, notes) {
+            document.getElementById('editPartId').value = id;
+            document.getElementById('editPartName').value = name;
+            document.getElementById('editPartNameAr').value = nameAr;
+            document.getElementById('editPartNumber').value = sku;
+            var deptSelect = document.getElementById('editDepartment');
+            if (deptSelect) deptSelect.value = dept;
+            var deptDisplay = document.getElementById('editDepartmentDisplay');
+            if (deptDisplay) deptDisplay.value = dept;
+            document.getElementById('editCategory').value = category;
+            document.getElementById('editMinReserve').value = minReserve;
+            document.getElementById('editUnit').value = unit;
+            document.getElementById('editUnitCost').value = unitCost;
+            document.getElementById('editStorageLocation').value = storage;
+            document.getElementById('editCanAssetCheck').checked = canAsset === true;
+            document.getElementById('editCompatibleEquipment').value = compat;
+            document.getElementById('editNotes').value = notes;
+
+            var modal = new bootstrap.Modal(document.getElementById('editPartModal'));
+            modal.show();
+        }
+    </script>
+}

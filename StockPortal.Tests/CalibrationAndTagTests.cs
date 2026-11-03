@@ -246,5 +246,121 @@ namespace StockPortal.Tests
             var bulkModel = Assert.IsAssignableFrom<IEnumerable<Asset>>(bulkTagResult.Model);
             Assert.Contains(bulkModel, a => a.HospitalNo == "TAG-55");
         }
+
+        [Fact]
+        public async Task AssetsController_PrintBulkTags_WithNoFilters_ReturnsAllAssets()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_PrintBulkTags_WithNoFilters_ReturnsAllAssets));
+            db.Assets.AddRange(
+                new Asset { Id = 101, HospitalNo = "TAG-101", Status = "In Service", Brand = "Dell", Type = "Workstation" },
+                new Asset { Id = 102, HospitalNo = "TAG-102", Status = "Out of Service", Brand = "HP", Type = "Printer" },
+                new Asset { Id = 103, HospitalNo = "TAG-103", Status = "Maintenance", Brand = "GE", Type = "ECG" }
+            );
+            await db.SaveChangesAsync();
+
+            var userMock = CreateMockUserService();
+            var controller = new AssetsController(db, userMock.Object);
+
+            var result = await controller.PrintBulkTags() as ViewResult;
+            Assert.NotNull(result);
+            var model = Assert.IsAssignableFrom<IEnumerable<Asset>>(result.Model).ToList();
+            Assert.Equal(3, model.Count);
+        }
+
+        [Fact]
+        public async Task AssetsController_PrintBulkTags_WithFilters_ReturnsOnlyFilteredAssets()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_PrintBulkTags_WithFilters_ReturnsOnlyFilteredAssets));
+            var today = DateTime.Now.Date;
+            db.Assets.AddRange(
+                new Asset { Id = 201, HospitalNo = "TAG-201", Status = "In Service", Brand = "Dell OptiPlex", Type = "Workstation", NeedsCalibration = true, NextCalibration = today.AddDays(-5) },
+                new Asset { Id = 202, HospitalNo = "TAG-202", Status = "Out of Service", Brand = "HP LaserJet", Type = "Printer", NeedsCalibration = false },
+                new Asset { Id = 203, HospitalNo = "TAG-203", Status = "In Service", Brand = "Lenovo ThinkCentre", Type = "Workstation", NeedsCalibration = true, NextCalibration = today.AddDays(15) }
+            );
+            await db.SaveChangesAsync();
+
+            var userMock = CreateMockUserService();
+            var controller = new AssetsController(db, userMock.Object);
+
+            // Test 1: Filter by status
+            var statusResult = await controller.PrintBulkTags(status: "In Service") as ViewResult;
+            Assert.NotNull(statusResult);
+            var statusModel = Assert.IsAssignableFrom<IEnumerable<Asset>>(statusResult.Model).ToList();
+            Assert.Equal(2, statusModel.Count);
+            Assert.All(statusModel, a => Assert.Equal("In Service", a.Status));
+
+            // Test 2: Filter by search keyword
+            var searchResult = await controller.PrintBulkTags(search: "LaserJet") as ViewResult;
+            Assert.NotNull(searchResult);
+            var searchModel = Assert.IsAssignableFrom<IEnumerable<Asset>>(searchResult.Model).ToList();
+            Assert.Single(searchModel);
+            Assert.Equal("TAG-202", searchModel.First().HospitalNo);
+
+            // Test 3: Filter by calibration overdue
+            var calibResult = await controller.PrintBulkTags(calibration: "overdue") as ViewResult;
+            Assert.NotNull(calibResult);
+            var calibModel = Assert.IsAssignableFrom<IEnumerable<Asset>>(calibResult.Model).ToList();
+            Assert.Single(calibModel);
+            Assert.Equal("TAG-201", calibModel.First().HospitalNo);
+        }
+
+        [Fact]
+        public async Task AssetsController_PrintBulkTags_WithIds_ReturnsOnlySpecifiedAssets()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_PrintBulkTags_WithIds_ReturnsOnlySpecifiedAssets));
+            db.Assets.AddRange(
+                new Asset { Id = 301, HospitalNo = "TAG-301", Status = "In Service" },
+                new Asset { Id = 302, HospitalNo = "TAG-302", Status = "In Service" },
+                new Asset { Id = 303, HospitalNo = "TAG-303", Status = "In Service" }
+            );
+            await db.SaveChangesAsync();
+
+            var userMock = CreateMockUserService();
+            var controller = new AssetsController(db, userMock.Object);
+
+            // Passing specific IDs "301,303"
+            var result = await controller.PrintBulkTags(ids: "301, 303") as ViewResult;
+            Assert.NotNull(result);
+            var model = Assert.IsAssignableFrom<IEnumerable<Asset>>(result.Model).ToList();
+            Assert.Equal(2, model.Count);
+            Assert.Contains(model, a => a.Id == 301);
+            Assert.Contains(model, a => a.Id == 303);
+            Assert.DoesNotContain(model, a => a.Id == 302);
+
+            // Passing "none" when 0 items matched filter
+            var emptyResult = await controller.PrintBulkTags(ids: "none") as ViewResult;
+            Assert.NotNull(emptyResult);
+            var emptyModel = Assert.IsAssignableFrom<IEnumerable<Asset>>(emptyResult.Model).ToList();
+            Assert.Empty(emptyModel);
+        }
+
+        [Fact]
+        public async Task AssetsController_ExportCsv_WithFiltersAndIds_ReturnsMatchingData()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_ExportCsv_WithFiltersAndIds_ReturnsMatchingData));
+            db.Assets.AddRange(
+                new Asset { Id = 401, HospitalNo = "CSV-401", Status = "In Service", Brand = "Dell" },
+                new Asset { Id = 402, HospitalNo = "CSV-402", Status = "Out of Service", Brand = "HP" }
+            );
+            await db.SaveChangesAsync();
+
+            var userMock = CreateMockUserService();
+            var controller = new AssetsController(db, userMock.Object);
+
+            // 1. Export with status filter
+            var fileResult = await controller.ExportCsv(status: "In Service") as FileContentResult;
+            Assert.NotNull(fileResult);
+            Assert.Equal("text/csv", fileResult.ContentType);
+            var csvText = System.Text.Encoding.UTF8.GetString(fileResult.FileContents);
+            Assert.Contains("CSV-401", csvText);
+            Assert.DoesNotContain("CSV-402", csvText);
+
+            // 2. Export with ids filter
+            var idsResult = await controller.ExportCsv(ids: "402") as FileContentResult;
+            Assert.NotNull(idsResult);
+            var idsText = System.Text.Encoding.UTF8.GetString(idsResult.FileContents);
+            Assert.Contains("CSV-402", idsText);
+            Assert.DoesNotContain("CSV-401", idsText);
+        }
     }
 }

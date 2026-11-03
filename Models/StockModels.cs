@@ -292,6 +292,49 @@ namespace StockPortal.Models
         [NotMapped]
         public string DisplayRole => RoleDisplay;
 
+        public bool BelongsToResponsibleDepartment(string? targetTeam)
+        {
+            if (string.IsNullOrWhiteSpace(targetTeam)) return true;
+            var normTeam = targetTeam.Trim().ToUpperInvariant();
+
+            // 1. Direct match on MaintenanceTeam
+            if (!string.IsNullOrWhiteSpace(MaintenanceTeam) && string.Equals(MaintenanceTeam.Trim(), normTeam, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // 2. Administrators have cross-department oversight
+            if (!string.IsNullOrWhiteSpace(Role) && (string.Equals(Role.Trim(), SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) || Role.Contains("Admin", StringComparison.OrdinalIgnoreCase) || Role.Contains("Manager", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            // 3. User's Department matches the maintenance target team
+            if (Department != null && !string.IsNullOrWhiteSpace(Department.Name))
+            {
+                var dName = Department.Name;
+                if (normTeam == MaintenanceTeams.IT && (dName.Contains("IT", StringComparison.OrdinalIgnoreCase) || dName.Contains("Information", StringComparison.OrdinalIgnoreCase) || dName.Contains("Technology", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+                if (normTeam == MaintenanceTeams.Biomedical && (dName.Contains("Biomedical", StringComparison.OrdinalIgnoreCase) || dName.Contains("Medical", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+                if (normTeam == MaintenanceTeams.General && (dName.Contains("Facility", StringComparison.OrdinalIgnoreCase) || dName.Contains("Engineering", StringComparison.OrdinalIgnoreCase) || dName.Contains("Maintenance", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+
+            // 4. Role title explicitly specifies the team/discipline
+            if (!string.IsNullOrWhiteSpace(Role))
+            {
+                if (normTeam == MaintenanceTeams.IT && (Role.Contains("IT", StringComparison.OrdinalIgnoreCase) || Role.Contains("SysAdmin", StringComparison.OrdinalIgnoreCase) || Role.Contains("Support", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+                if (normTeam == MaintenanceTeams.Biomedical && Role.Contains("Biomedical", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (normTeam == MaintenanceTeams.General && (Role.Contains("Facility", StringComparison.OrdinalIgnoreCase) || Role.Contains("General", StringComparison.OrdinalIgnoreCase) || Role.Contains("Maintenance", StringComparison.OrdinalIgnoreCase)))
+                    return true;
+            }
+
+            return false;
+        }
+
         public virtual ICollection<Asset> CustodyAssets { get; set; } = new List<Asset>();
         public virtual ICollection<Ticket> OpenedTickets { get; set; } = new List<Ticket>();
     }
@@ -1054,5 +1097,170 @@ namespace StockPortal.Models
 
         [ForeignKey("UploadedBy")]
         public virtual User? UploadedByUser { get; set; }
+    }
+
+    [Table("spare_parts")]
+    public class SparePart
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Part / Item Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Part / Item Name (Arabic)")]
+        public string? NameAr { get; set; }
+
+        [Column("part_number")]
+        [StringLength(100)]
+        [Display(Name = "Part Number / SKU / Code")]
+        public string? PartNumber { get; set; }
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Maintenance Department")]
+        public string Department { get; set; } = MaintenanceTeams.IT; // IT, BIOMEDICAL, GENERAL
+
+        [Column("category")]
+        [StringLength(50)]
+        [Display(Name = "Stock Category")]
+        public string Category { get; set; } = "Spare Part"; // "Spare Part", "Consumable", "Periodic Maintenance Reserve"
+
+        [Column("quantity")]
+        [Display(Name = "Quantity in Stock")]
+        public int Quantity { get; set; } = 0;
+
+        [Column("min_reserve_quantity")]
+        [Display(Name = "Minimum Reserve Level")]
+        public int MinReserveQuantity { get; set; } = 2;
+
+        [Column("unit")]
+        [StringLength(50)]
+        [Display(Name = "Unit of Measure")]
+        public string? Unit { get; set; } = "Piece"; // Piece, Box, Meter, Liter, Roll, etc.
+
+        [Column("unit_cost", TypeName = "decimal(18,2)")]
+        [Display(Name = "Unit Cost")]
+        public decimal? UnitCost { get; set; }
+
+        [Column("storage_location")]
+        [StringLength(255)]
+        [Display(Name = "Shelf / Storage Location")]
+        public string? StorageLocation { get; set; }
+
+        [Column("can_function_as_asset")]
+        [Display(Name = "Can Function as Independent Asset")]
+        public bool CanFunctionAsAsset { get; set; } = false; // e.g. SSD (spare part or backup external disk), RAM, Monitor, etc.
+
+        [Column("compatible_equipment")]
+        [StringLength(500)]
+        [Display(Name = "Compatible Devices / Equipment")]
+        public string? CompatibleEquipment { get; set; }
+
+        [Column("notes")]
+        [StringLength(1024)]
+        public string? Notes { get; set; }
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [Column("updated_at")]
+        public DateTime? UpdatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public string DisplayName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(NameAr)) ? NameAr : Name;
+
+        [NotMapped]
+        public bool IsLowStock => Quantity <= MinReserveQuantity;
+
+        [NotMapped]
+        public string DisplayCategory => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? Category switch
+            {
+                "Spare Part" => "قطعة غيار",
+                "Consumable" => "مستهلكات",
+                "Periodic Maintenance Reserve" => "مخزون صيانة دورية",
+                _ => Category
+            }
+            : Category;
+
+        public virtual ICollection<SparePartTransaction> Transactions { get; set; } = new List<SparePartTransaction>();
+    }
+
+    [Table("spare_part_transactions")]
+    public class SparePartTransaction
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("spare_part_id")]
+        public int SparePartId { get; set; }
+
+        [ForeignKey("SparePartId")]
+        public virtual SparePart? SparePart { get; set; }
+
+        [Column("ticket_id")]
+        public int? TicketId { get; set; }
+
+        [ForeignKey("TicketId")]
+        public virtual Ticket? Ticket { get; set; }
+
+        [Column("asset_id")]
+        public int? AssetId { get; set; }
+
+        [ForeignKey("AssetId")]
+        public virtual Asset? Asset { get; set; }
+
+        [Column("user_id")]
+        public int? UserId { get; set; }
+
+        [ForeignKey("UserId")]
+        public virtual User? User { get; set; }
+
+        [Column("transaction_type")]
+        [StringLength(50)]
+        [Display(Name = "Transaction Type")]
+        public string TransactionType { get; set; } = "Usage in Ticket"; // "Usage in Ticket", "Replenishment", "Commissioned as Asset", "Returned to Reserve", "Inventory Adjustment"
+
+        [Column("quantity_changed")]
+        [Display(Name = "Quantity Changed")]
+        public int QuantityChanged { get; set; }
+
+        [Column("quantity_after")]
+        [Display(Name = "Stock After")]
+        public int QuantityAfter { get; set; }
+
+        [Column("notes")]
+        [StringLength(1024)]
+        public string? Notes { get; set; }
+
+        [Column("timestamp")]
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public string DisplayTransactionType => CultureInfo.CurrentUICulture.Name.StartsWith("ar")
+            ? TransactionType switch
+            {
+                "Usage in Ticket" => "استخدام في تذكرة",
+                "Replenishment" => "توريد وإعادة تزويد",
+                "Commissioned as Asset" => "تحويل إلى أصل مستقل",
+                "Returned to Reserve" => "استرجاع إلى مخزون الاحتياط",
+                "Inventory Adjustment" => "تسوية جردية",
+                _ => TransactionType
+            }
+            : TransactionType;
     }
 }

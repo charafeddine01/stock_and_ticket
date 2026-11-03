@@ -354,7 +354,7 @@
                         <div class="input-group">
                             <select name="techUserId" class="form-select">
                                 <option value="">@(Loc.IsArabic ? "-- غير معين (قائمة مهام القسم) --" : "-- Unassigned (Department Queue) --")</option>
-                                @foreach (var tech in Model.Technicians.Where(t => t.Role == "ADMIN" || t.MaintenanceTeam == ticket.TargetTeam))
+                                @foreach (var tech in (Model.DepartmentEmployees.Any() ? Model.DepartmentEmployees : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))))
                                 {
                                     <option value="@tech.Id" selected="@(tech.Id == ticket.Handler?.TechUserId)">
                                         @tech.DisplayFullName (@tech.DisplayRole)
@@ -444,6 +444,78 @@
             </div>
         }
 
+        <!-- Reserve Stock & Spare Parts Card -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-layer-group text-warning me-2"></i> @Loc["Reserve Stock & Spare Parts"]</h6>
+                @if (!isClosed && canManage && Model.AvailableSpareParts.Any())
+                {
+                    <button type="button" class="btn btn-sm btn-outline-success py-0" data-bs-toggle="modal" data-bs-target="#useSparePartModal">
+                        <i class="fa-solid fa-plus me-1"></i> @Loc["Use Spare Part"]
+                    </button>
+                }
+            </div>
+            <div class="card-body">
+                @if (Model.UsedSpareParts.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-borderless align-middle mb-0" style="font-size: 0.85rem;">
+                            <thead class="text-muted border-bottom">
+                                <tr>
+                                    <th>@Loc["Part / Item Name"]</th>
+                                    <th class="text-center">@Loc["Quantity"]</th>
+                                    <th>@Loc["By"]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.UsedSpareParts)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold text-dark">@(item.SparePart?.DisplayName ?? "Item")</div>
+                                            @if (!string.IsNullOrWhiteSpace(item.SparePart?.PartNumber))
+                                            {
+                                                <code class="text-muted small">@item.SparePart.PartNumber</code>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                            {
+                                                <div class="text-muted small fst-italic">@item.Notes</div>
+                                            }
+                                        </td>
+                                        <td class="text-center fw-bold text-danger">@Math.Abs(item.QuantityChanged) @(item.SparePart?.Unit ?? "Piece")</td>
+                                        <td class="small text-muted">
+                                            @(item.User?.DisplayFullName ?? "Tech")
+                                            <div style="font-size: 0.7rem;">@item.Timestamp.ToString("MMM dd, HH:mm")</div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted small py-2 text-center">
+                        <i class="fa-solid fa-boxes-stacked me-1 opacity-50"></i>
+                        @Loc["No spare parts used yet for this ticket."]
+                    </div>
+                }
+
+                @if (!isClosed && canManage)
+                {
+                    <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                        <span class="small text-muted">@Loc["Available in Reserve"]: <strong>@Model.AvailableSpareParts.Count @(Loc.IsArabic ? "صنف متاح" : "items")</strong></span>
+                        @if (Model.AvailableSpareParts.Any())
+                        {
+                            <button type="button" class="btn btn-sm btn-success text-white" data-bs-toggle="modal" data-bs-target="#useSparePartModal">
+                                <i class="fa-solid fa-wrench me-1"></i> @Loc["Use Spare Part"]
+                            </button>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
         <!-- Requester Info Card -->
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white">
@@ -492,7 +564,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-semibold">@Loc["Assigned Technician"]</label>
                             <select name="technicianId" class="form-select" required>
-                                @foreach (var tech in Model.Technicians)
+                                @foreach (var tech in (Model.DepartmentEmployees.Any() ? Model.DepartmentEmployees : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))))
                                 {
                                     <option value="@tech.Id" selected="@(tech.Id == (ticket.Handler?.TechUserId ?? 1))">@tech.DisplayFullName (@tech.DisplayRole)</option>
                                 }
@@ -529,6 +601,59 @@
         </div>
     </div>
 
+    <!-- Modal: Use Spare Part from Reserve Stock -->
+    <div class="modal fade" id="useSparePartModal" tabindex="-1" aria-labelledby="useSparePartModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="LogSparePartUsage" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="ticketId" value="@ticket.Id" />
+
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="useSparePartModalLabel">
+                            <i class="fa-solid fa-wrench text-warning me-2"></i> @Loc["Log Spare Part Usage"]
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="fa-solid fa-info-circle me-1"></i>
+                            @(Loc.IsArabic ? $"يتم استهلاك قطع الغيار والمستهلكات مباشرة من مخزون قسم {Loc.TargetTeam(ticket.TargetTeam)} وخصمها وتسجيلها في التذكرة." : $"Parts are deducted directly from {ticket.TargetTeam} Reserve Stock and logged into this ticket's timeline.")
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@Loc["Select Spare Part"]</label>
+                            <select name="sparePartId" class="form-select" required>
+                                @foreach (var part in Model.AvailableSpareParts)
+                                {
+                                    <option value="@part.Id">
+                                        @part.DisplayName - @(Loc.IsArabic ? $"المخزون: {part.Quantity} {part.Unit}" : $"In Stock: {part.Quantity} {part.Unit}") @(!string.IsNullOrWhiteSpace(part.PartNumber) ? $"[{part.PartNumber}]" : "")
+                                    </option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@Loc["Quantity"]</label>
+                            <input type="number" name="quantity" class="form-control" value="1" min="1" max="1000" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@Loc["Notes / Justification (Optional)"]</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "مثال: استبدال القرص التالف / تركيب فلتر دوري جديد..." : "e.g. Replaced damaged drive / installed new periodic filter...")"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fa-solid fa-check me-1"></i> @Loc["Log Spare Part Usage"]
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Resolve & Close Ticket -->
     <div class="modal fade" id="closeTicketModal" tabindex="-1" aria-labelledby="closeTicketModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -546,12 +671,19 @@
                             @(Loc.IsArabic ? "إغلاق التذكرة يعين حالتها إلى مكتملة، ويحدد الطابع الزمني للحل، ويحفظ الفنيين المشاركين في سجلات التحليل." : "Closing this ticket marks the issue as resolved, sets the closed timestamp, and credits all selected technicians in the maintenance analytics.")
                         </p>
 
-                        <!-- Multi-Technician Selection -->
+                        <!-- Multi-Technician Selection (Only Responsible Department Employees) -->
                         <div class="mb-3">
                             <label class="form-label fw-bold d-flex justify-content-between align-items-center mb-1">
                                 <span><i class="fa-solid fa-user-group text-success me-1"></i> @(Loc.IsArabic ? "الفنيون المشاركون في حل التذكرة (تحديد متعدد):" : "Who worked on & resolved this ticket? (Multi-check):")</span>
-                                <small class="text-muted fw-normal">@(Loc.IsArabic ? "حدد جميع المشاركين" : "Select all that collaborated")</small>
+                                <span class="badge bg-primary-subtle text-primary border">
+                                    <i class="fa-solid fa-users-gear me-1"></i> @(Loc.IsArabic ? $"قسم {Loc.TargetTeam(ticket.TargetTeam)}" : $"{ticket.TargetTeam} Department")
+                                </span>
                             </label>
+                            <div class="small text-muted mb-2">
+                                @(Loc.IsArabic 
+                                    ? $"يتم عرض موظفي قسم {Loc.TargetTeam(ticket.TargetTeam)} المسؤول عن التذكرة فقط." 
+                                    : $"Displaying only employees belonging to the responsible {ticket.TargetTeam} department.")
+                            </div>
                             
                             <div class="input-group input-group-sm mb-2">
                                 <span class="input-group-text bg-white"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
@@ -562,32 +694,44 @@
                                 @{
                                     var currentUserId = CurrentUser.GetUserId();
                                     var assignedTechId = ticket.Handler?.TechUserId;
-                                    var orderedTechs = Model.Technicians
+                                    var candidateTechs = Model.DepartmentEmployees.Any()
+                                        ? Model.DepartmentEmployees
+                                        : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam)).ToList();
+                                    var orderedTechs = candidateTechs
                                         .OrderByDescending(u => u.Id == currentUserId || u.Id == assignedTechId)
                                         .ThenBy(u => u.FullName)
                                         .ToList();
                                 }
-                                @foreach (var tech in orderedTechs)
+                                @if (orderedTechs.Any())
                                 {
-                                    bool isPreChecked = (tech.Id == currentUserId) || (assignedTechId.HasValue && tech.Id == assignedTechId.Value);
-                                    <div class="form-check py-1 px-2 mb-1 rounded bg-white border border-light tech-item-row" data-name="@(tech.FullName?.ToLower()) @(tech.FullNameAr?.ToLower()) @(tech.DomainUser?.ToLower())">
-                                        <input class="form-check-input" type="checkbox" name="closedByUserIds" value="@tech.Id" id="closeTech_@tech.Id" @(isPreChecked ? "checked" : "")>
-                                        <label class="form-check-label d-flex align-items-center justify-content-between w-100 cursor-pointer" for="closeTech_@tech.Id">
-                                            <span class="fw-semibold text-dark">
-                                                <i class="fa-solid fa-user-gear text-secondary me-1"></i> @tech.DisplayFullName
-                                                @if (tech.Id == currentUserId)
-                                                {
-                                                    <span class="badge bg-secondary-subtle text-secondary small ms-1">@(Loc.IsArabic ? "أنت" : "You")</span>
-                                                }
-                                                @if (assignedTechId.HasValue && tech.Id == assignedTechId.Value)
-                                                {
-                                                    <span class="badge bg-primary-subtle text-primary small ms-1">@(Loc.IsArabic ? "المُعيَّن" : "Assigned")</span>
-                                                }
-                                            </span>
-                                            <span class="badge bg-light text-dark border">
-                                                @(string.IsNullOrEmpty(tech.MaintenanceTeam) ? tech.RoleDisplay : tech.MaintenanceTeam)
-                                            </span>
-                                        </label>
+                                    @foreach (var tech in orderedTechs)
+                                    {
+                                        bool isPreChecked = (tech.Id == currentUserId) || (assignedTechId.HasValue && tech.Id == assignedTechId.Value);
+                                        <div class="form-check py-1 px-2 mb-1 rounded bg-white border border-light tech-item-row" data-name="@(tech.FullName?.ToLower()) @(tech.FullNameAr?.ToLower()) @(tech.DomainUser?.ToLower())">
+                                            <input class="form-check-input" type="checkbox" name="closedByUserIds" value="@tech.Id" id="closeTech_@tech.Id" @(isPreChecked ? "checked" : "")>
+                                            <label class="form-check-label d-flex align-items-center justify-content-between w-100 cursor-pointer" for="closeTech_@tech.Id">
+                                                <span class="fw-semibold text-dark">
+                                                    <i class="fa-solid fa-user-gear text-secondary me-1"></i> @tech.DisplayFullName
+                                                    @if (tech.Id == currentUserId)
+                                                    {
+                                                        <span class="badge bg-secondary-subtle text-secondary small ms-1">@(Loc.IsArabic ? "أنت" : "You")</span>
+                                                    }
+                                                    @if (assignedTechId.HasValue && tech.Id == assignedTechId.Value)
+                                                    {
+                                                        <span class="badge bg-primary-subtle text-primary small ms-1">@(Loc.IsArabic ? "المُعيَّن" : "Assigned")</span>
+                                                    }
+                                                </span>
+                                                <span class="badge bg-light text-dark border">
+                                                    @(string.IsNullOrEmpty(tech.MaintenanceTeam) ? tech.RoleDisplay : tech.MaintenanceTeam)
+                                                </span>
+                                            </label>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <div class="text-muted small text-center py-2">
+                                        @(Loc.IsArabic ? "لا يوجد فنيون مسجلون في هذا القسم" : "No specialists found in this department")
                                     </div>
                                 }
                             </div>

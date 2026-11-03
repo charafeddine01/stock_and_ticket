@@ -31,105 +31,113 @@
         <div class="row g-3 mb-4">
             <!-- Assets Card -->
             <div class="col-xl-3 col-md-6">
-                <div class="card stat-card stat-card-blue shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Total Assets"]</div>
-                            <div class="h2 fw-bold text-primary mb-1">@Model.TotalAssets</div>
-                            <div class="small text-muted">
-                                <span class="text-success fw-semibold">@Model.InServiceAssets</span> @Loc["in service"] &bull; 
-                                <span class="text-warning fw-semibold">@Model.UnderMaintenanceAssets</span> @Loc["in repair"]
+                <a href="@Url.Action("Index", "Assets")" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-blue shadow-sm h-100 card-hover-lift">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Total Assets"]</div>
+                                <div class="h2 fw-bold text-primary mb-1">@Model.TotalAssets</div>
+                                <div class="small text-muted">
+                                    <span class="text-success fw-semibold">@Model.InServiceAssets</span> @Loc["in service"] &bull; 
+                                    <span class="text-warning fw-semibold">@Model.UnderMaintenanceAssets</span> @Loc["in repair"]
+                                </div>
+                            </div>
+                            <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="fa-solid fa-boxes-stacked"></i>
                             </div>
                         </div>
-                        <div class="stat-icon bg-primary bg-opacity-10 text-primary">
-                            <i class="fa-solid fa-boxes-stacked"></i>
+                        <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
+                            <span class="text-muted">@Loc["Total Asset Value"]:</span>
+                            <span class="fw-bold text-dark">@Model.TotalInventoryValue.ToString("C0", System.Globalization.CultureInfo.CurrentUICulture)</span>
                         </div>
                     </div>
-                    <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                        <span class="text-muted">@Loc["Total Asset Value"]:</span>
-                        <span class="fw-bold text-dark">@Model.TotalInventoryValue.ToString("C0", System.Globalization.CultureInfo.CurrentUICulture)</span>
-                    </div>
-                </div>
+                </a>
             </div>
 
             <!-- Active Tickets Card -->
             <div class="col-xl-3 col-md-6">
-                <div class="card stat-card stat-card-amber shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Open & Active Tickets"]</div>
-                            <div class="h2 fw-bold text-warning mb-1">@(Model.OpenTickets + Model.PendingTickets)</div>
-                            <div class="small text-muted">
-                                <span class="text-danger fw-semibold">@Model.OpenTickets</span> @Loc["unassigned"] &bull; 
-                                <span class="text-info fw-semibold">@Model.PendingTickets</span> @Loc["in progress"]
+                <a href="@Url.Action("Index", "Tickets", new { statusId = -1 })" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-amber shadow-sm h-100 card-hover-lift">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Open & Active Tickets"]</div>
+                                <div class="h2 fw-bold text-warning mb-1">@(Model.OpenTickets + Model.PendingTickets)</div>
+                                <div class="small text-muted">
+                                    <span class="text-danger fw-semibold">@Model.OpenTickets</span> @Loc["unassigned"] &bull; 
+                                    <span class="text-info fw-semibold">@Model.PendingTickets</span> @Loc["in progress"]
+                                </div>
+                            </div>
+                            <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="fa-solid fa-ticket"></i>
                             </div>
                         </div>
-                        <div class="stat-icon bg-warning bg-opacity-10 text-warning">
-                            <i class="fa-solid fa-ticket"></i>
+                        <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
+                            <span class="text-muted">@Loc["Closed Resolved"]:</span>
+                            <span class="fw-bold text-success">@Model.ClosedTickets</span>
                         </div>
                     </div>
-                    <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                        <span class="text-muted">@Loc["Closed Resolved"]:</span>
-                        <span class="fw-bold text-success">@Model.ClosedTickets</span>
-                    </div>
-                </div>
+                </a>
             </div>
 
             <!-- Preventive Maintenance & Calibration Alert Card -->
             <div class="col-xl-3 col-md-6">
-                <div class="card stat-card stat-card-rose shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Maintenance Alerts"]</div>
-                            <div class="h2 fw-bold @((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0 ? "text-danger" : "text-success") mb-1">
-                                @(Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count)
+                <a href="@Url.Action("Index", "Maintenance")" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-rose shadow-sm h-100 card-hover-lift">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Maintenance Alerts"]</div>
+                                <div class="h2 fw-bold @((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0 ? "text-danger" : "text-success") mb-1">
+                                    @(Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count)
+                                </div>
+                                <div class="small text-muted">
+                                    @if ((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0)
+                                    {
+                                        <span>@Model.OverduePeriodicAssets.Count @Loc["Maintenance"] &bull; @Model.OverdueCalibrationAssets.Count @Loc["Calibration Overdue"]</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@Loc["Scheduled Maintenance Up-to-date"]</span>
+                                    }
+                                </div>
                             </div>
-                            <div class="small text-muted">
-                                @if ((Model.OverduePeriodicAssets.Count + Model.OverdueCalibrationAssets.Count) > 0)
-                                {
-                                    <span>@Model.OverduePeriodicAssets.Count @Loc["Maintenance"] &bull; @Model.OverdueCalibrationAssets.Count @Loc["Calibration Overdue"]</span>
-                                }
-                                else
-                                {
-                                    <span>@Loc["Scheduled Maintenance Up-to-date"]</span>
-                                }
+                            <div class="stat-icon bg-danger bg-opacity-10 text-danger">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
                             </div>
                         </div>
-                        <div class="stat-icon bg-danger bg-opacity-10 text-danger">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
+                            <span class="text-muted">@Loc["Expiring in 30 Days"]:</span>
+                            <span class="fw-bold text-dark">@(Model.UpcomingPeriodicAssets.Count + Model.UpcomingCalibrationAssets.Count)</span>
                         </div>
                     </div>
-                    <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                        <span class="text-muted">@Loc["Expiring in 30 Days"]:</span>
-                        <span class="fw-bold text-dark">@(Model.UpcomingPeriodicAssets.Count + Model.UpcomingCalibrationAssets.Count)</span>
-                    </div>
-                </div>
+                </a>
             </div>
 
             <!-- Resolved Tickets / Health Card -->
             <div class="col-xl-3 col-md-6">
-                <div class="card stat-card stat-card-emerald shadow-sm">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div>
-                            <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Service Resolution Rate"]</div>
-                            @{
-                                int total = Model.TotalTickets;
-                                int rate = total > 0 ? (int)((double)Model.ClosedTickets / total * 100) : 100;
-                            }
-                            <div class="h2 fw-bold text-success mb-1">@rate%</div>
-                            <div class="small text-muted">
-                                <span>@Model.ClosedTickets / @total @Loc["Closed Resolved"]</span>
+                <a href="@Url.Action("Index", "Tickets", new { statusId = 5 })" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-emerald shadow-sm h-100 card-hover-lift">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="text-uppercase fw-bold text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">@Loc["Service Resolution Rate"]</div>
+                                @{
+                                    int total = Model.TotalTickets;
+                                    int rate = total > 0 ? (int)((double)Model.ClosedTickets / total * 100) : 100;
+                                }
+                                <div class="h2 fw-bold text-success mb-1">@rate%</div>
+                                <div class="small text-muted">
+                                    <span>@Model.ClosedTickets / @total @Loc["Closed Resolved"]</span>
+                                </div>
+                            </div>
+                            <div class="stat-icon bg-success bg-opacity-10 text-success">
+                                <i class="fa-solid fa-circle-check"></i>
                             </div>
                         </div>
-                        <div class="stat-icon bg-success bg-opacity-10 text-success">
-                            <i class="fa-solid fa-circle-check"></i>
+                        <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
+                            <span class="text-muted">@Loc["delayed"]:</span>
+                            <span class="fw-bold text-danger">@Model.DelayedTickets</span>
                         </div>
                     </div>
-                    <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between small">
-                        <span class="text-muted">@Loc["delayed"]:</span>
-                        <span class="fw-bold text-danger">@Model.DelayedTickets</span>
-                    </div>
-                </div>
+                </a>
             </div>
         </div>
 
@@ -410,35 +418,60 @@
                         <button type="button" class="btn btn-sm @(Model.DatePreset == "all" ? "btn-primary" : "btn-outline-secondary bg-white")" onclick="setPreset('all')">@Loc["All Time"]</button>
                     </div>
 
-                    <!-- Date & Team Pickers -->
-                    <div class="col-md-3">
+                    <!-- Date & Team & Technician Pickers (Dynamic Real-time Filtering) -->
+                    <div class="col-md-2 col-sm-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="fa-solid fa-calendar me-1"></i> @Loc["From Date"]</span>
-                            <input type="date" name="fromDate" id="filterFromDate" class="form-control" value="@Model.FromDate?.ToString("yyyy-MM-dd")" onchange="clearPreset()">
+                            <input type="date" name="fromDate" id="filterFromDate" class="form-control" value="@Model.FromDate?.ToString("yyyy-MM-dd")" onchange="onDateFilterChanged()">
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2 col-sm-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-white"><i class="fa-solid fa-calendar-check me-1"></i> @Loc["To Date"]</span>
-                            <input type="date" name="toDate" id="filterToDate" class="form-control" value="@Model.ToDate?.ToString("yyyy-MM-dd")" onchange="clearPreset()">
+                            <input type="date" name="toDate" id="filterToDate" class="form-control" value="@Model.ToDate?.ToString("yyyy-MM-dd")" onchange="onDateFilterChanged()">
                         </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3 col-sm-6">
+                        @if (Model.CanFilterTeam)
+                        {
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><i class="fa-solid fa-filter me-1"></i> @Loc["Maintenance Team"]</span>
+                                <select name="teamFilter" id="filterTeamSelect" class="form-select" onchange="onTeamFilterChanged()">
+                                    <option value="ALL" selected="@(Model.SelectedTeam == "ALL")">@Loc["All Maintenance Teams"]</option>
+                                    <option value="IT" selected="@(Model.SelectedTeam == "IT")">IT - @(LocHelper.TranslateTargetTeam("IT"))</option>
+                                    <option value="BIOMEDICAL" selected="@(Model.SelectedTeam == "BIOMEDICAL")">Biomedical - @(LocHelper.TranslateTargetTeam("BIOMEDICAL"))</option>
+                                    <option value="GENERAL" selected="@(Model.SelectedTeam == "GENERAL")">General Maintenance - @(LocHelper.TranslateTargetTeam("GENERAL"))</option>
+                                </select>
+                            </div>
+                        }
+                        else
+                        {
+                            <input type="hidden" name="teamFilter" value="@Model.SelectedTeam" />
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white text-muted"><i class="fa-solid fa-lock me-1"></i> @Loc["Maintenance Team"]</span>
+                                <span class="form-control bg-light fw-bold text-primary">
+                                    @(isAr ? LocHelper.TranslateTargetTeam(Model.SelectedTeam) : Model.SelectedTeam)
+                                </span>
+                            </div>
+                        }
+                    </div>
+                    <div class="col-md-3 col-sm-6">
                         <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white"><i class="fa-solid fa-filter me-1"></i> @Loc["Maintenance Team"]</span>
-                            <select name="teamFilter" class="form-select">
-                                <option value="ALL" selected="@(Model.SelectedTeam == "ALL")">@Loc["All Maintenance Teams"]</option>
-                                <option value="IT" selected="@(Model.SelectedTeam == "IT")">IT - @(LocHelper.TranslateTargetTeam("IT"))</option>
-                                <option value="BIOMEDICAL" selected="@(Model.SelectedTeam == "BIOMEDICAL")">Biomedical - @(LocHelper.TranslateTargetTeam("BIOMEDICAL"))</option>
-                                <option value="GENERAL" selected="@(Model.SelectedTeam == "GENERAL")">General Maintenance - @(LocHelper.TranslateTargetTeam("GENERAL"))</option>
+                            <span class="input-group-text bg-white"><i class="fa-solid fa-user-gear me-1"></i> @Loc["Team Member / Specialist"]</span>
+                            <select name="techId" id="filterTechId" class="form-select" onchange="onTechFilterChanged()">
+                                <option value="">@Loc["All Team Members"]</option>
+                                @foreach (var member in Model.AvailableTechnicians)
+                                {
+                                    <option value="@member.Id" selected="@(Model.SelectedTechUserId == member.Id)">@member.DisplayFullName (@member.RoleDisplay)</option>
+                                }
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-3 d-flex gap-2">
-                        <button type="submit" class="btn btn-sm btn-primary fw-semibold flex-grow-1">
-                            <i class="fa-solid fa-check me-1"></i> @Loc["Apply Filters"]
-                        </button>
-                        <a href="@Url.Action("Index", new { tab = "analytics", datePreset = "30days" })" class="btn btn-sm btn-outline-secondary" title="@Loc["Reset Filters"]">
+                    <div class="col-md-2 col-sm-12 d-flex gap-2 align-items-center">
+                        <span class="badge bg-success-subtle text-success border border-success-subtle py-2 px-2 w-100 d-flex align-items-center justify-content-center gap-1 small" title="@(isAr ? "التصفية تعمل فوراً وتلقائياً عند تغيير أي خيار" : "Filters update instantly on selection")">
+                            <i class="fa-solid fa-bolt text-success"></i> @(isAr ? "تصفية فورية" : "Live Filter")
+                        </span>
+                        <a href="@Url.Action("Index", new { tab = "analytics", teamFilter = Model.SelectedTeam, datePreset = "30days" })" class="btn btn-sm btn-outline-secondary" title="@Loc["Reset Filters"]">
                             <i class="fa-solid fa-rotate-left"></i>
                         </a>
                     </div>
@@ -446,58 +479,95 @@
             </div>
         </div>
 
+        @if (Model.SelectedTechUserId.HasValue)
+        {
+            var selectedTech = Model.AvailableTechnicians.FirstOrDefault(u => u.Id == Model.SelectedTechUserId.Value);
+            if (selectedTech != null)
+            {
+                <div class="alert alert-primary border-primary shadow-sm d-flex justify-content-between align-items-center mb-4 py-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-user-check fs-4 text-primary"></i>
+                        <div>
+                            <div class="fw-bold text-dark">@(isAr ? $"عرض التحليلات الفردية للفني: {selectedTech.DisplayFullName}" : $"Viewing Individual Analysis for: {selectedTech.DisplayFullName}")</div>
+                            <div class="small text-muted">@(selectedTech.DomainUser) &bull; @(selectedTech.RoleDisplay) &bull; @(isAr ? LocHelper.TranslateTargetTeam(selectedTech.MaintenanceTeam) : selectedTech.MaintenanceTeam)</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <a href="@Url.Action("PrintMemberReport", new { userId = selectedTech.Id, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" target="_blank" class="btn btn-sm btn-primary fw-semibold shadow-xs">
+                            <i class="fa-solid fa-print me-1"></i> @Loc["Print Member Activity Report"]
+                        </a>
+                        <a href="@Url.Action("Index", new { tab = "analytics", teamFilter = Model.SelectedTeam, datePreset = Model.DatePreset, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd") })" class="btn btn-sm btn-outline-secondary">
+                            <i class="fa-solid fa-xmark me-1"></i> @Loc["Clear Member Filter"]
+                        </a>
+                    </div>
+                </div>
+            }
+        }
+
         <!-- Period KPI Summary Cards -->
         <div class="row g-3 mb-4">
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-emerald shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Closed Resolved"]</div>
-                    <div class="h2 fw-bold text-success my-1">@Model.FilteredClosedTickets</div>
-                    <div class="small text-muted"><i class="fa-solid fa-circle-check text-success me-1"></i> @(isAr ? "في الفترة المحددة" : "In selected range")</div>
-                </div>
-            </div>
-            <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-blue shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Average Resolution Time"]</div>
-                    <div class="h2 fw-bold text-primary my-1">
-                        @if (Model.FilteredAverageResolutionHours > 24)
-                        {
-                            <span>@Math.Round(Model.FilteredAverageResolutionHours / 24.0, 1) <small class="fs-6 fw-normal">@Loc["Days"]</small></span>
-                        }
-                        else
-                        {
-                            <span>@Model.FilteredAverageResolutionHours <small class="fs-6 fw-normal">@Loc["Hours"]</small></span>
-                        }
+                <a href="#closedTicketsTable" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-emerald shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Closed Resolved"]</div>
+                        <div class="h2 fw-bold text-success my-1">@Model.FilteredClosedTickets</div>
+                        <div class="small text-muted"><i class="fa-solid fa-circle-check text-success me-1"></i> @(isAr ? "في الفترة المحددة" : "In selected range")</div>
                     </div>
-                    <div class="small text-muted"><i class="fa-solid fa-stopwatch text-primary me-1"></i> MTTR (@(isAr ? "متوسط سرعة الإنجاز" : "Turnaround"))</div>
-                </div>
+                </a>
             </div>
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-emerald shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Service Resolution Rate"]</div>
-                    <div class="h2 fw-bold text-success my-1">@Model.FilteredResolutionRate%</div>
-                    <div class="small text-muted"><i class="fa-solid fa-percent text-success me-1"></i> @Model.FilteredClosedTickets / @Model.FilteredTotalTickets @(isAr ? "تذكرة" : "tickets")</div>
-                </div>
+                <a href="#closedTicketsTable" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-blue shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Average Resolution Time"]</div>
+                        <div class="h2 fw-bold text-primary my-1">
+                            @if (Model.FilteredAverageResolutionHours > 24)
+                            {
+                                <span>@Math.Round(Model.FilteredAverageResolutionHours / 24.0, 1) <small class="fs-6 fw-normal">@Loc["Days"]</small></span>
+                            }
+                            else
+                            {
+                                <span>@Model.FilteredAverageResolutionHours <small class="fs-6 fw-normal">@Loc["Hours"]</small></span>
+                            }
+                        </div>
+                        <div class="small text-muted"><i class="fa-solid fa-stopwatch text-primary me-1"></i> MTTR (@(isAr ? "متوسط سرعة الإنجاز" : "Turnaround"))</div>
+                    </div>
+                </a>
             </div>
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-amber shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Active Queue"]</div>
-                    <div class="h2 fw-bold text-warning my-1">@Model.FilteredActiveTickets</div>
-                    <div class="small text-muted"><i class="fa-solid fa-list-check text-warning me-1"></i> @(isAr ? "قيد المتابعة والعمل" : "Open / in progress")</div>
-                </div>
+                <a href="@Url.Action("Index", "Tickets", new { statusId = 5 })" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-emerald shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Service Resolution Rate"]</div>
+                        <div class="h2 fw-bold text-success my-1">@Model.FilteredResolutionRate%</div>
+                        <div class="small text-muted"><i class="fa-solid fa-percent text-success me-1"></i> @Model.FilteredClosedTickets / @Model.FilteredTotalTickets @(isAr ? "تذكرة" : "tickets")</div>
+                    </div>
+                </a>
             </div>
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-blue shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Work Orders Logged"]</div>
-                    <div class="h2 fw-bold text-info my-1">@Model.FilteredMaintenanceLogsCount</div>
-                    <div class="small text-muted"><i class="fa-solid fa-screwdriver-wrench text-info me-1"></i> @(isAr ? "سجلات صيانة منفذة" : "Maintenance records")</div>
-                </div>
+                <a href="@Url.Action("Index", "Tickets", new { statusId = -1 })" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-amber shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Active Queue"]</div>
+                        <div class="h2 fw-bold text-warning my-1">@Model.FilteredActiveTickets</div>
+                        <div class="small text-muted"><i class="fa-solid fa-list-check text-warning me-1"></i> @(isAr ? "قيد المتابعة والعمل" : "Open / in progress")</div>
+                    </div>
+                </a>
             </div>
             <div class="col-xl-2 col-md-4 col-sm-6">
-                <div class="card stat-card stat-card-rose shadow-sm h-100">
-                    <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Total Handled"]</div>
-                    <div class="h2 fw-bold text-dark my-1">@Model.FilteredTotalTickets</div>
-                    <div class="small text-muted"><i class="fa-solid fa-ticket text-secondary me-1"></i> @(isAr ? "حجم العمل الكلي" : "Total workload volume")</div>
-                </div>
+                <a href="@Url.Action("Index", "Maintenance")" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-blue shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Work Orders Logged"]</div>
+                        <div class="h2 fw-bold text-info my-1">@Model.FilteredMaintenanceLogsCount</div>
+                        <div class="small text-muted"><i class="fa-solid fa-screwdriver-wrench text-info me-1"></i> @(isAr ? "سجلات صيانة منفذة" : "Maintenance records")</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-xl-2 col-md-4 col-sm-6">
+                <a href="@Url.Action("Index", "Tickets", new { statusId = 0 })" class="text-decoration-none d-block h-100">
+                    <div class="card stat-card stat-card-rose shadow-sm h-100 card-hover-lift">
+                        <div class="text-uppercase fw-bold text-muted small" style="font-size: 0.7rem;">@Loc["Total Handled"]</div>
+                        <div class="h2 fw-bold text-dark my-1">@Model.FilteredTotalTickets</div>
+                        <div class="small text-muted"><i class="fa-solid fa-ticket text-secondary me-1"></i> @(isAr ? "حجم العمل الكلي" : "Total workload volume")</div>
+                    </div>
+                </a>
             </div>
         </div>
 
@@ -527,13 +597,14 @@
                                 <th class="text-center">@Loc["Average Resolution Time"]</th>
                                 <th class="text-center">@Loc["Work Orders Logged"]</th>
                                 <th style="min-width: 130px;">@(isAr ? "مؤشر المساهمة" : "Workload Share")</th>
+                                <th class="text-center" style="min-width: 140px;">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (!Model.TechnicianStats.Any())
                             {
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">@Loc["No notifications found"]</td>
+                                    <td colspan="9" class="text-center text-muted py-4">@Loc["No notifications found"]</td>
                                 </tr>
                             }
                             @{
@@ -601,6 +672,19 @@
                                             <span class="small text-muted" style="min-width: 32px;">@sharePct%</span>
                                         </div>
                                     </td>
+                                    <td class="text-center">
+                                        <div class="d-flex align-items-center justify-content-center gap-1">
+                                            <a href="@Url.Action("PrintMemberReport", new { userId = tech.UserId, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2" title="@Loc["Print Member Activity Report"]">
+                                                <i class="fa-solid fa-print me-1"></i> <span class="small">@Loc["Print Report"]</span>
+                                            </a>
+                                            @if (Model.SelectedTechUserId != tech.UserId)
+                                            {
+                                                <a href="@Url.Action("Index", new { tab = "analytics", teamFilter = Model.SelectedTeam, techId = tech.UserId, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" class="btn btn-sm btn-light border py-1 px-2" title="@Loc["Filter by this member"]">
+                                                    <i class="fa-solid fa-filter text-secondary"></i>
+                                                </a>
+                                            }
+                                        </div>
+                                    </td>
                                 </tr>
                             }
                         </tbody>
@@ -611,19 +695,19 @@
 
         <!-- SECTION 2: Maintenance Teams Comparison & Issue Category Breakdown -->
         <div class="row g-4 mb-4">
-            <!-- Team Comparison Cards -->
+            <!-- Team Performance Cards -->
             <div class="col-lg-7">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white py-3">
                         <h6 class="fw-bold mb-0 text-dark">
-                            <i class="fa-solid fa-chart-column text-success me-2"></i> @Loc["Team Performance Comparison"]
+                            <i class="fa-solid fa-chart-column text-success me-2"></i> @(Model.CanFilterTeam ? Loc["Team Performance Comparison"] : Loc["My Team Analysis"])
                         </h6>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
                             @foreach (var team in Model.TeamStats)
                             {
-                                <div class="col-md-4">
+                                <div class="@(Model.TeamStats.Count == 1 ? "col-12" : "col-md-4")">
                                     <div class="border rounded p-3 bg-light h-100 d-flex flex-column justify-content-between">
                                         <div>
                                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -833,6 +917,21 @@
         document.getElementById('datePresetInput').value = preset;
         document.getElementById('filterFromDate').value = '';
         document.getElementById('filterToDate').value = '';
+        document.getElementById('analyticsFilterForm').submit();
+    }
+
+    function onDateFilterChanged() {
+        document.getElementById('datePresetInput').value = 'custom';
+        document.getElementById('analyticsFilterForm').submit();
+    }
+
+    function onTeamFilterChanged() {
+        var techSelect = document.getElementById('filterTechId');
+        if (techSelect) techSelect.value = '';
+        document.getElementById('analyticsFilterForm').submit();
+    }
+
+    function onTechFilterChanged() {
         document.getElementById('analyticsFilterForm').submit();
     }
 

@@ -1,0 +1,195 @@
+@model StockPortal.ViewModels.SparePartTransactionsViewModel
+@inject StockPortal.Services.ILocalizationService Loc
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+
+@{
+    ViewData["Title"] = Loc["Stock Transactions"];
+    var isArabic = Loc.IsArabic;
+    var isAdmin = CurrentUser.IsAdmin();
+}
+
+<div class="container-fluid py-3">
+    <!-- Breadcrumb & Header -->
+    <div class="mb-3">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item">
+                    <a href="@Url.Action("Index", "SpareParts", new { department = Model.Department })" class="text-decoration-none">
+                        <i class="fa-solid fa-layer-group me-1"></i> @Loc["Reserve Stock & Spare Parts"]
+                    </a>
+                </li>
+                <li class="breadcrumb-item active" aria-current="page">@Loc["Stock Transactions"]</li>
+            </ol>
+        </nav>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h3 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-primary"></i>
+                    @Loc["Stock Transactions"]
+                </h3>
+                <p class="text-muted small mb-0">
+                    @(isArabic 
+                        ? "سجل التدقيق الشامل لحركات المخزون الاحتياطي: الاستهلاك في التذاكر، التوريدات، والتحويل إلى أصول مستقلة." 
+                        : "Full audit trail of reserve stock movements: consumption in tickets, restocks, and asset commissioning.")
+                </p>
+            </div>
+            <a href="@Url.Action("Index", "SpareParts", new { department = Model.Department })" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Back to List"]
+            </a>
+        </div>
+    </div>
+
+    <!-- Active Filter Notice -->
+    @if (Model.FilterPart != null || Model.TicketId.HasValue)
+    {
+        <div class="alert alert-info py-2 d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <i class="fa-solid fa-filter me-1"></i>
+                @if (Model.FilterPart != null)
+                {
+                    <span>@(isArabic ? "تصفية خاصة بالصنف:" : "Filtered for Part:") <strong>@Model.FilterPart.DisplayName</strong> (SKU: @Model.FilterPart.PartNumber)</span>
+                }
+                @if (Model.TicketId.HasValue)
+                {
+                    <span class="ms-2">@(isArabic ? "التذكرة المرتبطة:" : "Linked Ticket:") <strong>#@Model.TicketId</strong></span>
+                }
+            </div>
+            <a href="@Url.Action("Transactions", "SpareParts", new { department = Model.Department })" class="btn btn-sm btn-outline-primary py-0">
+                @Loc["Reset Filters"]
+            </a>
+        </div>
+    }
+
+    <!-- Transactions Table -->
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            @if (Model.Transactions.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th class="ps-3">@Loc["Date / Time"]</th>
+                                <th>@Loc["Part / Item Name"]</th>
+                                @if (isAdmin)
+                                {
+                                    <th>@Loc["Department"]</th>
+                                }
+                                <th>@Loc["Transaction Type"]</th>
+                                <th class="text-center">@Loc["Quantity Changed"]</th>
+                                <th class="text-center">@Loc["Stock After"]</th>
+                                <th>@(isArabic ? "التذكرة المرتبطة" : "Linked Ticket")</th>
+                                <th>@(isArabic ? "الأصل المرتبط" : "Linked Asset")</th>
+                                <th>@(isArabic ? "بواسطة" : "User")</th>
+                                <th class="pe-3">@Loc["Notes"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var tr in Model.Transactions)
+                            {
+                                <tr>
+                                    <td class="ps-3 small text-muted">
+                                        <div class="fw-semibold text-dark">@tr.Timestamp.ToString("yyyy-MM-dd")</div>
+                                        <div style="font-size: 0.72rem;">@tr.Timestamp.ToString("HH:mm:ss")</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark">@(tr.SparePart?.DisplayName ?? "Item")</div>
+                                        @if (!string.IsNullOrWhiteSpace(tr.SparePart?.PartNumber))
+                                        {
+                                            <code class="small text-muted font-monospace">@tr.SparePart.PartNumber</code>
+                                        }
+                                    </td>
+                                    @if (isAdmin)
+                                    {
+                                        <td>
+                                            <span class="badge @(tr.SparePart?.Department == "IT" ? "bg-primary" : tr.SparePart?.Department == "BIOMEDICAL" ? "bg-info text-dark" : "bg-secondary")">
+                                                @Loc.TargetTeam(tr.SparePart?.Department)
+                                            </span>
+                                        </td>
+                                    }
+                                    <td>
+                                        @if (tr.TransactionType == "Usage in Ticket")
+                                        {
+                                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">
+                                                <i class="fa-solid fa-wrench me-1"></i> @tr.DisplayTransactionType
+                                            </span>
+                                        }
+                                        else if (tr.TransactionType == "Replenishment")
+                                        {
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                                <i class="fa-solid fa-cart-plus me-1"></i> @tr.DisplayTransactionType
+                                            </span>
+                                        }
+                                        else if (tr.TransactionType == "Commissioned as Asset")
+                                        {
+                                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning">
+                                                <i class="fa-solid fa-wand-magic-sparkles me-1 text-warning"></i> @tr.DisplayTransactionType
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-light text-dark border">
+                                                @tr.DisplayTransactionType
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-center fw-bold @(tr.QuantityChanged > 0 ? "text-success" : "text-danger")">
+                                        @(tr.QuantityChanged > 0 ? $"+{tr.QuantityChanged}" : tr.QuantityChanged.ToString())
+                                        <span class="small fw-normal text-muted">@(tr.SparePart?.Unit ?? "")</span>
+                                    </td>
+                                    <td class="text-center small fw-semibold text-dark">
+                                        @tr.QuantityAfter <span class="text-muted fw-normal">@(tr.SparePart?.Unit ?? "")</span>
+                                    </td>
+                                    <td class="small">
+                                        @if (tr.TicketId.HasValue)
+                                        {
+                                            <a href="@Url.Action("Details", "Tickets", new { id = tr.TicketId.Value })" class="badge bg-light text-primary border text-decoration-none">
+                                                <i class="fa-solid fa-ticket me-1"></i> #@tr.TicketId.Value
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    <td class="small">
+                                        @if (tr.Asset != null)
+                                        {
+                                            <a href="@Url.Action("Details", "Assets", new { id = tr.Asset.Id })" class="badge bg-light text-dark border text-decoration-none">
+                                                <i class="fa-solid fa-barcode me-1 text-secondary"></i> @tr.Asset.HospitalNo
+                                            </a>
+                                        }
+                                        else if (tr.AssetId.HasValue)
+                                        {
+                                            <a href="@Url.Action("Details", "Assets", new { id = tr.AssetId.Value })" class="badge bg-light text-dark border text-decoration-none">
+                                                <i class="fa-solid fa-barcode me-1 text-secondary"></i> Asset #@tr.AssetId.Value
+                                            </a>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">--</span>
+                                        }
+                                    </td>
+                                    <td class="small">
+                                        <div class="fw-semibold text-dark">@(tr.User?.DisplayFullName ?? "System")</div>
+                                        <div class="text-muted" style="font-size: 0.72rem;">@(tr.User?.DisplayRole ?? "")</div>
+                                    </td>
+                                    <td class="pe-3 small text-muted" style="max-width: 250px;">
+                                        @(tr.Notes ?? "--")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-clock-rotate-left fs-1 mb-3 opacity-25"></i>
+                    <h5 class="fw-semibold">@(isArabic ? "لا توجد حركات مسجلة في هذا السجل" : "No stock transactions found")</h5>
+                </div>
+            }
+        </div>
+    </div>
+</div>

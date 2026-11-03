@@ -957,6 +957,61 @@ h1, h2, h3, h4, h5, h6, .card-title, .modal-title, .page-header-title {
     border-bottom: 2px solid var(--card-border) !important;
 }
 
+/* Universal Table Header Sorting */
+.table thead th.sortable-th {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    position: relative;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.table thead th.sortable-th:hover {
+    background-color: var(--table-hover-bg) !important;
+    color: var(--primary) !important;
+}
+
+.table thead th.sortable-th:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+}
+
+.sort-icon-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-inline-start: 0.4rem;
+    font-size: 0.75rem;
+    vertical-align: middle;
+    transition: color 0.15s ease, transform 0.15s ease;
+    opacity: 0.35;
+}
+
+.table thead th.sortable-th:hover .sort-icon-box {
+    opacity: 0.85;
+    color: var(--primary);
+}
+
+.table thead th.sortable-th[aria-sort="ascending"] .sort-icon-box,
+.table thead th.sortable-th[aria-sort="descending"] .sort-icon-box {
+    opacity: 1 !important;
+    color: var(--primary) !important;
+}
+
+.table thead th.sortable-th[aria-sort="ascending"],
+.table thead th.sortable-th[aria-sort="descending"] {
+    color: var(--primary) !important;
+}
+
+@media print {
+    .sort-icon-box {
+        display: none !important;
+    }
+    .table thead th.sortable-th {
+        cursor: default !important;
+    }
+}
+
 .table-hover tbody tr {
     transition: background-color 0.15s ease, transform 0.15s ease;
 }

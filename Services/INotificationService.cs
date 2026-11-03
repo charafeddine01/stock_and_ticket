@@ -9,6 +9,7 @@ namespace StockPortal.Services
         Task NotifyTicketCreatedAsync(Ticket ticket, User? openedByUser);
         Task NotifyTicketMessageAsync(Ticket ticket, TicketMsg msg, User? sender);
         Task NotifyStatusChangedAsync(Ticket ticket, string newStatus, User? actor);
+        Task NotifyLowReserveStockAsync(SparePart part);
         Task<int> GetUnreadCountAsync(int userId);
         Task<List<Notification>> GetUserNotificationsAsync(int userId, bool unreadOnly = false, int limit = 50);
         Task<bool> MarkAsReadAsync(int notificationId, int userId);

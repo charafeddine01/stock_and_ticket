@@ -71,12 +71,40 @@
                 @(CurrentUser.IsEndUser() ? $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]}" : $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]} • {Loc["Total Asset Value"]}: {Model.Sum(a => a.Price ?? 0).ToString("C0", System.Globalization.CultureInfo.CurrentUICulture)}")
             </small>
         </div>
-        <div class="d-flex gap-2">
-            <a href="@Url.Action("PrintBulkTags", new { search = ViewBag.Search, status = ViewBag.SelectedStatus, type = ViewBag.SelectedType, roomId = ViewBag.SelectedRoomId })" class="btn btn-outline-dark btn-sm shadow-sm" target="_blank" title="@(isArabic ? "طباعة ملصقات الأصول مع رمز الاستجابة السريعة QR" : "Print Asset Tag Labels with QR Code")">
+        @{
+            bool isFiltered = !string.IsNullOrWhiteSpace(ViewBag.Search as string) ||
+                             !string.IsNullOrWhiteSpace(ViewBag.SelectedStatus as string) ||
+                             !string.IsNullOrWhiteSpace(ViewBag.SelectedType as string) ||
+                             (ViewBag.SelectedRoomId != null) ||
+                             !string.IsNullOrWhiteSpace(ViewBag.SelectedWarranty as string) ||
+                             !string.IsNullOrWhiteSpace(ViewBag.SelectedCalibration as string);
+
+            string? activeIdsParam = isFiltered 
+                ? (Model.Any() ? (Model.Count() <= 300 ? string.Join(",", Model.Select(a => a.Id)) : null) : "none") 
+                : null;
+        }
+        <div class="d-flex gap-2 align-items-center">
+            <a href="@Url.Action("PrintBulkTags", new { 
+                search = ViewBag.Search, 
+                status = ViewBag.SelectedStatus, 
+                type = ViewBag.SelectedType, 
+                roomId = ViewBag.SelectedRoomId,
+                warranty = ViewBag.SelectedWarranty,
+                calibration = ViewBag.SelectedCalibration,
+                ids = activeIdsParam
+            })" class="btn btn-outline-dark btn-sm shadow-sm" target="_blank" title="@(isArabic ? (isFiltered ? $"طباعة ملصقات QR للأجهزة المصفاة فقط ({Model.Count()} أصل)" : "طباعة ملصقات QR لكافة الأجهزة") : (isFiltered ? $"Print QR Tags for filtered devices only ({Model.Count()} assets)" : "Print QR Tags for all devices"))">
                 <i class="fa-solid fa-qrcode me-1 text-primary"></i>
-                <span>@(isArabic ? "طباعة ملصقات QR" : "Print QR Tags")</span>
+                <span>@(isArabic ? (isFiltered ? $"طباعة ملصقات QR المصفاة ({Model.Count()})" : "طباعة ملصقات QR") : (isFiltered ? $"Print Filtered QR Tags ({Model.Count()})" : "Print QR Tags"))</span>
             </a>
-            <a href="@Url.Action("ExportCsv", new { search = ViewBag.Search, status = ViewBag.SelectedStatus, type = ViewBag.SelectedType, roomId = ViewBag.SelectedRoomId })" class="btn btn-outline-success btn-sm">
+            <a href="@Url.Action("ExportCsv", new { 
+                search = ViewBag.Search, 
+                status = ViewBag.SelectedStatus, 
+                type = ViewBag.SelectedType, 
+                roomId = ViewBag.SelectedRoomId,
+                warranty = ViewBag.SelectedWarranty,
+                calibration = ViewBag.SelectedCalibration,
+                ids = activeIdsParam
+            })" class="btn btn-outline-success btn-sm">
                 <i class="fa-solid fa-file-csv me-1"></i> @Loc["Export CSV"]
             </a>
             @if (canManage)

@@ -254,6 +254,13 @@
 
     <!-- Cards Grid -->
     <div class="bulk-grid">
+        @if (!Model.Any())
+        {
+            <div class="col-12 text-center py-5 no-print" style="grid-column: 1 / -1;">
+                <i class="fa-solid fa-tags fa-3x text-muted mb-3 opacity-25"></i>
+                <h5 class="fw-bold text-muted">@(Loc.IsArabic ? "لا توجد أصول مطابقة لمعايير التصفية لطباعة الملصقات" : "No matching assets to print for the selected filter criteria.")</h5>
+            </div>
+        }
         @foreach (var item in Model)
         {
             var itemTag = string.IsNullOrWhiteSpace(item.HospitalNo) ? $"ASSET-{item.Id:D5}" : item.HospitalNo;
