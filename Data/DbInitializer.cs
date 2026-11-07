@@ -472,6 +472,8 @@ namespace StockPortal.Data
                     {
                         Name = "Laptop",
                         Department = MaintenanceTeams.IT,
+                        HasSoftware = true,
+                        InstallableSoftwares = @"[""Windows 11 Pro"",""Microsoft Office 365"",""Hospital HIS / EHR Client"",""PACS Imaging Viewer"",""Antivirus Agent"",""Google Chrome""]",
                         Form = @"[
                             {""name"":""Processor"",""label"":""Processor / CPU"",""type"":""text"",""required"":true,""placeholder"":""e.g. Intel Core i7-1165G7""},
                             {""name"":""RAM"",""label"":""Installed Memory (RAM)"",""type"":""select"",""options"":[""8 GB"",""16 GB"",""32 GB"",""64 GB""],""required"":true},
@@ -484,6 +486,8 @@ namespace StockPortal.Data
                     {
                         Name = "Desktop Workstation",
                         Department = MaintenanceTeams.IT,
+                        HasSoftware = true,
+                        InstallableSoftwares = @"[""Windows 11 Pro"",""Microsoft Office 365"",""Hospital HIS / EHR Client"",""PACS Imaging Viewer"",""Antivirus Agent"",""Google Chrome""]",
                         Form = @"[
                             {""name"":""FormFactor"",""label"":""Chassis / Form Factor"",""type"":""select"",""options"":[""Small Form Factor (SFF)"",""Mini Tower"",""All-in-One (AIO)"",""Micro / Tiny PC""],""required"":true},
                             {""name"":""CPU"",""label"":""Processor (CPU)"",""type"":""text"",""required"":true,""placeholder"":""e.g. Intel Core i5-12500 / Ryzen 5 5600G""},
@@ -694,6 +698,11 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN closed_by_users TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE ticket_attachments ADD COLUMN messageID INTEGER NULL;");
 
+                    // Device Forms Installable Softwares Schema
+                    TryExecuteSql(context, "ALTER TABLE device_forms ADD COLUMN has_software INTEGER NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE device_forms ADD COLUMN installable_softwares TEXT NULL;");
+                    TryExecuteSql(context, @"UPDATE device_forms SET has_software = 1, installable_softwares = '[""Windows 11 Pro"",""Microsoft Office 365"",""Hospital HIS / EHR Client"",""PACS Imaging Viewer"",""Antivirus Agent"",""Google Chrome""]' WHERE (name = 'Laptop' OR name = 'Desktop Workstation') AND (has_software = 0 OR installable_softwares IS NULL OR installable_softwares = '[]');");
+
                     TryExecuteSql(context, @"
                         CREATE TABLE IF NOT EXISTS software_catalog (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -779,6 +788,11 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `pc_name` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `closed_by_users` LONGTEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE `ticket_attachments` ADD COLUMN IF NOT EXISTS `messageID` int NULL;");
+
+                    // Device Forms Installable Softwares Schema
+                    TryExecuteSql(context, "ALTER TABLE `device_forms` ADD COLUMN IF NOT EXISTS `has_software` tinyint(1) NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE `device_forms` ADD COLUMN IF NOT EXISTS `installable_softwares` LONGTEXT NULL;");
+                    TryExecuteSql(context, @"UPDATE `device_forms` SET `has_software` = 1, `installable_softwares` = '[""Windows 11 Pro"",""Microsoft Office 365"",""Hospital HIS / EHR Client"",""PACS Imaging Viewer"",""Antivirus Agent"",""Google Chrome""]' WHERE (`name` = 'Laptop' OR `name` = 'Desktop Workstation') AND (`has_software` = 0 OR `installable_softwares` IS NULL OR `installable_softwares` = '[]');");
 
                     TryExecuteSql(context, @"
                         CREATE TABLE IF NOT EXISTS `software_catalog` (

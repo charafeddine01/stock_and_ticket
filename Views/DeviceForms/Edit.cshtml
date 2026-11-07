@@ -18,6 +18,7 @@
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
                     <input type="hidden" asp-for="Id" />
                     <input type="hidden" asp-for="Form" id="hiddenFormJson" />
+                    <input type="hidden" asp-for="InstallableSoftwares" id="hiddenSoftwaresJson" />
 
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
@@ -43,6 +44,47 @@
                                     }
                                 </select>
                             }
+                        </div>
+                    </div>
+
+                    <!-- Installable Software Configuration -->
+                    <div class="card bg-white border mb-4 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <h6 class="fw-bold mb-1 text-dark">
+                                        <i class="fa-solid fa-laptop-code text-primary me-2"></i>
+                                        @(Loc.IsArabic ? "هل توجد برامج يمكن تثبيتها على هذا الأصل؟" : "Are there softwares installable on this asset?")
+                                    </h6>
+                                    <div class="text-muted small">
+                                        @(Loc.IsArabic ? "فعّل هذا الخيار إذا كان هذا الجهاز (مثل الحواسيب والمحطات والخوادم) يدعم تثبيت برامج وتطبيقات." : "Enable if this equipment (e.g. workstations, laptops, servers) supports installable softwares and applications.")
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch fs-4 mb-0">
+                                    <input type="checkbox" asp-for="HasSoftware" class="form-check-input" id="chkHasSoftware" role="switch" />
+                                </div>
+                            </div>
+
+                            <div id="softwareListSection" class="mt-3 pt-3 border-top" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <span class="fw-semibold text-dark">
+                                            <i class="fa-solid fa-cubes text-primary me-1"></i>
+                                            @(Loc.IsArabic ? "قائمة البرامج القابلة للتثبيت" : "Installable Softwares List")
+                                        </span>
+                                        <small class="text-muted d-block">
+                                            @(Loc.IsArabic ? "أدخل أسماء البرامج المتاحة يدوياً، وستظهر كخيارات متعددة عند إضافة أصل من هذا النوع" : "Enter software names manually. They will appear as multi-check options when registering an asset of this type.")
+                                        </small>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-primary" id="btnAddSoftwareLine">
+                                        <i class="fa-solid fa-plus me-1"></i> @(Loc.IsArabic ? "إضافة سطر برنامج" : "Add Software Line")
+                                    </button>
+                                </div>
+
+                                <div id="softwaresContainer" class="d-flex flex-column gap-2 mb-2">
+                                    <!-- Dynamic software lines -->
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -98,6 +140,70 @@
         const btnAddField = document.getElementById("btnAddField");
         const formEl = document.getElementById("deviceFormEditor");
         const hiddenFormJson = document.getElementById("hiddenFormJson");
+        const chkHasSoftware = document.getElementById("chkHasSoftware");
+        const softwareSection = document.getElementById("softwareListSection");
+        const btnAddSoftwareLine = document.getElementById("btnAddSoftwareLine");
+        const softwaresContainer = document.getElementById("softwaresContainer");
+        const hiddenSoftwaresJson = document.getElementById("hiddenSoftwaresJson");
+
+        let initialSoftwares = [];
+        try {
+            initialSoftwares = JSON.parse(hiddenSoftwaresJson.value || "[]");
+        } catch(e) {
+            initialSoftwares = [];
+        }
+
+        function createSoftwareRow(name = "") {
+            const row = document.createElement("div");
+            row.className = "input-group software-row";
+            row.innerHTML = `
+                <span class="input-group-text bg-light text-primary"><i class="fa-solid fa-cube"></i></span>
+                <input type="text" class="form-control software-line-input" value="${name ? name.replace(/"/g, '&quot;') : ''}" placeholder="${isAr ? 'أدخل اسم البرنامج يدوياً (مثال: Windows 11 Pro، حزمة Office 365، نظام PACS...)' : 'Enter software name manually (e.g. Windows 11 Pro, Office 365, PACS Viewer...)'}" />
+                <button type="button" class="btn btn-outline-danger btn-remove-software" title="${isAr ? 'حذف السطر' : 'Remove Line'}"><i class="fa-solid fa-trash-can"></i></button>
+            `;
+
+            const inputEl = row.querySelector(".software-line-input");
+            inputEl.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    createSoftwareRow();
+                }
+            });
+
+            row.querySelector(".btn-remove-software").addEventListener("click", function() {
+                row.remove();
+            });
+
+            softwaresContainer.appendChild(row);
+            inputEl.focus();
+        }
+
+        function toggleSoftwareSection() {
+            if (chkHasSoftware && chkHasSoftware.checked) {
+                softwareSection.style.display = "block";
+                if (softwaresContainer.children.length === 0) {
+                    createSoftwareRow();
+                }
+            } else if (softwareSection) {
+                softwareSection.style.display = "none";
+            }
+        }
+
+        if (chkHasSoftware) {
+            chkHasSoftware.addEventListener("change", toggleSoftwareSection);
+        }
+
+        if (initialSoftwares.length > 0) {
+            initialSoftwares.forEach(sw => createSoftwareRow(sw));
+        }
+
+        toggleSoftwareSection();
+
+        if (btnAddSoftwareLine) {
+            btnAddSoftwareLine.addEventListener("click", function() {
+                createSoftwareRow();
+            });
+        }
 
         let initialFields = [];
         try {
@@ -207,6 +313,18 @@
             }
 
             hiddenFormJson.value = JSON.stringify(fields);
+
+            if (chkHasSoftware && chkHasSoftware.checked) {
+                const swInputs = softwaresContainer.querySelectorAll(".software-line-input");
+                const softwares = [];
+                swInputs.forEach(inp => {
+                    const val = inp.value.trim();
+                    if (val && !softwares.includes(val)) softwares.push(val);
+                });
+                hiddenSoftwaresJson.value = JSON.stringify(softwares);
+            } else if (hiddenSoftwaresJson) {
+                hiddenSoftwaresJson.value = "[]";
+            }
         });
     });
 </script>

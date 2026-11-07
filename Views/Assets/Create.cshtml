@@ -37,6 +37,8 @@
                                             data-name="@form.Name" 
                                             data-department="@form.Department" 
                                             data-schema="@form.Form"
+                                            data-has-software="@(form.HasSoftware ? "true" : "false")"
+                                            data-softwares="@form.InstallableSoftwares"
                                             selected="@(selectedForm?.Id == form.Id)">
                                         @form.Name &bull; (@Loc.TargetTeam(form.Department))
                                     </option>
@@ -68,6 +70,34 @@
                                 <div class="col-12 text-center text-muted py-3" id="noTemplateAlert">
                                     <i class="fa-solid fa-arrow-up text-primary me-1"></i> @(Loc.IsArabic ? "يرجى اختيار نموذج الجهاز أعلاه لتحميل حقول المواصفات." : "Please choose a device template above to load its specification fields.")
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2b. Installed Software Packages (Multi-check from Device Form) -->
+                    <div id="assetSoftwaresCard" class="card shadow-sm border mb-4" style="display: none;">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">
+                                    <i class="fa-solid fa-cube text-primary me-2"></i>
+                                    <span id="assetSoftwaresHeader">@Loc["Installed Software Packages"]</span>
+                                </h6>
+                                <small class="text-muted">
+                                    @(Loc.IsArabic ? "حدد البرامج والأنظمة المثبتة فعلياً على هذا الأصل من قائمة البرامج المعتمدة لهذا النموذج:" : "Check the softwares and packages installed on this asset from the template's available list:")
+                                </small>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnSelectAllSw">
+                                    <i class="fa-solid fa-check-double me-1"></i> @(Loc.IsArabic ? "تحديد الكل" : "Select All")
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
+                                    <i class="fa-solid fa-xmark me-1"></i> @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3" id="assetSoftwaresContainer">
+                                <!-- Dynamically populated checkboxes -->
                             </div>
                         </div>
                     </div>
@@ -232,6 +262,79 @@
         const teamBadge = document.getElementById("specsTeamBadge");
         const noAlert = document.getElementById("noTemplateAlert");
 
+        const softwaresCard = document.getElementById("assetSoftwaresCard");
+        const softwaresContainer = document.getElementById("assetSoftwaresContainer");
+        const btnSelectAllSw = document.getElementById("btnSelectAllSw");
+        const btnClearSw = document.getElementById("btnClearSw");
+
+        let preSelectedSoftwares = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model?.InstalledSoftwaresList ?? new List<string>()));
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function renderSoftwares() {
+            if (!selector.value || !softwaresCard || !softwaresContainer) {
+                if (softwaresCard) softwaresCard.style.display = "none";
+                if (softwaresContainer) softwaresContainer.innerHTML = "";
+                return;
+            }
+
+            const selectedOpt = selector.options[selector.selectedIndex];
+            const hasSoftware = selectedOpt ? selectedOpt.getAttribute("data-has-software") === "true" : false;
+            const softwaresRaw = selectedOpt ? selectedOpt.getAttribute("data-softwares") : "[]";
+
+            let softwaresList = [];
+            try {
+                softwaresList = JSON.parse(softwaresRaw || "[]");
+            } catch (e) {
+                softwaresList = [];
+            }
+
+            if (!hasSoftware || softwaresList.length === 0) {
+                softwaresCard.style.display = "none";
+                softwaresContainer.innerHTML = "";
+                return;
+            }
+
+            softwaresCard.style.display = "block";
+            softwaresContainer.innerHTML = "";
+
+            softwaresList.forEach((sw, idx) => {
+                const col = document.createElement("div");
+                col.className = "col-md-6 col-lg-4";
+                const isChecked = Array.isArray(preSelectedSoftwares) && preSelectedSoftwares.includes(sw);
+                col.innerHTML = `
+                    <div class="card h-100 border p-2 bg-light bg-opacity-50">
+                        <div class="form-check m-0 d-flex align-items-center gap-2">
+                            <input class="form-check-input sw-checkbox mt-0" type="checkbox" name="selectedSoftwares" value="${escapeHtml(sw)}" id="sw_${idx}" ${isChecked ? 'checked' : ''} />
+                            <label class="form-check-label small fw-semibold text-dark flex-grow-1 cursor-pointer" for="sw_${idx}">
+                                <i class="fa-solid fa-cube text-primary opacity-75 me-1"></i> ${escapeHtml(sw)}
+                            </label>
+                        </div>
+                    </div>
+                `;
+                softwaresContainer.appendChild(col);
+            });
+        }
+
+        if (btnSelectAllSw) {
+            btnSelectAllSw.addEventListener("click", function() {
+                if (softwaresContainer) {
+                    softwaresContainer.querySelectorAll(".sw-checkbox").forEach(cb => cb.checked = true);
+                }
+            });
+        }
+
+        if (btnClearSw) {
+            btnClearSw.addEventListener("click", function() {
+                if (softwaresContainer) {
+                    softwaresContainer.querySelectorAll(".sw-checkbox").forEach(cb => cb.checked = false);
+                }
+            });
+        }
+
         const chkPeriodic = document.getElementById("chkNeedsPeriodic");
         const intervalBox = document.getElementById("periodicIntervalContainer");
 
@@ -335,10 +438,14 @@
             });
         }
 
-        selector.addEventListener("change", renderDynamicFields);
+        selector.addEventListener("change", function() {
+            renderDynamicFields();
+            renderSoftwares();
+        });
 
         if (selector.value) {
             renderDynamicFields();
+            renderSoftwares();
         }
     });
 </script>

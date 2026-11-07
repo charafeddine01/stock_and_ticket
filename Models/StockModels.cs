@@ -949,6 +949,36 @@ namespace StockPortal.Models
         [Display(Name = "Form Field Schema (JSON)")]
         public string Form { get; set; } = "[]";
 
+        [Column("has_software")]
+        [Display(Name = "Softwares Installable on this Asset")]
+        public bool HasSoftware { get; set; } = false;
+
+        [Column("installable_softwares")]
+        [Display(Name = "Installable Softwares (JSON)")]
+        public string? InstallableSoftwares { get; set; } = "[]";
+
+        [NotMapped]
+        public List<string> InstallableSoftwaresList
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(InstallableSoftwares)) return new List<string>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<string>>(InstallableSoftwares,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<string>();
+                }
+                catch
+                {
+                    return new List<string>();
+                }
+            }
+            set
+            {
+                InstallableSoftwares = JsonSerializer.Serialize(value ?? new List<string>());
+            }
+        }
+
         [NotMapped]
         public List<FormFieldDefinition> Fields
         {

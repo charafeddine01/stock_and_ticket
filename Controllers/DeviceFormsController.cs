@@ -99,6 +99,9 @@ namespace StockPortal.Controllers
             if (ModelState.IsValid)
             {
                 deviceForm.Name = deviceForm.Name.Trim();
+                deviceForm.InstallableSoftwares = deviceForm.HasSoftware
+                    ? (!string.IsNullOrWhiteSpace(deviceForm.InstallableSoftwares) ? deviceForm.InstallableSoftwares : "[]")
+                    : "[]";
                 _context.DeviceForms.Add(deviceForm);
                 await _context.SaveChangesAsync();
 
@@ -167,6 +170,10 @@ namespace StockPortal.Controllers
                 existing.Name = deviceForm.Name.Trim();
                 existing.Department = deviceForm.Department;
                 existing.Form = deviceForm.Form;
+                existing.HasSoftware = deviceForm.HasSoftware;
+                existing.InstallableSoftwares = deviceForm.HasSoftware
+                    ? (!string.IsNullOrWhiteSpace(deviceForm.InstallableSoftwares) ? deviceForm.InstallableSoftwares : "[]")
+                    : "[]";
 
                 _context.Update(existing);
                 await _context.SaveChangesAsync();
@@ -231,7 +238,9 @@ namespace StockPortal.Controllers
                 id = form.Id,
                 name = form.Name,
                 department = form.Department,
-                fields = form.Fields
+                fields = form.Fields,
+                hasSoftware = form.HasSoftware,
+                installableSoftwares = form.InstallableSoftwaresList
             });
         }
     }

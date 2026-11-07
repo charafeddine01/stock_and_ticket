@@ -217,70 +217,58 @@
                         </div>
                     </div>
 
-                    <!-- 5. Installed Workstation Software Packages (Pre-configured by Maintenance) -->
+                    <!-- 5. Installed Workstation Software Packages (Driven by Device Template) -->
                     @{
-                        var softwareCatalog = ViewBag.SoftwareCatalog as List<StockPortal.Models.SoftwareCatalogItem> ?? new List<StockPortal.Models.SoftwareCatalogItem>();
                         var installedList = Model.InstalledSoftwaresList;
+                        var formSoftwares = (deviceForm != null && deviceForm.HasSoftware)
+                            ? deviceForm.InstallableSoftwaresList
+                            : new List<string>();
+                        var allAvailableSoftwares = formSoftwares.Union(installedList).Distinct().ToList();
+                        bool hasSoftwareSupport = (deviceForm != null && deviceForm.HasSoftware) || installedList.Any();
                     }
-                    <div class="card shadow-sm border mb-4">
-                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="fw-bold mb-0 text-dark">
-                                    <i class="fa-solid fa-cube text-primary me-2"></i>
-                                    @(Loc.IsArabic ? "البرامج المثبتة على محطة العمل (تهيئة مسبقة من قسم الصيانة)" : "Installed Workstation Software Packages (Pre-configured by Maintenance)")
-                                </h6>
-                                <div class="small text-muted mt-1">
-                                    @(Loc.IsArabic ? "حدد حزم البرامج والأنظمة المثبتة على هذا الجهاز ليتمكن المستخدم من اختيارها عند فتح بلاغ عطل فني." : "Select the software suites installed on this PC so users can select them when submitting support tickets.")
+                    @if (hasSoftwareSupport && allAvailableSoftwares.Any())
+                    {
+                        <div class="card shadow-sm border mb-4">
+                            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="fw-bold mb-0 text-dark">
+                                        <i class="fa-solid fa-cube text-primary me-2"></i>
+                                        @(Loc.IsArabic ? "البرامج المثبتة على محطة العمل / الأصل" : "Installed Software Packages on Asset")
+                                    </h6>
+                                    <div class="small text-muted mt-1">
+                                        @(Loc.IsArabic ? "حدد حزم البرامج والأنظمة المثبتة على هذا الجهاز من قائمة البرامج المعتمدة لهذا النموذج:" : "Select the software suites installed on this equipment from the template's available list:")
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnSelectAllSw">
+                                        <i class="fa-solid fa-check-double me-1"></i> @(Loc.IsArabic ? "تحديد الكل" : "Select All")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
+                                        <i class="fa-solid fa-xmark me-1"></i> @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
+                                    </button>
                                 </div>
                             </div>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnSelectAllSw">
-                                    @(Loc.IsArabic ? "تحديد الكل" : "Select All")
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
-                                    @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body p-4">
-                            @if (softwareCatalog.Any())
-                            {
-                                var groupedCatalog = softwareCatalog.GroupBy(s => s.Category ?? "General").OrderBy(g => g.Key);
-                                <div class="row g-4">
-                                    @foreach (var group in groupedCatalog)
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    @for (int i = 0; i < allAvailableSoftwares.Count; i++)
                                     {
-                                        <div class="col-md-6 col-lg-6">
-                                            <div class="border rounded p-3 h-100 bg-light bg-opacity-50">
-                                                <div class="fw-bold text-primary small text-uppercase mb-2 pb-1 border-bottom">
-                                                    <i class="fa-solid fa-folder-tree me-1"></i> @group.Key
-                                                </div>
-                                                <div class="d-flex flex-column gap-2">
-                                                    @foreach (var sw in group)
-                                                    {
-                                                        bool isChecked = installedList.Contains(sw.Name);
-                                                        <div class="form-check">
-                                                            <input class="form-check-input sw-checkbox" type="checkbox" name="selectedSoftwares" value="@sw.Name" id="sw_@sw.Id" @(isChecked ? "checked" : "") />
-                                                            <label class="form-check-label small fw-semibold text-dark" for="sw_@sw.Id">
-                                                                @sw.Name
-                                                                @if (!string.IsNullOrWhiteSpace(sw.Vendor))
-                                                                {
-                                                                    <span class="text-muted fw-normal d-block" style="font-size: 0.72rem;">@sw.Vendor</span>
-                                                                }
-                                                            </label>
-                                                        </div>
-                                                    }
+                                        var sw = allAvailableSoftwares[i];
+                                        bool isChecked = installedList.Contains(sw);
+                                        <div class="col-md-6 col-lg-4">
+                                            <div class="card h-100 border p-2 bg-light bg-opacity-50">
+                                                <div class="form-check m-0 d-flex align-items-center gap-2">
+                                                    <input class="form-check-input sw-checkbox mt-0" type="checkbox" name="selectedSoftwares" value="@sw" id="sw_@i" @(isChecked ? "checked" : "") />
+                                                    <label class="form-check-label small fw-semibold text-dark flex-grow-1 cursor-pointer" for="sw_@i">
+                                                        <i class="fa-solid fa-cube text-primary opacity-75 me-1"></i> @sw
+                                                    </label>
                                                 </div>
                                             </div>
                                         </div>
                                     }
                                 </div>
-                            }
-                            else
-                            {
-                                <div class="text-muted fst-italic">@(Loc.IsArabic ? "لا توجد برامج مسجلة في دليل برامج المستشفى." : "No software items found in software catalog.")</div>
-                            }
+                            </div>
                         </div>
-                    </div>
+                    }
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
                         <a href="@Url.Action("Details", new { id = Model.Id })" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
