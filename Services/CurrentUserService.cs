@@ -87,11 +87,42 @@ namespace StockPortal.Services
             var user = GetCurrentUser();
             if (user != null && !string.IsNullOrWhiteSpace(user.Role))
             {
+                if (CheckIsAdminRole(user.Role)) return SystemRoles.Admin;
+                if (CheckIsMaintenanceRole(user.Role)) return SystemRoles.Maintenance;
                 return user.Role.Trim().ToUpperInvariant();
             }
 
             var claim = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role);
-            return claim?.Value?.Trim().ToUpperInvariant() ?? SystemRoles.EndUser;
+            var claimVal = claim?.Value?.Trim().ToUpperInvariant();
+            if (!string.IsNullOrWhiteSpace(claimVal))
+            {
+                if (CheckIsAdminRole(claimVal)) return SystemRoles.Admin;
+                if (CheckIsMaintenanceRole(claimVal)) return SystemRoles.Maintenance;
+                return claimVal;
+            }
+
+            return SystemRoles.EndUser;
+        }
+
+        private static bool CheckIsAdminRole(string? role)
+        {
+            if (string.IsNullOrWhiteSpace(role)) return false;
+            var r = role.Trim().ToUpperInvariant();
+            return r == SystemRoles.Admin ||
+                   r == "ADMINISTRATOR" ||
+                   r.Contains("ADMIN") ||
+                   r.Contains("SYSADMIN") ||
+                   r.Contains("MANAGER");
+        }
+
+        private static bool CheckIsMaintenanceRole(string? role)
+        {
+            if (string.IsNullOrWhiteSpace(role)) return false;
+            var r = role.Trim().ToUpperInvariant();
+            return r == SystemRoles.Maintenance ||
+                   r.Contains("MAINTENANCE") ||
+                   r.Contains("TECHNICIAN") ||
+                   r.Contains("ENGINEER");
         }
 
         public string? GetMaintenanceTeam()
@@ -119,12 +150,17 @@ namespace StockPortal.Services
 
         public bool IsAdmin()
         {
-            return string.Equals(GetRole(), SystemRoles.Admin, StringComparison.OrdinalIgnoreCase);
+            var user = GetCurrentUser();
+            if (user != null && CheckIsAdminRole(user.Role)) return true;
+            return CheckIsAdminRole(GetRole());
         }
 
         public bool IsMaintenance()
         {
-            return string.Equals(GetRole(), SystemRoles.Maintenance, StringComparison.OrdinalIgnoreCase);
+            if (IsAdmin()) return false;
+            var user = GetCurrentUser();
+            if (user != null && CheckIsMaintenanceRole(user.Role)) return true;
+            return CheckIsMaintenanceRole(GetRole());
         }
 
         public bool IsEndUser()

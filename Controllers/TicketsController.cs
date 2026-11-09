@@ -1493,9 +1493,22 @@ namespace StockPortal.Controllers
                 .GroupBy(x => x.AssetId)
                 .ToDictionary(g => g.Key, g => g.First().TicketId);
 
-            // Only assets associated with the current user appear!
+            // Assets associated with the current user / authorized scope
             var userAssetsQuery = _context.Assets.Include(a => a.Room).AsQueryable();
-            if (currentUserId.HasValue && currentUserId.Value > 0)
+
+            if (_currentUserService.IsAdmin())
+            {
+                // Admin can open tickets for any asset across all departments in the hospital
+            }
+            else if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam();
+                if (!string.IsNullOrWhiteSpace(myTeam))
+                {
+                    userAssetsQuery = userAssetsQuery.Where(a => a.MaintenanceTeam == myTeam || (currentUserId.HasValue && a.UserId == currentUserId.Value));
+                }
+            }
+            else if (currentUserId.HasValue && currentUserId.Value > 0)
             {
                 userAssetsQuery = userAssetsQuery.Where(a => a.UserId == currentUserId.Value);
             }

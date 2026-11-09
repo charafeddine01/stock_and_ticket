@@ -169,7 +169,7 @@ namespace StockPortal.Data
 
                 var users = new[]
                 {
-                    new User { FullName = "Abbas Al-Amiri", DomainUser = currentPcUser, Role = "IT Manager & Lead SysAdmin", DepartmentId = itDept?.Id, IsActive = true },
+                    new User { FullName = "Abbas Al-Amiri", DomainUser = currentPcUser, Role = SystemRoles.Admin, DepartmentId = itDept?.Id, IsActive = true },
                     new User { FullName = "Ahmed Mansour", DomainUser = "a.mansour", Role = "Field Support Technician", DepartmentId = itDept?.Id, IsActive = true },
                     new User { FullName = "Dr. Sarah Jenkins", DomainUser = "s.jenkins", Role = "Lead Cardiologist", DepartmentId = cardDept?.Id, IsActive = true },
                     new User { FullName = "Dr. Elena Rostova", DomainUser = "e.rostova", Role = "Radiology Consultant", DepartmentId = radDept?.Id, IsActive = true },
@@ -1524,6 +1524,17 @@ namespace StockPortal.Data
         {
             try
             {
+                // Ensure Admin user (Abbas / domain admin) has role 'ADMIN' so Admin can manage users and see everything
+                string currentPcUser = string.IsNullOrWhiteSpace(Environment.UserName) ? "Abbas" : Environment.UserName;
+                TryExecuteSql(context, "UPDATE users SET role = 'ADMIN' WHERE role LIKE '%Admin%' OR role LIKE '%Manager%' OR role LIKE '%SysAdmin%' OR fullName LIKE '%Abbas%';");
+                var adminUser = context.Users.FirstOrDefault(u => u.DomainUser == currentPcUser || (u.FullName != null && u.FullName.Contains("Abbas")));
+                if (adminUser != null && adminUser.Role != SystemRoles.Admin)
+                {
+                    adminUser.Role = SystemRoles.Admin;
+                    adminUser.IsActive = true;
+                    context.SaveChanges();
+                }
+
                 // 1. Seed Asset Categories (Task 6)
                 if (!context.AssetCategories.Any())
                 {

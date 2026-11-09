@@ -21,7 +21,7 @@ namespace StockPortal.Controllers
         }
 
         // GET: AssetCategories
-        public async Task<IActionResult> Index(string? department)
+        public async Task<IActionResult> Index(string? department, string? search = null, string? filter = null)
         {
             if (_currentUserService.IsEndUser())
             {
@@ -35,9 +35,29 @@ namespace StockPortal.Controllers
                 var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
                 query = query.Where(c => c.Department == myTeam);
             }
-            else if (!string.IsNullOrWhiteSpace(department) && !string.Equals(department, "ALL", StringComparison.OrdinalIgnoreCase))
+            else if (_currentUserService.IsAdmin())
             {
-                query = query.Where(c => c.Department == department);
+                if (!string.IsNullOrWhiteSpace(department) && !string.Equals(department, "ALL", StringComparison.OrdinalIgnoreCase))
+                {
+                    query = query.Where(c => c.Department == department);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                query = query.Where(c => c.Name.ToLower().Contains(term) ||
+                                         (c.NameAr != null && c.NameAr.ToLower().Contains(term)) ||
+                                         (c.Description != null && c.Description.ToLower().Contains(term)));
+            }
+
+            if (string.Equals(filter, "with_assets", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(c => c.Assets.Any());
+            }
+            else if (string.Equals(filter, "empty", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(c => !c.Assets.Any());
             }
 
             var categories = await query
@@ -47,7 +67,11 @@ namespace StockPortal.Controllers
                 .ToListAsync();
 
             ViewBag.SelectedDepartment = department;
+            ViewBag.SearchTerm = search;
+            ViewBag.SelectedFilter = filter;
             ViewBag.AvailableDepartments = MaintenanceTeams.All;
+            ViewBag.IsAdmin = _currentUserService.IsAdmin();
+            ViewBag.UserDepartment = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
 
             return View(categories);
         }

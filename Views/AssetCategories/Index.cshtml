@@ -1,8 +1,13 @@
 @model IEnumerable<StockPortal.Models.AssetCategory>
+@inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
     ViewData["Title"] = Loc["Asset Categories"];
     var availableDepts = ViewBag.AvailableDepartments as string[] ?? MaintenanceTeams.All;
     var selectedDept = ViewBag.SelectedDepartment as string;
+    var searchTerm = ViewBag.SearchTerm as string ?? "";
+    var selectedFilter = ViewBag.SelectedFilter as string ?? "all";
+    bool isAdmin = CurrentUser.IsAdmin();
+    var userDept = ViewBag.UserDepartment as string ?? CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
     var isAr = Loc.IsArabic;
 }
 
@@ -28,27 +33,79 @@
     </div>
 }
 
-<!-- Department Filter Pills -->
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body py-2">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <span class="text-muted small fw-semibold me-2">@Loc["Department"]:</span>
-            <a href="@Url.Action("Index")" class="btn btn-sm @(string.IsNullOrEmpty(selectedDept) || selectedDept == "ALL" ? "btn-primary" : "btn-outline-secondary")">
-                @Loc["All Departments"]
-            </a>
-            @foreach (var dept in availableDepts)
-            {
-                <a href="@Url.Action("Index", new { department = dept })" class="btn btn-sm @(selectedDept == dept ? "btn-primary" : "btn-outline-secondary")">
-                    @Loc[dept]
+@if (isAdmin)
+{
+    <!-- Department Filter Pills (Strictly for Administrators) -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="text-muted small fw-semibold me-2"><i class="fa-solid fa-building me-1"></i>@Loc["Department"]:</span>
+                <a href="@Url.Action("Index", new { department = "ALL", search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(string.IsNullOrEmpty(selectedDept) || selectedDept == "ALL" ? "btn-primary" : "btn-outline-secondary")">
+                    @Loc["All Departments"]
                 </a>
-            }
+                @foreach (var dept in availableDepts)
+                {
+                    <a href="@Url.Action("Index", new { department = dept, search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(selectedDept == dept ? "btn-primary" : "btn-outline-secondary")">
+                        @Loc.TargetTeam(dept)
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Department Indicator for Maintenance Users (Departmental Isolation preserved) -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="badge bg-primary fs-6 px-3 py-2">
+            <i class="fa-solid fa-shield-halved me-1"></i> @(isAr ? $"فئات أصول قسم: {Loc.TargetTeam(userDept)}" : $"{userDept} Department Categories")
+        </span>
+    </div>
+}
+
+<!-- Dynamic Filters Toolbar for All Users -->
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-center">
+            <!-- Dynamic Search Input -->
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-white border-end-0 text-muted">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input type="text" id="categoryLiveSearch" class="form-control border-start-0" placeholder="@(isAr ? "بحث فوري بالاسم، الاسم العربي، الوصف..." : "Quick filter by name, Arabic name, or description...")" value="@searchTerm" autocomplete="off" />
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" title="@Loc["Reset"]">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- In-Use vs Empty Filter Buttons -->
+            <div class="col-md-5">
+                <div class="btn-group btn-group-sm w-100" role="group" id="categoryFilterGroup">
+                    <button type="button" class="btn btn-outline-secondary active" data-filter="all" id="btnFilterAll">
+                        <i class="fa-solid fa-layer-group me-1"></i> @(isAr ? "كافة الفئات" : "All Categories")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-filter="with_assets" id="btnFilterWithAssets">
+                        <i class="fa-solid fa-boxes-stacked me-1"></i> @(isAr ? "فئات بها أجهزة" : "With Assets")
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-filter="empty" id="btnFilterEmpty">
+                        <i class="fa-solid fa-inbox me-1"></i> @(isAr ? "فئات فارغة (0 أصل)" : "Empty (0 Assets)")
+                    </button>
+                </div>
+            </div>
+
+            <!-- Live Item Counter -->
+            <div class="col-md-2 text-md-end text-muted small fw-semibold">
+                <span id="categoryCounter">@Model.Count() @(isAr ? "فئة" : "categories")</span>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="card shadow-sm border-0">
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0" id="categoriesTable">
             <thead class="table-light small text-uppercase">
                 <tr>
                     <th style="width: 25%;">@Loc["Category Name"]</th>
@@ -61,7 +118,7 @@
             <tbody>
                 @if (!Model.Any())
                 {
-                    <tr>
+                    <tr id="emptyRowServer">
                         <td colspan="5" class="text-center py-4 text-muted">
                             <i class="fa-solid fa-inbox fs-3 d-block mb-2"></i>
                             @(isAr ? "لا توجد فئات معرفة حالياً لهذا القسم." : "No categories defined for this department yet.")
@@ -72,27 +129,33 @@
                 {
                     @foreach (var item in Model)
                     {
-                        <tr>
+                        var assetCount = item.Assets?.Count ?? 0;
+                        <tr class="category-row"
+                            data-name="@(item.Name?.ToLower() ?? "")"
+                            data-name-ar="@(item.NameAr?.ToLower() ?? "")"
+                            data-desc="@(item.Description?.ToLower() ?? "")"
+                            data-dept="@(item.Department?.ToUpper() ?? "")"
+                            data-asset-count="@assetCount">
                             <td>
                                 <div class="fw-bold text-dark">
-                                    <i class="fa-solid fa-folder me-2 text-primary opacity-75"></i> @item.Name
+                                    <i class="fa-solid fa-folder me-2 text-primary opacity-75"></i> <span class="cat-name-display">@item.Name</span>
                                 </div>
                                 @if (!string.IsNullOrWhiteSpace(item.Description))
                                 {
-                                    <div class="small text-muted text-truncate" style="max-width: 320px;">@item.Description</div>
+                                    <div class="small text-muted text-truncate cat-desc-display" style="max-width: 320px;">@item.Description</div>
                                 }
                             </td>
                             <td>
-                                <span class="fw-semibold text-secondary">@(item.NameAr ?? "-")</span>
+                                <span class="fw-semibold text-secondary cat-namear-display">@(item.NameAr ?? "-")</span>
                             </td>
                             <td>
                                 <span class="badge @(item.Department == MaintenanceTeams.IT ? "bg-primary-subtle text-primary border border-primary-subtle" : item.Department == MaintenanceTeams.Biomedical ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning-emphasis border border-warning-subtle")">
-                                    @item.Department
+                                    @Loc.TargetTeam(item.Department)
                                 </span>
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border">
-                                    @(item.Assets?.Count ?? 0) @(isAr ? "أصل" : "asset(s)")
+                                <span class="badge @(assetCount > 0 ? "bg-primary-subtle text-primary border" : "bg-light text-muted border")">
+                                    @assetCount @(isAr ? "أصل" : "asset(s)")
                                 </span>
                             </td>
                             <td class="text-end">
@@ -108,8 +171,101 @@
                             </td>
                         </tr>
                     }
+                    <tr id="noResultsClientRow" style="display: none;">
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-filter-circle-xmark fs-3 d-block mb-2"></i>
+                            @(isAr ? "لا توجد نتائج تطابق معايير البحث الحالية." : "No categories match the active filter criteria.")
+                        </td>
+                    </tr>
                 }
             </tbody>
         </table>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const searchInput = document.getElementById("categoryLiveSearch");
+        const clearBtn = document.getElementById("clearSearchBtn");
+        const filterGroup = document.getElementById("categoryFilterGroup");
+        const counterSpan = document.getElementById("categoryCounter");
+        const rows = document.querySelectorAll(".category-row");
+        const noResultsRow = document.getElementById("noResultsClientRow");
+        const isAr = @(isAr ? "true" : "false");
+
+        let currentActiveFilter = "all";
+
+        function applyClientFilter() {
+            const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const name = row.getAttribute("data-name") || "";
+                const nameAr = row.getAttribute("data-name-ar") || "";
+                const desc = row.getAttribute("data-desc") || "";
+                const count = parseInt(row.getAttribute("data-asset-count") || "0", 10);
+
+                let matchesSearch = !query || name.includes(query) || nameAr.includes(query) || desc.includes(query);
+                let matchesStatus = true;
+
+                if (currentActiveFilter === "with_assets") {
+                    matchesStatus = count > 0;
+                } else if (currentActiveFilter === "empty") {
+                    matchesStatus = count === 0;
+                }
+
+                if (matchesSearch && matchesStatus) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            if (noResultsRow) {
+                noResultsRow.style.display = (visibleCount === 0 && rows.length > 0) ? "" : "none";
+            }
+
+            if (counterSpan) {
+                counterSpan.textContent = isAr 
+                    ? `عرض ${visibleCount} من ${rows.length} فئة` 
+                    : `Showing ${visibleCount} of ${rows.length}`;
+            }
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener("input", applyClientFilter);
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener("click", function () {
+                if (searchInput) {
+                    searchInput.value = "";
+                    searchInput.focus();
+                }
+                applyClientFilter();
+            });
+        }
+
+        if (filterGroup) {
+            filterGroup.querySelectorAll("button").forEach(btn => {
+                btn.addEventListener("click", function () {
+                    filterGroup.querySelectorAll("button").forEach(b => {
+                        b.classList.remove("active", "btn-secondary");
+                        b.classList.add("btn-outline-secondary");
+                    });
+                    this.classList.add("active", "btn-secondary");
+                    this.classList.remove("btn-outline-secondary");
+
+                    currentActiveFilter = this.getAttribute("data-filter") || "all";
+                    applyClientFilter();
+                });
+            });
+        }
+
+        // Run initial filter in case search input was restored
+        applyClientFilter();
+    });
+</script>
+}

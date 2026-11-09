@@ -117,7 +117,7 @@
                         </div>
                     }
 
-                    <div id="clientSideActiveTicketAlert" class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" style="display: none;" role="alert">
+                    <div id="clientSideActiveTicketAlert" class="alert alert-danger d-none align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-ban fs-4 text-danger flex-shrink-0"></i>
                             <div>
@@ -156,7 +156,18 @@
                         <div class="col-md-12" id="myAssetsContainer">
                             <label class="form-label fw-semibold d-flex justify-content-between align-items-center mb-2">
                                 <span id="assetContainerTitle">
-                                    <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @Loc["Your Assigned Hardware Asset"]
+                                    @if (CurrentUser.IsAdmin())
+                                    {
+                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @(Loc.IsArabic ? "معدات وأصول المستشفى (اختر الجهاز للإبلاغ)" : "Hospital Asset Inventory (Select Device)")
+                                    }
+                                    else if (CurrentUser.IsMaintenance())
+                                    {
+                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @(Loc.IsArabic ? $"معدات قسم الصيانة ({Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}) والأجهزة المسندة إليك" : $"{CurrentUser.GetMaintenanceTeam()} Department Equipment & Assigned Assets")
+                                    }
+                                    else
+                                    {
+                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @Loc["Your Assigned Hardware Asset"]
+                                    }
                                 </span>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-light text-muted border fw-normal" id="assetCountBadge">@userAssetsCount @Loc["assigned items"]</span>
@@ -899,7 +910,8 @@
                         ? `الجهاز [${item.display || item.hospitalNo}] مرتبط بتذكرة نشطة حالياً برقم #${item.activeTicketId}. لا يمكن فتح تذكرة جديدة حتى يتم إغلاق التذكرة السابقة.`
                         : `Asset [${item.display || item.hospitalNo}] already has an active open ticket (#${item.activeTicketId}). You cannot open another ticket until it is closed or canceled.`;
                     clientAlertLink.href = `/Tickets/Details/${item.activeTicketId}`;
-                    clientAlert.style.display = "flex";
+                    clientAlert.classList.remove("d-none");
+                    clientAlert.classList.add("d-flex");
                 }
                 if (submitBtn) {
                     submitBtn.disabled = true;
@@ -907,7 +919,10 @@
                     submitBtn.title = isAr ? "لا يمكن الإرسال لوجود تذكرة نشطة على هذا الجهاز" : "Cannot submit: an active ticket already exists for this device";
                 }
             } else {
-                if (clientAlert) clientAlert.style.display = "none";
+                if (clientAlert) {
+                    clientAlert.classList.add("d-none");
+                    clientAlert.classList.remove("d-flex");
+                }
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.classList.remove("opacity-50");
