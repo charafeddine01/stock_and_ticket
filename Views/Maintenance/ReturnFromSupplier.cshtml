@@ -83,16 +83,9 @@
                     </h6>
 
                     <div class="row g-3 mb-4">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label class="form-label fw-bold">@(Loc.IsArabic ? "تاريخ الاستلام الفعلي" : "Actual Return Date") <span class="text-danger">*</span></label>
                             <input type="datetime-local" name="returnDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-ddTHH:mm")" required />
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold">@Loc["Cost"] ($)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" step="0.01" name="cost" class="form-control" placeholder="0.00" />
-                            </div>
                         </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">@Loc["Work Summary / Actions Taken"] <span class="text-danger">*</span></label>
@@ -118,12 +111,11 @@
                         <table class="table table-bordered align-middle" id="partsTable">
                             <thead class="table-light small text-uppercase">
                                 <tr>
-                                    <th style="width: 28%;">@Loc["Part Name"] <span class="text-danger">*</span></th>
-                                    <th style="width: 20%;">@Loc["Part Number"]</th>
-                                    <th style="width: 10%;">@Loc["Quantity"]</th>
-                                    <th style="width: 14%;">@Loc["Cost"] ($)</th>
-                                    <th style="width: 12%;">@Loc["Under Warranty"]?</th>
-                                    <th style="width: 16%;">@(Loc.IsArabic ? "الرقم التسلسلي / ملاحظات" : "Serial / Notes")</th>
+                                    <th style="width: 32%;">@Loc["Part Name"] <span class="text-danger">*</span></th>
+                                    <th style="width: 25%;">@Loc["Part Number"]</th>
+                                    <th style="width: 12%;">@Loc["Quantity"]</th>
+                                    <th style="width: 13%;">@Loc["Under Warranty"]?</th>
+                                    <th style="width: 18%;">@(Loc.IsArabic ? "الرقم التسلسلي / ملاحظات" : "Serial / Notes")</th>
                                     <th style="width: 5%;" class="text-center">@Loc["Actions"]</th>
                                 </tr>
                             </thead>
@@ -241,9 +233,6 @@
             <td>
                 <input type="number" class="form-control form-control-sm part-qty text-center" min="1" value="${item.quantity || 1}" required />
             </td>
-            <td>
-                <input type="number" step="0.01" class="form-control form-control-sm part-cost" placeholder="0.00" value="${item.cost != null ? item.cost : ''}" />
-            </td>
             <td class="text-center">
                 <input type="checkbox" class="form-check-input part-warranty" ${item.underWarranty ? 'checked' : ''} />
             </td>
@@ -280,7 +269,6 @@
                     partName: name,
                     partNumber: tr.querySelector(".part-number").value.trim(),
                     quantity: parseInt(tr.querySelector(".part-qty").value) || 1,
-                    cost: parseFloat(tr.querySelector(".part-cost").value) || 0,
                     underWarranty: tr.querySelector(".part-warranty").checked,
                     notes: tr.querySelector(".part-notes").value.trim()
                 });

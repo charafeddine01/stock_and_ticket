@@ -1,0 +1,320 @@
+@model List<StockPortal.Models.Asset>
+@inject StockPortal.Services.ILocalizationService Loc
+@{
+    Layout = null;
+    var isAr = Loc.IsArabic;
+    var activeChecklist = ViewBag.ActiveChecklist as StockPortal.Models.ChecklistForm;
+    var allCandidateAssets = ViewBag.AllCandidateAssets as List<StockPortal.Models.Asset> ?? new();
+    var availableChecklists = ViewBag.AvailableChecklists as List<StockPortal.Models.ChecklistForm> ?? new();
+    var selectedAssetIds = ViewBag.SelectedAssetIds as List<int> ?? new();
+}
+
+<!DOCTYPE html>
+<html lang="@(isAr ? "ar" : "en")" dir="@(isAr ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(isAr ? "نموذج الفحص الدوري الميداني" : "Preventive Inspection Checklist Matrix") - @(activeChecklist?.Title ?? "Checklist")</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+            padding: 20px;
+        }
+        .sheet-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+        }
+        .sheet-header {
+            border-bottom: 2px solid #198754;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .audit-table th {
+            background-color: #f0f7f3;
+            color: #0f5132;
+            font-size: 0.82rem;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .audit-table td {
+            font-size: 0.85rem;
+            vertical-align: middle;
+            height: 42px;
+        }
+        .tick-box {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 1.5px solid #495057;
+            border-radius: 3px;
+            background: #fff;
+        }
+        .dotted-line {
+            border-bottom: 1px dotted #495057;
+            display: inline-block;
+            min-width: 140px;
+            height: 16px;
+        }
+        @@media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-container {
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            .audit-table th {
+                background-color: #eee !important;
+                color: #000 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Configuration & Print Toolbar (Hidden during print) -->
+    <div class="sheet-container mb-4 no-print border p-3 bg-white">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <h5 class="fw-bold text-dark mb-1">
+                    <i class="fa-solid fa-print text-success me-2"></i>
+                    @(isAr ? "إعداد وطباعة نموذج الفحص الدوري الميداني" : "Printable Preventive Checklist Sheet")
+                </h5>
+                <span class="text-muted small">
+                    @(isAr ? "حدد الأجهزة المطلوب إدراجها في ورقة الفحص واطبع النموذج للمهندسين الميدانيين." : "Select the devices to include in this audit sheet and click Print.")
+                </span>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#deviceSelectorModal">
+                    <i class="fa-solid fa-list-check me-1"></i> @(isAr ? $"اختيار الأجهزة ({Model.Count})" : $"Select Devices ({Model.Count})")
+                </button>
+                <button onclick="window.print()" class="btn btn-success shadow-sm fw-bold">
+                    <i class="fa-solid fa-print me-1"></i> @(isAr ? "طباعة النموذج الآن" : "Print Checklist")
+                </button>
+                <button onclick="window.close()" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-xmark me-1"></i> @Loc["Close"]
+                </button>
+            </div>
+        </div>
+
+        @if (availableChecklists.Count > 1)
+        {
+            <div class="row g-2 mt-2 pt-2 border-top align-items-center">
+                <div class="col-auto">
+                    <label class="form-label small fw-bold mb-0">@(isAr ? "تغيير نموذج الفحص:" : "Switch Checklist Form:")</label>
+                </div>
+                <div class="col-md-5">
+                    <select class="form-select form-select-sm" onchange="location.href='@Url.Action("PrintChecklist")?id=' + this.value">
+                        @foreach (var ch in availableChecklists)
+                        {
+                            <option value="@ch.Id" selected="@(activeChecklist?.Id == ch.Id)">@ch.Title (@ch.ChecklistType)</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Main Printable Inspection Sheet -->
+    <div class="sheet-container">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start sheet-header">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="fa-solid fa-hospital text-success fs-4"></i>
+                    <h4 class="fw-bold mb-0 text-dark">@(isAr ? "مستشفى الرعاية الطبية - إدارة الصيانة الطبية والتقنية" : "Hospital Maintenance & Engineering Department")</h4>
+                </div>
+                <h5 class="fw-bold text-success mb-1">@(activeChecklist?.Title ?? "Equipment Periodic Inspection Checklist")</h5>
+                <div class="text-muted small">
+                    <span>@Loc["Department"]: <strong>@Loc.TargetTeam(activeChecklist?.Department)</strong></span> &bull;
+                    <span>@(isAr ? "فئة الأصل:" : "Category:") <strong>@(activeChecklist?.Category?.DisplayName ?? (isAr ? "كافة الأجهزة" : "All equipment"))</strong></span> &bull;
+                    <span>@(isAr ? "نوع الفحص:" : "Inspection Scope:") <strong>@(activeChecklist?.ChecklistType ?? "Periodic Maintenance")</strong></span>
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="text-muted small">@(isAr ? "تاريخ الفحص الميداني:" : "Inspection Date:")</div>
+                <div class="fw-bold font-monospace fs-6">@DateTime.Now.ToString("yyyy/MM/dd")</div>
+                <div class="small text-muted mt-1">@(isAr ? "إجمالي الأجهزة:" : "Total Devices:") <strong>@Model.Count</strong></div>
+            </div>
+        </div>
+
+        <!-- Checklist Actions Legend -->
+        <div class="bg-light p-3 rounded border mb-3">
+            <h6 class="fw-bold small text-success mb-2">
+                <i class="fa-solid fa-clipboard-list me-1"></i>
+                @(isAr ? "بنود الفحص والإجراءات المعتمدة (Action Items):" : "Audited Action Items & Procedures:")
+            </h6>
+            <div class="row g-2">
+                @{
+                    var items = activeChecklist?.Items ?? new List<string>();
+                }
+                @for (int idx = 0; idx < items.Count; idx++)
+                {
+                    <div class="col-md-6 col-lg-4">
+                        <div class="small d-flex align-items-start gap-2">
+                            <span class="badge bg-success bg-opacity-25 text-success font-monospace">[@(idx + 1)]</span>
+                            <span class="text-dark">@items[idx]</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Devices Inspection Matrix Table -->
+        <table class="table table-bordered audit-table mb-4">
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 14%;">@(isAr ? "رقم الأصل / Tag" : "Asset Tag / SN")</th>
+                    <th style="width: 16%;">@(isAr ? "الجهاز / الموديل" : "Brand & Type")</th>
+                    <th style="width: 15%;">@(isAr ? "الموقع / الغرفة" : "Location / Custodian")</th>
+                    <!-- Check items columns -->
+                    @for (int idx = 0; idx < items.Count; idx++)
+                    {
+                        <th style="width: @(Math.Max(5, 30 / Math.Max(1, items.Count)))%;" title="@items[idx]">
+                            [@(idx + 1)]
+                        </th>
+                    }
+                    <th style="width: 10%;">@(isAr ? "النتيجة" : "Result")</th>
+                    <th style="width: 10%;">@(isAr ? "توقيع الفاحص" : "Sign")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="@(6 + items.Count)" class="text-center text-muted py-4">
+                            @(isAr ? "لم يتم تحديد أي أجهزة للطباعة." : "No devices selected for printing.")
+                        </td>
+                    </tr>
+                }
+                @{ int rowNum = 1; }
+                @foreach (var device in Model)
+                {
+                    <tr>
+                        <td class="text-center fw-bold text-muted">@rowNum</td>
+                        <td>
+                            <strong class="font-monospace text-dark d-block">@(device.HospitalNo ?? ("#" + device.Id))</strong>
+                            <small class="text-muted font-monospace" style="font-size: 0.72rem;">SN: @(device.SerialNo ?? "-")</small>
+                        </td>
+                        <td>
+                            <div class="fw-semibold">@device.Brand</div>
+                            <small class="text-muted">@device.DisplayType</small>
+                        </td>
+                        <td>
+                            <div><i class="fa-solid fa-location-dot text-danger opacity-75 me-1"></i> @(device.Room?.DisplayName ?? "-")</div>
+                            <small class="text-muted" style="font-size: 0.72rem;">@(device.User?.DisplayFullName ?? "-")</small>
+                        </td>
+                        @for (int idx = 0; idx < items.Count; idx++)
+                        {
+                            <td class="text-center">
+                                <span class="tick-box"></span>
+                            </td>
+                        }
+                        <td class="text-center small text-muted">
+                            <span class="tick-box" style="width:12px; height:12px;"></span> P &nbsp;
+                            <span class="tick-box" style="width:12px; height:12px;"></span> F
+                        </td>
+                        <td></td>
+                    </tr>
+                    rowNum++;
+                }
+            </tbody>
+        </table>
+
+        <!-- Signatures Footer -->
+        <div class="row g-3 mt-4 pt-3 border-top">
+            <div class="col-4">
+                <div class="small text-muted mb-1">@(isAr ? "اسم المهندس / الفاحص:" : "Inspected By (Engineer):")</div>
+                <span class="dotted-line w-75"></span>
+            </div>
+            <div class="col-4 text-center">
+                <div class="small text-muted mb-1">@(isAr ? "التوقيع والاعتماد:" : "Signature & Stamp:")</div>
+                <span class="dotted-line w-75"></span>
+            </div>
+            <div class="col-4 text-end">
+                <div class="small text-muted mb-1">@(isAr ? "رئيس قسم الصيانة:" : "Head of Maintenance:")</div>
+                <span class="dotted-line w-75"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Device Selector Modal (No print) -->
+    <div class="modal fade no-print" id="deviceSelectorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="get" asp-action="PrintChecklist">
+                    <input type="hidden" name="id" value="@(activeChecklist?.Id ?? 0)" />
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">
+                            <i class="fa-solid fa-filter text-primary me-2"></i>
+                            @(isAr ? "تحديد الأجهزة المراد إدراجها في ورقة الفحص" : "Select Devices to Include in Audit Sheet")
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted mb-2">
+                            @(isAr ? "حدد الأجهزة التي ترغب في طباعتها في هذا النموذج:" : "Check the devices you want to include on the printout:")
+                        </p>
+                        <div class="d-flex justify-content-between mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnCheckAll">@(isAr ? "تحديد الكل" : "Select All")</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnUncheckAll">@(isAr ? "إلغاء التحديد" : "Uncheck All")</button>
+                        </div>
+                        <div class="p-2 border rounded bg-light" style="max-height: 350px; overflow-y: auto;">
+                            <div class="row g-2">
+                                @foreach (var dev in allCandidateAssets)
+                                {
+                                    bool isSelected = selectedAssetIds.Contains(dev.Id);
+                                    <div class="col-md-6">
+                                        <div class="form-check p-2 bg-white rounded border">
+                                            <input class="form-check-input dev-chk ms-1" type="checkbox" name="selectedAssetIds" value="@dev.Id" id="dev_@dev.Id" @(isSelected ? "checked" : "") />
+                                            <label class="form-check-label small fw-semibold text-dark text-truncate d-block" for="dev_@dev.Id">
+                                                @(dev.HospitalNo ?? ("#" + dev.Id)) - @dev.Brand @dev.DisplayType
+                                                <small class="text-muted d-block">@(dev.Room?.DisplayName ?? "Unassigned") &bull; SN: @(dev.SerialNo ?? "-")</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-primary fw-bold">
+                            <i class="fa-solid fa-check me-1"></i> @(isAr ? "تطبيق وتحديث الجدول" : "Update Matrix")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const btnAll = document.getElementById("btnCheckAll");
+            const btnNone = document.getElementById("btnUncheckAll");
+            if (btnAll) {
+                btnAll.addEventListener("click", () => document.querySelectorAll(".dev-chk").forEach(c => c.checked = true));
+            }
+            if (btnNone) {
+                btnNone.addEventListener("click", () => document.querySelectorAll(".dev-chk").forEach(c => c.checked = false));
+            }
+        });
+    </script>
+</body>
+</html>

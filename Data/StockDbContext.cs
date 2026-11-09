@@ -27,6 +27,11 @@ namespace StockPortal.Data
         public DbSet<TicketAttachment> TicketAttachments { get; set; } = null!;
         public DbSet<SparePart> SpareParts { get; set; } = null!;
         public DbSet<SparePartTransaction> SparePartTransactions { get; set; } = null!;
+        public DbSet<AssetCategory> AssetCategories { get; set; } = null!;
+        public DbSet<SparePartForm> SparePartForms { get; set; } = null!;
+        public DbSet<AssetCompatibleSparePart> AssetCompatibleSpareParts { get; set; } = null!;
+        public DbSet<CalibrationForm> CalibrationForms { get; set; } = null!;
+        public DbSet<ChecklistForm> ChecklistForms { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -226,6 +231,58 @@ namespace StockPortal.Data
                 entity.HasOne(t => t.User)
                     .WithMany()
                     .HasForeignKey(t => t.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // AssetCompatibleSparePart many-to-many
+            modelBuilder.Entity<AssetCompatibleSparePart>(entity =>
+            {
+                entity.HasKey(e => new { e.AssetId, e.SparePartId });
+
+                entity.HasOne(e => e.Asset)
+                    .WithMany(a => a.CompatibleSpareParts)
+                    .HasForeignKey(e => e.AssetId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.SparePart)
+                    .WithMany(p => p.CompatibleAssets)
+                    .HasForeignKey(e => e.SparePartId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Asset & Category
+            modelBuilder.Entity<Asset>(entity =>
+            {
+                entity.HasOne(a => a.Category)
+                    .WithMany(c => c.Assets)
+                    .HasForeignKey(a => a.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // SparePart & SparePartForm
+            modelBuilder.Entity<SparePart>(entity =>
+            {
+                entity.HasOne(p => p.SparePartForm)
+                    .WithMany(f => f.SpareParts)
+                    .HasForeignKey(p => p.FormId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // CalibrationForm & Category
+            modelBuilder.Entity<CalibrationForm>(entity =>
+            {
+                entity.HasOne(f => f.Category)
+                    .WithMany(c => c.CalibrationForms)
+                    .HasForeignKey(f => f.CategoryId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // ChecklistForm & Category
+            modelBuilder.Entity<ChecklistForm>(entity =>
+            {
+                entity.HasOne(f => f.Category)
+                    .WithMany(c => c.Checklists)
+                    .HasForeignKey(f => f.CategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
         }

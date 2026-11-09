@@ -158,6 +158,11 @@ namespace StockPortal.ViewModels
         public int NewRoomId { get; set; }
         public int NewCustodyTypeId { get; set; }
         public string? TransferNotes { get; set; }
+
+        public List<CalibrationForm> AvailableCalibrationProtocols { get; set; } = new();
+        public List<ChecklistForm> AvailableChecklists { get; set; } = new();
+        public List<SparePart> AvailableSpareParts { get; set; } = new();
+        public List<User> AvailableTechnicians { get; set; } = new();
     }
 
     public class MaintenanceScheduleViewModel
@@ -214,6 +219,8 @@ namespace StockPortal.ViewModels
         public List<string> AvailableDepartments { get; set; } = new();
         public List<User> Users { get; set; } = new();
         public List<Room> Rooms { get; set; } = new();
+        public List<SparePartForm> AvailableForms { get; set; } = new();
+        public List<Asset> AvailableAssets { get; set; } = new();
     }
 
     public class SparePartTransactionsViewModel

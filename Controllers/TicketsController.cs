@@ -186,17 +186,10 @@ namespace StockPortal.Controllers
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            // Filter for responsible department employees (e.g. IT, BIOMEDICAL, GENERAL)
+            // Filter strictly for responsible department employees (e.g. IT, BIOMEDICAL, GENERAL) (Task 12)
             var departmentEmployees = allUsers
-                .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam) || (ticket.Handler?.TechUserId.HasValue == true && u.Id == ticket.Handler.TechUserId.Value))
+                .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam))
                 .ToList();
-
-            if (!departmentEmployees.Any())
-            {
-                departmentEmployees = allUsers
-                    .Where(u => u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin)
-                    .ToList();
-            }
 
             var vm = new TicketDetailsViewModel
             {
@@ -219,6 +212,18 @@ namespace StockPortal.Controllers
         {
             var currentUserId = _currentUserService.GetUserId();
             await PopulateDropdowns(assetId, currentUserId, currentUserId);
+
+            // Task 11: Check if an active ticket exists for this asset
+            if (assetId.HasValue && assetId.Value > 0)
+            {
+                var existingActiveTicket = await _context.Tickets
+                    .FirstOrDefaultAsync(t => t.AssetId == assetId.Value && t.StatusId != 4 && t.StatusId != 5);
+                if (existingActiveTicket != null)
+                {
+                    ViewBag.ActiveTicketWarning = $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. Please resolve or view the existing ticket before opening a new one.";
+                    ViewBag.ExistingActiveTicketId = existingActiveTicket.Id;
+                }
+            }
 
             var ticket = new Ticket
             {
@@ -243,6 +248,21 @@ namespace StockPortal.Controllers
             ticket.OpenedBy = currentUserId > 0 ? currentUserId : ticket.OpenedBy;
 
             bool isOnBehalfOf = ticket.OnBehalfOf.HasValue && ticket.OnBehalfOf.Value != ticket.OpenedBy;
+
+            // Task 11: Block opening another ticket if an active ticket already exists for the asset
+            if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
+            {
+                var existingActiveTicket = await _context.Tickets
+                    .FirstOrDefaultAsync(t => t.AssetId == ticket.AssetId.Value && t.StatusId != 4 && t.StatusId != 5);
+                if (existingActiveTicket != null)
+                {
+                    ModelState.AddModelError("AssetId", $"Cannot open a new ticket for this asset. Active ticket #{existingActiveTicket.Id} is currently open.");
+                    ViewBag.ActiveTicketWarning = $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. Please resolve or view the existing ticket before opening a new one.";
+                    ViewBag.ExistingActiveTicketId = existingActiveTicket.Id;
+                    await PopulateDropdowns(ticket.AssetId, ticket.OnBehalfOf, currentUserId);
+                    return View(ticket);
+                }
+            }
 
             if (ModelState.IsValid)
             {
@@ -451,6 +471,18 @@ namespace StockPortal.Controllers
                     .FirstOrDefaultAsync(a => a.HospitalNo != null && a.HospitalNo.ToLower() == search);
             }
 
+            // Task 11: If asset has an active ticket, redirect to existing ticket
+            if (asset != null)
+            {
+                var existingActive = await _context.Tickets
+                    .FirstOrDefaultAsync(t => t.AssetId == asset.Id && t.StatusId != 4 && t.StatusId != 5);
+                if (existingActive != null)
+                {
+                    TempData["ErrorMessage"] = $"An active ticket (#{existingActive.Id}) already exists for this equipment. Redirecting to existing ticket.";
+                    return RedirectToAction(nameof(Details), new { id = existingActive.Id });
+                }
+            }
+
             // 2. If room was selected and asset exists, update asset room if not set or changed
             Room? selectedRoom = null;
             if (model.SelectedRoomId.HasValue && model.SelectedRoomId.Value > 0)
@@ -639,7 +671,7 @@ namespace StockPortal.Controllers
 
             var currentUserId = _currentUserService.GetUserId();
 
-            // Determine multi-technician closure participants: only responsible department employees
+            // Determine multi-technician closure participants: strictly responsible department employees (Task 12)
             var participatingTechIds = new HashSet<int>();
             if (closedByUserIds != null && closedByUserIds.Length > 0)
             {
@@ -649,7 +681,7 @@ namespace StockPortal.Controllers
                     .ToListAsync();
 
                 var allowedIds = candidateUsers
-                    .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam) || u.Id == ticket.Handler?.TechUserId || u.Id == currentUserId)
+                    .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam))
                     .Select(u => u.Id)
                     .ToHashSet();
 
@@ -660,10 +692,20 @@ namespace StockPortal.Controllers
             }
             if (participatingTechIds.Count == 0)
             {
-                if (currentUserId > 0) participatingTechIds.Add(currentUserId);
-                if (ticket.Handler?.TechUserId.HasValue == true && ticket.Handler.TechUserId.Value > 0)
+                var candidateUsers = await _context.Users.Include(u => u.Department).Where(u => u.IsActive == true).ToListAsync();
+                var allowedIds = candidateUsers.Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam)).Select(u => u.Id).ToHashSet();
+
+                if (currentUserId > 0 && allowedIds.Contains(currentUserId))
+                {
+                    participatingTechIds.Add(currentUserId);
+                }
+                else if (ticket.Handler?.TechUserId.HasValue == true && allowedIds.Contains(ticket.Handler.TechUserId.Value))
                 {
                     participatingTechIds.Add(ticket.Handler.TechUserId.Value);
+                }
+                else if (currentUserId > 0)
+                {
+                    participatingTechIds.Add(currentUserId);
                 }
             }
 
@@ -691,6 +733,60 @@ namespace StockPortal.Controllers
                 Msg = logMsg,
                 TimeStamp = DateTime.Now
             });
+
+            // Task 10: Automatically record internal maintenance in AssetMaintenance
+            if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
+            {
+                var existingMaint = await _context.AssetMaintenances.FirstOrDefaultAsync(m => m.TicketId == ticket.Id);
+                if (existingMaint == null)
+                {
+                    var usedPartsList = await _context.SparePartTransactions
+                        .Where(t => t.TicketId == ticket.Id && t.SparePart != null)
+                        .Select(t => t.SparePart.Name)
+                        .ToListAsync();
+                    string? partsReplacedStr = usedPartsList.Any() ? string.Join(", ", usedPartsList.Distinct()) : null;
+
+                    var primaryTechId = participatingTechIds.FirstOrDefault();
+                    if (primaryTechId <= 0)
+                    {
+                        primaryTechId = currentUserId > 0 ? currentUserId : (ticket.Handler?.TechUserId ?? 1);
+                    }
+
+                    var maintTitle = $"[Ticket #{ticket.Id}] {ticket.Type ?? "Internal Maintenance"}";
+                    if (!string.IsNullOrWhiteSpace(ticket.AffectedSoftware))
+                    {
+                        maintTitle += $" - {ticket.AffectedSoftware}";
+                    }
+
+                    var internalMaint = new AssetMaintenance
+                    {
+                        AssetId = ticket.AssetId.Value,
+                        TicketId = ticket.Id,
+                        MaintenanceType = 1, // Corrective / Repair
+                        SupplierId = null, // In-house / internal maintenance
+                        UserId = primaryTechId > 0 ? primaryTechId : null,
+                        WorkOrderStatus = "Completed",
+                        Description = maintTitle.Trim(),
+                        ActionTaken = string.IsNullOrWhiteSpace(resolutionNotes) ? "Internal ticket maintenance completed." : resolutionNotes.Trim(),
+                        PartsReplaced = partsReplacedStr,
+                        TimStamp = DateTime.Now,
+                        SentDate = ticket.OpenedDT,
+                        ReturnDate = ticket.ClosedDT ?? DateTime.Now
+                    };
+                    _context.AssetMaintenances.Add(internalMaint);
+
+                    var assetObj = await _context.Assets.FindAsync(ticket.AssetId.Value);
+                    if (assetObj != null)
+                    {
+                        assetObj.LastPeriodic = DateTime.Now;
+                        if (assetObj.PeriodicInterval.HasValue && assetObj.PeriodicInterval.Value > 0)
+                        {
+                            assetObj.NextPeriodic = DateTime.Now.AddDays(assetObj.PeriodicInterval.Value);
+                        }
+                        _context.Update(assetObj);
+                    }
+                }
+            }
 
             await _context.SaveChangesAsync();
 
@@ -1165,25 +1261,36 @@ namespace StockPortal.Controllers
                 return Json(new { success = false, count = 0, assets = Array.Empty<object>() });
             }
 
-            var assets = await _context.Assets
+            var activeTickets = await _context.Tickets
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5)
+                .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
+                .ToListAsync();
+            var activeTicketsDict = activeTickets
+                .GroupBy(x => x.AssetId)
+                .ToDictionary(g => g.Key, g => g.First().TicketId);
+
+            var rawAssets = await _context.Assets
                 .Include(a => a.Room)
                 .Where(a => a.UserId == targetUserId)
                 .OrderBy(a => a.HospitalNo)
-                .Select(a => new
-                {
-                    id = a.Id,
-                    hospitalNo = a.HospitalNo ?? "",
-                    brand = a.Brand ?? "",
-                    type = a.Type ?? "Equipment",
-                    displayType = a.DisplayType,
-                    serialNo = a.SerialNo ?? "",
-                    roomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
-                    maintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(),
-                    installedSoftwares = a.InstalledSoftwares ?? "[]",
-                    installedSoftwaresList = a.InstalledSoftwaresList,
-                    display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})"
-                })
                 .ToListAsync();
+
+            var assets = rawAssets.Select(a => new
+            {
+                id = a.Id,
+                hospitalNo = a.HospitalNo ?? "",
+                brand = a.Brand ?? "",
+                type = a.Type ?? "Equipment",
+                displayType = a.DisplayType,
+                serialNo = a.SerialNo ?? "",
+                roomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
+                maintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(),
+                installedSoftwares = a.InstalledSoftwares ?? "[]",
+                installedSoftwaresList = a.InstalledSoftwaresList,
+                display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})",
+                hasActiveTicket = activeTicketsDict.ContainsKey(a.Id),
+                activeTicketId = activeTicketsDict.ContainsKey(a.Id) ? activeTicketsDict[a.Id] : (int?)null
+            }).ToList();
 
             return Json(new { success = true, count = assets.Count, assets });
         }
@@ -1378,6 +1485,14 @@ namespace StockPortal.Controllers
 
         private async Task PopulateDropdowns(int? selectedAssetId = null, int? defaultUserId = null, int? currentUserId = null)
         {
+            var activeTickets = await _context.Tickets
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5)
+                .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
+                .ToListAsync();
+            var activeTicketsDict = activeTickets
+                .GroupBy(x => x.AssetId)
+                .ToDictionary(g => g.Key, g => g.First().TicketId);
+
             // Only assets associated with the current user appear!
             var userAssetsQuery = _context.Assets.Include(a => a.Room).AsQueryable();
             if (currentUserId.HasValue && currentUserId.Value > 0)
@@ -1385,27 +1500,31 @@ namespace StockPortal.Controllers
                 userAssetsQuery = userAssetsQuery.Where(a => a.UserId == currentUserId.Value);
             }
 
-            var userAssets = await userAssetsQuery
+            var rawUserAssets = await userAssetsQuery
                 .OrderBy(a => a.HospitalNo)
-                .Select(a => new { 
-                    a.Id, 
-                    HospitalNo = a.HospitalNo ?? "", 
-                    Brand = a.Brand ?? "", 
-                    Type = a.Type ?? "Equipment", 
-                    DisplayType = a.DisplayType,
-                    SerialNo = a.SerialNo ?? "",
-                    RoomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
-                    MaintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(), 
-                    InstalledSoftwares = a.InstalledSoftwares ?? "[]",
-                    InstalledSoftwaresList = a.InstalledSoftwaresList,
-                    Display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})" 
-                })
                 .ToListAsync();
+
+            var userAssets = rawUserAssets.Select(a => new { 
+                a.Id, 
+                HospitalNo = a.HospitalNo ?? "", 
+                Brand = a.Brand ?? "", 
+                Type = a.Type ?? "Equipment", 
+                DisplayType = a.DisplayType,
+                SerialNo = a.SerialNo ?? "",
+                RoomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
+                MaintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(), 
+                InstalledSoftwares = a.InstalledSoftwares ?? "[]",
+                InstalledSoftwaresList = a.InstalledSoftwaresList,
+                Display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})",
+                HasActiveTicket = activeTicketsDict.ContainsKey(a.Id),
+                ActiveTicketId = activeTicketsDict.ContainsKey(a.Id) ? activeTicketsDict[a.Id] : (int?)null
+            }).ToList();
 
             ViewBag.Assets = new SelectList(userAssets, "Id", "Display", selectedAssetId);
             ViewBag.UserAssetsList = userAssets;
             ViewBag.UserAssetsCount = userAssets.Count;
             ViewBag.UserAssetsJson = JsonSerializer.Serialize(userAssets);
+            ViewBag.ActiveTicketAssetsMap = activeTicketsDict;
             ViewBag.CurrentUserId = currentUserId ?? 0;
             ViewBag.DetectedPcName = Environment.MachineName;
             ViewBag.Users = new SelectList(await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(), "Id", "FullName", defaultUserId);

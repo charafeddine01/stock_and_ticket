@@ -346,6 +346,13 @@ namespace StockPortal.Models
         [Column("id")]
         public int Id { get; set; }
 
+        [Column("categoryID")]
+        public int? CategoryId { get; set; }
+
+        [ForeignKey("CategoryId")]
+        [Display(Name = "Category")]
+        public virtual AssetCategory? Category { get; set; }
+
         [Column("price", TypeName = "decimal(10,2)")]
         [Display(Name = "Purchase Price")]
         [DataType(DataType.Currency)]
@@ -548,6 +555,68 @@ namespace StockPortal.Models
             }
         }
 
+        [Column("has_vendor_maintenance")]
+        [Display(Name = "Free Vendor Maintenance (After Sale)")]
+        public bool HasVendorMaintenance { get; set; } = false;
+
+        [Column("vendor_maintenance_start", TypeName = "date")]
+        [Display(Name = "Vendor Maintenance Start Date")]
+        [DataType(DataType.Date)]
+        public DateTime? VendorMaintenanceStartDate { get; set; }
+
+        [Column("vendor_maintenance_end", TypeName = "date")]
+        [Display(Name = "Vendor Maintenance End Date")]
+        [DataType(DataType.Date)]
+        public DateTime? VendorMaintenanceEndDate { get; set; }
+
+        [Column("vendor_maintenance_count")]
+        [Display(Name = "Number of Free Maintenances")]
+        public int? VendorMaintenanceCount { get; set; }
+
+        [Column("vendor_maintenance_completed")]
+        [Display(Name = "Completed Vendor Maintenances")]
+        public int VendorMaintenanceCompletedCount { get; set; } = 0;
+
+        [Column("vendor_maintenance_visits")]
+        [Display(Name = "Recorded Vendor Visits (JSON)")]
+        public string? VendorMaintenanceVisits { get; set; } = "[]";
+
+        [NotMapped]
+        public List<VendorVisitItem> VendorVisitsList
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(VendorMaintenanceVisits)) return new List<VendorVisitItem>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<VendorVisitItem>>(VendorMaintenanceVisits,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<VendorVisitItem>();
+                }
+                catch
+                {
+                    return new List<VendorVisitItem>();
+                }
+            }
+            set
+            {
+                VendorMaintenanceVisits = JsonSerializer.Serialize(value ?? new List<VendorVisitItem>());
+            }
+        }
+
+        [Column("last_calibration_data")]
+        [Display(Name = "Last Calibration Protocol Data (JSON)")]
+        public string? LastCalibrationData { get; set; }
+
+        [Column("last_checklist_date")]
+        [Display(Name = "Last Checklist Date")]
+        public DateTime? LastChecklistDate { get; set; }
+
+        [Column("last_checklist_by")]
+        [StringLength(255)]
+        [Display(Name = "Last Checklist Completed By")]
+        public string? LastChecklistBy { get; set; }
+
+        public virtual ICollection<AssetCompatibleSparePart> CompatibleSpareParts { get; set; } = new List<AssetCompatibleSparePart>();
         public virtual ICollection<AssetHistory> History { get; set; } = new List<AssetHistory>();
         public virtual ICollection<AssetMaintenance> MaintenanceRecords { get; set; } = new List<AssetMaintenance>();
         public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
@@ -1225,6 +1294,39 @@ namespace StockPortal.Models
             }
             : Category;
 
+        [Column("form_id")]
+        public int? FormId { get; set; }
+
+        [ForeignKey("FormId")]
+        public virtual SparePartForm? SparePartForm { get; set; }
+
+        [Column("specs")]
+        [Display(Name = "Technical Specifications (JSON)")]
+        public string? Specs { get; set; } = "{}";
+
+        [NotMapped]
+        public Dictionary<string, string> SpecsDictionary
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Specs)) return new Dictionary<string, string>();
+                try
+                {
+                    return JsonSerializer.Deserialize<Dictionary<string, string>>(Specs,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new Dictionary<string, string>();
+                }
+                catch
+                {
+                    return new Dictionary<string, string>();
+                }
+            }
+            set
+            {
+                Specs = JsonSerializer.Serialize(value ?? new Dictionary<string, string>());
+            }
+        }
+
+        public virtual ICollection<AssetCompatibleSparePart> CompatibleAssets { get; set; } = new List<AssetCompatibleSparePart>();
         public virtual ICollection<SparePartTransaction> Transactions { get; set; } = new List<SparePartTransaction>();
     }
 
@@ -1292,5 +1394,254 @@ namespace StockPortal.Models
                 _ => TransactionType
             }
             : TransactionType;
+    }
+
+    [Table("asset_categories")]
+    public class AssetCategory
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Category Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Category Name (Arabic)")]
+        public string? NameAr { get; set; }
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Department")]
+        public string Department { get; set; } = MaintenanceTeams.IT;
+
+        [Column("description")]
+        [StringLength(1024)]
+        [Display(Name = "Description")]
+        public string? Description { get; set; }
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public string DisplayName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(NameAr)) ? NameAr : Name;
+
+        public virtual ICollection<Asset> Assets { get; set; } = new List<Asset>();
+        public virtual ICollection<ChecklistForm> Checklists { get; set; } = new List<ChecklistForm>();
+        public virtual ICollection<CalibrationForm> CalibrationForms { get; set; } = new List<CalibrationForm>();
+    }
+
+    [Table("spare_part_forms")]
+    public class SparePartForm
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Spare Part Form Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Maintenance Department")]
+        public string Department { get; set; } = MaintenanceTeams.IT;
+
+        [Column("form")]
+        [Required]
+        [Display(Name = "Form Field Schema (JSON)")]
+        public string Form { get; set; } = "[]";
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public List<FormFieldDefinition> Fields
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Form)) return new List<FormFieldDefinition>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<FormFieldDefinition>>(Form,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<FormFieldDefinition>();
+                }
+                catch
+                {
+                    return new List<FormFieldDefinition>();
+                }
+            }
+            set
+            {
+                Form = JsonSerializer.Serialize(value ?? new List<FormFieldDefinition>());
+            }
+        }
+
+        public virtual ICollection<SparePart> SpareParts { get; set; } = new List<SparePart>();
+    }
+
+    [Table("asset_compatible_spare_parts")]
+    public class AssetCompatibleSparePart
+    {
+        [Column("asset_id")]
+        public int AssetId { get; set; }
+
+        [ForeignKey("AssetId")]
+        public virtual Asset? Asset { get; set; }
+
+        [Column("spare_part_id")]
+        public int SparePartId { get; set; }
+
+        [ForeignKey("SparePartId")]
+        public virtual SparePart? SparePart { get; set; }
+
+        [Column("assigned_at")]
+        public DateTime AssignedAt { get; set; } = DateTime.Now;
+    }
+
+    [Table("calibration_forms")]
+    public class CalibrationForm
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Calibration Protocol Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Department")]
+        public string Department { get; set; } = MaintenanceTeams.Biomedical;
+
+        [Column("category_id")]
+        public int? CategoryId { get; set; }
+
+        [ForeignKey("CategoryId")]
+        public virtual AssetCategory? Category { get; set; }
+
+        [Column("form")]
+        [Required]
+        [Display(Name = "Protocol Schema (JSON)")]
+        public string Form { get; set; } = "[]";
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public List<FormFieldDefinition> Fields
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(Form)) return new List<FormFieldDefinition>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<FormFieldDefinition>>(Form,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<FormFieldDefinition>();
+                }
+                catch
+                {
+                    return new List<FormFieldDefinition>();
+                }
+            }
+            set
+            {
+                Form = JsonSerializer.Serialize(value ?? new List<FormFieldDefinition>());
+            }
+        }
+    }
+
+    [Table("checklist_forms")]
+    public class ChecklistForm
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("title")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Checklist Form Title")]
+        public string Title { get; set; } = string.Empty;
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Department")]
+        public string Department { get; set; } = MaintenanceTeams.IT;
+
+        [Column("category_id")]
+        public int? CategoryId { get; set; }
+
+        [ForeignKey("CategoryId")]
+        public virtual AssetCategory? Category { get; set; }
+
+        [Column("checklist_type")]
+        [StringLength(50)]
+        [Display(Name = "Checklist Scope")]
+        public string ChecklistType { get; set; } = "Periodic Maintenance"; // "Calibration", "Periodic Maintenance", "Safety Inspection"
+
+        [Column("items_json")]
+        [Display(Name = "Checklist Action Items (JSON)")]
+        public string ItemsJson { get; set; } = "[]";
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public List<string> Items
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ItemsJson)) return new List<string>();
+                try
+                {
+                    return JsonSerializer.Deserialize<List<string>>(ItemsJson,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new List<string>();
+                }
+                catch
+                {
+                    return new List<string>();
+                }
+            }
+            set
+            {
+                ItemsJson = JsonSerializer.Serialize(value ?? new List<string>());
+            }
+        }
+    }
+
+    public class VendorVisitItem
+    {
+        public int VisitNumber { get; set; }
+        public DateTime VisitDate { get; set; } = DateTime.Now;
+        public string? EngineerName { get; set; }
+        public string? Notes { get; set; }
+        public DateTime RecordedAt { get; set; } = DateTime.Now;
     }
 }

@@ -183,9 +183,14 @@
                                             }
                                         </td>
                                         <td class="text-end">
-                                            <a href="@Url.Action("ReturnFromSupplier", new { workOrderId = wo.Id })" class="btn btn-sm btn-success">
-                                                <i class="fa-solid fa-box-open me-1"></i> @Loc["Return from Maintenance"]
-                                            </a>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="@Url.Action("VendorDispatchForm", new { id = wo.Id })" class="btn btn-outline-primary" target="_blank" title="@(isArabic ? "طباعة إشعار الإرسال للمورد" : "Print Dispatch Note")">
+                                                    <i class="fa-solid fa-print"></i>
+                                                </a>
+                                                <a href="@Url.Action("ReturnFromSupplier", new { id = wo.Id })" class="btn btn-success">
+                                                    <i class="fa-solid fa-box-open me-1"></i> @Loc["Return from Maintenance"]
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 }
@@ -313,7 +318,6 @@
                                 <th>@Loc["Type"]</th>
                                 <th>@Loc["Assigned Technician"]</th>
                                 <th>@Loc["Work Summary / Actions Taken"]</th>
-                                <th>@Loc["Cost"]</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -325,7 +329,6 @@
                                     <td><span class="badge bg-info text-dark">@log.DisplayTypeName</span></td>
                                     <td>@(log.Technician?.DisplayFullName ?? Loc["Maintenance Provider"])</td>
                                     <td>@log.Description</td>
-                                    <td>@(log.Cost.HasValue ? log.Cost.Value.ToString("C2", System.Globalization.CultureInfo.CurrentUICulture) : "-")</td>
                                 </tr>
                             }
                         </tbody>

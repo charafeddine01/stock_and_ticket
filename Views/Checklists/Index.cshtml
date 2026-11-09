@@ -1,0 +1,160 @@
+@model IEnumerable<StockPortal.Models.ChecklistForm>
+@inject StockPortal.Services.ILocalizationService Loc
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+@{
+    ViewData["Title"] = Loc.IsArabic ? "نماذج وقوائم الفحص الدوري (Checklists)" : "Preventive Checklists & Inspection Forms";
+    var isAr = Loc.IsArabic;
+    var categories = ViewBag.Categories as List<StockPortal.Models.AssetCategory> ?? new();
+    var departments = ViewBag.Departments as string[] ?? StockPortal.Models.MaintenanceTeams.All;
+    bool canManage = CurrentUser.CanManageAssets();
+}
+
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h3 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
+                <i class="fa-solid fa-list-check text-success"></i>
+                @(isAr ? "نماذج وقوائم الفحص الدوري (Checklists)" : "Preventive Checklists & Inspection Protocols")
+            </h3>
+            <p class="text-muted small mb-0">
+                @(isAr 
+                    ? "نماذج الفحص الميداني المرتبطة بالفئات والأجهزة لتوثيق الفحص الدوري والمعايرة، وطباعة جداول التحقق الميدانية." 
+                    : "Checklist templates linked to asset categories for periodic maintenance and calibration inspections with printable batch audit sheets.")
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a asp-action="PrintChecklist" class="btn btn-outline-secondary shadow-sm">
+                <i class="fa-solid fa-print me-1"></i> @(isAr ? "طباعة نموذج فحص ميداني" : "Print Audit Checklist")
+            </a>
+            @if (canManage)
+            {
+                <a asp-action="Create" class="btn btn-success shadow-sm">
+                    <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إنشاء قائمة فحص جديدة" : "New Checklist Template")
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Filter toolbar -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-3">
+            <form method="get" class="row g-2 align-items-center">
+                @if (CurrentUser.IsAdmin())
+                {
+                    <div class="col-md-3">
+                        <select name="department" class="form-select" onchange="this.form.submit()">
+                            <option value="">@(isAr ? "كافة الأقسام" : "All Departments")</option>
+                            @foreach (var dept in departments)
+                            {
+                                <option value="@dept" selected="@(ViewBag.SelectedDepartment == dept)">@Loc.TargetTeam(dept)</option>
+                            }
+                        </select>
+                    </div>
+                }
+                <div class="col-md-4">
+                    <select name="categoryId" class="form-select" onchange="this.form.submit()">
+                        <option value="">@(isAr ? "كافة فئات الأصول" : "All Asset Categories")</option>
+                        @foreach (var cat in categories)
+                        {
+                            <option value="@cat.Id" selected="@(ViewBag.SelectedCategoryId == cat.Id)">@cat.DisplayName (@cat.Department)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary w-100">
+                        <i class="fa-solid fa-rotate-left me-1"></i> @Loc["Reset"]
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">@(isAr ? "عنوان نموذج الفحص" : "Checklist Title")</th>
+                            <th>@Loc["Department"]</th>
+                            <th>@(isAr ? "فئة الأصل المرتبطة" : "Linked Category")</th>
+                            <th>@(isAr ? "نطاق الفحص" : "Scope")</th>
+                            <th>@(isAr ? "عدد بنود الفحص" : "Action Items")</th>
+                            <th>@Loc["Status"]</th>
+                            <th class="text-end pe-3">@Loc["Actions"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-5">
+                                    <i class="fa-solid fa-clipboard-list fa-3x mb-2 text-secondary opacity-50"></i>
+                                    <div>@(isAr ? "لا توجد نماذج فحص مسجلة حالياً." : "No checklist templates created yet.")</div>
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark">@item.Title</div>
+                                    <div class="small text-muted font-monospace" style="font-size: 0.75rem;">Created: @item.CreatedAt.ToString("yyyy-MM-dd")</div>
+                                </td>
+                                <td>
+                                    <span class="badge @(item.Department == "BIOMEDICAL" ? "bg-info text-dark" : item.Department == "GENERAL" ? "bg-warning text-dark" : "bg-primary")">
+                                        @Loc.TargetTeam(item.Department)
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (item.Category != null)
+                                    {
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border">@item.Category.DisplayName</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">@(isAr ? "شامل لكافة الأجهزة" : "All equipment")</span>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">@item.ChecklistType</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success bg-opacity-10 text-success fw-bold">
+                                        @item.Items.Count @(isAr ? "بنود فحص" : "Actions")
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @(item.IsActive ? "bg-success" : "bg-secondary")">
+                                        @(item.IsActive ? (isAr ? "نشط" : "Active") : (isAr ? "معطل" : "Inactive"))
+                                    </span>
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="btn-group btn-group-sm">
+                                        <a asp-action="PrintChecklist" asp-route-id="@item.Id" class="btn btn-outline-secondary" target="_blank" title="@(isAr ? "طباعة نموذج الفحص الميداني" : "Print Checklist")">
+                                            <i class="fa-solid fa-print"></i>
+                                        </a>
+                                        @if (canManage)
+                                        {
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-outline-primary" title="@Loc["Edit"]">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </a>
+                                            <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('@(isAr ? "هل أنت متأكد من حذف نموذج الفحص؟" : "Are you sure you want to delete this checklist?")');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-danger">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

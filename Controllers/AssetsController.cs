@@ -27,13 +27,14 @@ namespace StockPortal.Controllers
         }
 
         // GET: Assets
-        public async Task<IActionResult> Index(string? search = null, string? status = null, string? type = null, int? roomId = null, string? warranty = null, string? calibration = null)
+        public async Task<IActionResult> Index(string? search = null, string? status = null, string? type = null, int? roomId = null, string? warranty = null, string? calibration = null, int? categoryId = null)
         {
             var query = _context.Assets
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
                 .Include(a => a.CustodyType)
+                .Include(a => a.Category)
                 .AsQueryable();
 
             // RBAC Guard: End users can view ONLY assets currently in their custody; Maintenance users view ONLY assets for their designated team
@@ -46,6 +47,11 @@ namespace StockPortal.Controllers
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
                 query = query.Where(a => a.MaintenanceTeam == myTeam);
+            }
+
+            if (categoryId.HasValue)
+            {
+                query = query.Where(a => a.CategoryId == categoryId.Value);
             }
 
             if (!string.IsNullOrWhiteSpace(search))
@@ -122,9 +128,18 @@ namespace StockPortal.Controllers
             ViewBag.SelectedRoomId = roomId;
             ViewBag.SelectedWarranty = warranty;
             ViewBag.SelectedCalibration = calibration;
+            ViewBag.SelectedCategoryId = categoryId;
 
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync();
             ViewBag.Types = await _context.Assets.Where(a => a.Type != null).Select(a => a.Type!).Distinct().ToListAsync();
+
+            var catQuery = _context.AssetCategories.Where(c => c.IsActive).AsQueryable();
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam();
+                catQuery = catQuery.Where(c => c.Department == myTeam);
+            }
+            ViewBag.Categories = await catQuery.OrderBy(c => c.Name).ToListAsync();
 
             var list = await query.OrderByDescending(a => a.Id).ToListAsync();
             return View(list);
@@ -140,6 +155,8 @@ namespace StockPortal.Controllers
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
                 .Include(a => a.CustodyType)
+                .Include(a => a.Category)
+                .Include(a => a.CompatibleSpareParts).ThenInclude(cp => cp.SparePart)
                 .Include(a => a.History).ThenInclude(h => h.User)
                 .Include(a => a.History).ThenInclude(h => h.Room)
                 .Include(a => a.History).ThenInclude(h => h.CustodyType)
@@ -157,6 +174,26 @@ namespace StockPortal.Controllers
                 return Forbid();
             }
 
+            var calProtocols = await _context.CalibrationForms
+                .Where(cf => cf.IsActive && (cf.Department == asset.MaintenanceTeam || (asset.CategoryId != null && cf.CategoryId == asset.CategoryId)))
+                .OrderBy(cf => cf.Name)
+                .ToListAsync();
+
+            var checklists = await _context.ChecklistForms
+                .Where(cl => cl.IsActive && (cl.Department == asset.MaintenanceTeam || (asset.CategoryId != null && cl.CategoryId == asset.CategoryId)))
+                .OrderBy(cl => cl.Title)
+                .ToListAsync();
+
+            var spareParts = await _context.SpareParts
+                .Where(sp => sp.IsActive && sp.Department == asset.MaintenanceTeam)
+                .OrderBy(sp => sp.Name)
+                .ToListAsync();
+
+            var technicians = await _context.Users
+                .Where(u => u.IsActive == true && (u.MaintenanceTeam == asset.MaintenanceTeam || u.Role == SystemRoles.Admin))
+                .OrderBy(u => u.FullName)
+                .ToListAsync();
+
             var vm = new AssetDetailsViewModel
             {
                 Asset = asset,
@@ -165,7 +202,11 @@ namespace StockPortal.Controllers
                 AvailableCustodyTypes = await _context.CustodyTypes.ToListAsync(),
                 NewUserId = asset.UserId ?? 0,
                 NewRoomId = asset.RoomId ?? 0,
-                NewCustodyTypeId = asset.CustodyTypeId ?? 1
+                NewCustodyTypeId = asset.CustodyTypeId ?? 1,
+                AvailableCalibrationProtocols = calProtocols,
+                AvailableChecklists = checklists,
+                AvailableSpareParts = spareParts,
+                AvailableTechnicians = technicians
             };
 
             return View(vm);
@@ -214,9 +255,10 @@ namespace StockPortal.Controllers
         // POST: Assets/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Asset asset, int deviceFormId, IFormCollection formCollection)
+        public async Task<IActionResult> Create(Asset asset, int deviceFormId, IFormCollection? formCollection = null, int[]? compatibleSparePartIds = null)
         {
             if (!_currentUserService.CanManageAssets()) return Forbid();
+            formCollection ??= new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
 
             var selectedForm = await _context.DeviceForms.FindAsync(deviceFormId);
             if (selectedForm == null)
@@ -302,6 +344,21 @@ namespace StockPortal.Controllers
                 _context.Assets.Add(asset);
                 await _context.SaveChangesAsync();
 
+                // Save compatible spare parts (Task 2)
+                if (compatibleSparePartIds != null && compatibleSparePartIds.Length > 0)
+                {
+                    foreach (var spId in compatibleSparePartIds.Distinct())
+                    {
+                        _context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart
+                        {
+                            AssetId = asset.Id,
+                            SparePartId = spId,
+                            AssignedAt = DateTime.Now
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
                 // Record initial custody history
                 if (asset.UserId.HasValue && asset.RoomId.HasValue)
                 {
@@ -366,6 +423,13 @@ namespace StockPortal.Controllers
             }
             ViewBag.SpecsDictionary = specsDict;
 
+            // Find existing compatible spare parts (Task 2)
+            var selectedSparePartIds = await _context.AssetCompatibleSpareParts
+                .Where(cp => cp.AssetId == asset.Id)
+                .Select(cp => cp.SparePartId)
+                .ToListAsync();
+            ViewBag.SelectedSparePartIds = selectedSparePartIds;
+
             await PopulateDropdowns(asset);
             return View(asset);
         }
@@ -373,9 +437,10 @@ namespace StockPortal.Controllers
         // POST: Assets/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, Asset asset, int? deviceFormId, IFormCollection formCollection)
+        public async Task<IActionResult> Edit(int id, Asset asset, int? deviceFormId = null, IFormCollection? formCollection = null, int[]? compatibleSparePartIds = null)
         {
             if (id != asset.Id) return NotFound();
+            formCollection ??= new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
 
             var existing = await _context.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
             if (existing == null) return NotFound();
@@ -385,6 +450,9 @@ namespace StockPortal.Controllers
             {
                 return Forbid();
             }
+
+            // Task 9: Retain original purchase price from database (Cost is not editable/visible in Edit view)
+            asset.Price = existing.Price;
 
             // Preserve maintenance team if not Admin
             if (_currentUserService.IsMaintenance())
@@ -471,6 +539,32 @@ namespace StockPortal.Controllers
 
                     _context.Update(asset);
                     await _context.SaveChangesAsync();
+
+                    // Synchronize compatible spare parts (Task 2)
+                    var currentRelations = await _context.AssetCompatibleSpareParts.Where(cp => cp.AssetId == asset.Id).ToListAsync();
+                    var targetIds = (compatibleSparePartIds ?? Array.Empty<int>()).Distinct().ToHashSet();
+
+                    var toRemove = currentRelations.Where(r => !targetIds.Contains(r.SparePartId)).ToList();
+                    if (toRemove.Any())
+                    {
+                        _context.AssetCompatibleSpareParts.RemoveRange(toRemove);
+                    }
+
+                    var currentIds = currentRelations.Select(r => r.SparePartId).ToHashSet();
+                    var toAdd = targetIds.Where(tid => !currentIds.Contains(tid)).Select(tid => new AssetCompatibleSparePart
+                    {
+                        AssetId = asset.Id,
+                        SparePartId = tid,
+                        AssignedAt = DateTime.Now
+                    }).ToList();
+
+                    if (toAdd.Any())
+                    {
+                        _context.AssetCompatibleSpareParts.AddRange(toAdd);
+                    }
+
+                    await _context.SaveChangesAsync();
+
                     TempData["SuccessMessage"] = "Asset specifications & details updated successfully!";
                 }
                 catch (DbUpdateConcurrencyException)
@@ -929,6 +1023,22 @@ namespace StockPortal.Controllers
             ViewBag.CustodyTypes = new SelectList(await _context.CustodyTypes.ToListAsync(), "Id", "Type", asset?.CustodyTypeId);
             ViewBag.MaintenanceTeams = new SelectList(MaintenanceTeams.All, asset?.MaintenanceTeam ?? MaintenanceTeams.IT);
             ViewBag.SoftwareCatalog = await _context.SoftwareCatalog.Where(s => s.IsActive).OrderBy(s => s.Category).ThenBy(s => s.Name).ToListAsync();
+
+            // Categories (Task 6)
+            var catQuery = _context.AssetCategories.Where(c => c.IsActive).AsQueryable();
+            if (!string.IsNullOrWhiteSpace(targetTeam))
+            {
+                catQuery = catQuery.Where(c => c.Department == targetTeam);
+            }
+            ViewBag.Categories = new SelectList(await catQuery.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", asset?.CategoryId);
+
+            // Available Spare Parts for compatibility (Task 2)
+            var partsQuery = _context.SpareParts.Where(sp => sp.IsActive).AsQueryable();
+            if (!string.IsNullOrWhiteSpace(targetTeam))
+            {
+                partsQuery = partsQuery.Where(sp => sp.Department == targetTeam);
+            }
+            ViewBag.AvailableSpareParts = await partsQuery.OrderBy(sp => sp.Name).ToListAsync();
         }
 
         // GET: Assets/GetInstalledSoftwares?assetId=123
@@ -952,6 +1062,228 @@ namespace StockPortal.Controllers
             asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares ?? Array.Empty<string>());
             await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = "Installed workstation software list updated successfully!";
+            return RedirectToAction(nameof(Details), new { id = assetId });
+        }
+
+        // POST: Assets/RecordVendorMaintenanceVisit (Task 5)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RecordVendorMaintenanceVisit(int assetId, DateTime visitDate, string? engineerName, string? notes)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            var visits = asset.VendorVisitsList;
+            int visitNo = (asset.VendorMaintenanceCompletedCount) + 1;
+            visits.Add(new VendorVisitItem
+            {
+                VisitNumber = visitNo,
+                VisitDate = visitDate,
+                EngineerName = string.IsNullOrWhiteSpace(engineerName) ? "Vendor Service Engineer" : engineerName.Trim(),
+                Notes = notes?.Trim(),
+                RecordedAt = DateTime.Now
+            });
+
+            asset.VendorVisitsList = visits;
+            asset.VendorMaintenanceCompletedCount = visits.Count;
+
+            // Also record in asset maintenance logs
+            _context.AssetMaintenances.Add(new AssetMaintenance
+            {
+                AssetId = asset.Id,
+                MaintenanceType = 3, // Vendor Maintenance
+                TimStamp = DateTime.Now,
+                UserId = _currentUserService.GetUserId(),
+                SupplierId = asset.SupplierId,
+                WorkOrderStatus = "Completed",
+                Description = $"Vendor Free After-Sale Maintenance Visit #{visitNo} conducted on {visitDate:yyyy-MM-dd} by {engineerName ?? "Vendor Engineer"}. Notes: {notes ?? "Periodic free checkup completed successfully."}"
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Vendor Maintenance Visit #{visitNo} was successfully recorded for asset {asset.HospitalNo ?? ("#" + asset.Id)}!";
+            return RedirectToAction(nameof(Details), new { id = assetId });
+        }
+
+        // GET: Assets/VendorMaintenanceSticker/5 (Task 5)
+        [HttpGet]
+        public async Task<IActionResult> VendorMaintenanceSticker(int id)
+        {
+            var asset = await _context.Assets
+                .Include(a => a.Supplier)
+                .Include(a => a.Room)
+                .Include(a => a.Category)
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanAccessAsset(asset)) return Forbid();
+
+            return View(asset);
+        }
+
+        // POST: Assets/LogInternalMaintenance (Task 10)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LogInternalMaintenance(int assetId, int? technicianId, string description, string? actionTaken, int[]? usedSparePartIds)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            int techId = technicianId ?? _currentUserService.GetUserId();
+
+            var partsList = new List<string>();
+            if (usedSparePartIds != null && usedSparePartIds.Length > 0)
+            {
+                foreach (var partId in usedSparePartIds.Distinct())
+                {
+                    var part = await _context.SpareParts.FindAsync(partId);
+                    if (part != null)
+                    {
+                        partsList.Add(part.Name);
+                        if (part.Quantity > 0)
+                        {
+                            part.Quantity--;
+                            _context.SparePartTransactions.Add(new SparePartTransaction
+                            {
+                                SparePartId = part.Id,
+                                AssetId = asset.Id,
+                                TransactionType = "Usage in Maintenance",
+                                QuantityChanged = -1,
+                                QuantityAfter = part.Quantity,
+                                UserId = techId,
+                                Notes = $"Used in internal maintenance of asset {asset.HospitalNo ?? ("#" + asset.Id)}",
+                                Timestamp = DateTime.Now
+                            });
+                        }
+                    }
+                }
+            }
+
+            var partsStr = partsList.Any() ? string.Join(", ", partsList) : null;
+
+            var maintenanceRecord = new AssetMaintenance
+            {
+                AssetId = asset.Id,
+                MaintenanceType = 1, // Internal Maintenance
+                TimStamp = DateTime.Now,
+                UserId = techId,
+                SupplierId = null, // Internal
+                WorkOrderStatus = "Completed",
+                Description = description,
+                ActionTaken = actionTaken,
+                PartsReplaced = partsStr
+            };
+
+            _context.AssetMaintenances.Add(maintenanceRecord);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Internal maintenance log successfully saved for asset {asset.HospitalNo ?? ("#" + asset.Id)}!";
+            return RedirectToAction(nameof(Details), new { id = assetId });
+        }
+
+        // POST: Assets/LogCalibrationProtocol (Task 7)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LogCalibrationProtocol(int assetId, int? calibrationFormId, DateTime calibrationDate, int? intervalDays, string? certNo, string? calibratedBy, string? notes, IFormCollection formCollection)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            asset.NeedsCalibration = true;
+            if (intervalDays.HasValue && intervalDays.Value > 0)
+            {
+                asset.CalibrationInterval = intervalDays.Value;
+            }
+            asset.LastCalibration = calibrationDate;
+            int interval = asset.CalibrationInterval ?? 180;
+            asset.NextCalibration = calibrationDate.AddDays(interval);
+            if (!string.IsNullOrWhiteSpace(certNo)) asset.CalibrationCertNo = certNo.Trim();
+            if (!string.IsNullOrWhiteSpace(calibratedBy)) asset.CalibratedBy = calibratedBy.Trim();
+            if (!string.IsNullOrWhiteSpace(notes)) asset.CalibrationNotes = notes.Trim();
+
+            // Extract dynamic calibration protocol fields if a calibration form was selected
+            var dynamicData = new Dictionary<string, string>();
+            string protocolName = "Standard Calibration";
+            if (calibrationFormId.HasValue && calibrationFormId.Value > 0)
+            {
+                var calForm = await _context.CalibrationForms.FindAsync(calibrationFormId.Value);
+                if (calForm != null)
+                {
+                    protocolName = calForm.Name;
+                    foreach (var field in calForm.Fields)
+                    {
+                        var val = formCollection[$"cal_{field.Name}"].ToString();
+                        if (string.IsNullOrWhiteSpace(val))
+                        {
+                            val = formCollection[$"calib_{field.Name}"].ToString();
+                        }
+                        if (!string.IsNullOrWhiteSpace(val))
+                        {
+                            dynamicData[field.Name] = val.Trim();
+                        }
+                    }
+                }
+            }
+
+            var protocolPayload = new
+            {
+                ProtocolName = protocolName,
+                CalibrationDate = calibrationDate,
+                CertNo = certNo,
+                CalibratedBy = calibratedBy,
+                Parameters = dynamicData,
+                Notes = notes
+            };
+
+            asset.LastCalibrationData = JsonSerializer.Serialize(protocolPayload, new JsonSerializerOptions { WriteIndented = false });
+
+            // Record verification in asset maintenance logs
+            _context.AssetMaintenances.Add(new AssetMaintenance
+            {
+                AssetId = asset.Id,
+                MaintenanceType = 2, // Periodic Inspection / Calibration
+                TimStamp = DateTime.Now,
+                UserId = _currentUserService.GetUserId(),
+                SupplierId = null,
+                WorkOrderStatus = "Completed",
+                Description = $"Calibration Protocol [{protocolName}] completed on {calibrationDate:yyyy-MM-dd}. Certificate #{certNo ?? "N/A"} issued by {calibratedBy ?? "Authorized Metrology Body"}. Next due: {asset.NextCalibration:yyyy-MM-dd}. Notes: {notes ?? "Compliant"}"
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Calibration protocol successfully saved for {asset.HospitalNo ?? ("#" + asset.Id)}! Next calibration due on {asset.NextCalibration:MMM dd, yyyy}.";
+            return RedirectToAction(nameof(Details), new { id = asset.Id });
+        }
+
+        // POST: Assets/MarkChecklistDone (Task 8)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkChecklistDone(int assetId, string checklistTitle, string? inspectorName, string? notes)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return NotFound();
+            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            string inspector = !string.IsNullOrWhiteSpace(inspectorName) 
+                ? inspectorName.Trim() 
+                : (_currentUserService.GetFullName() ?? "Technician");
+
+            asset.LastChecklistDate = DateTime.Now;
+            asset.LastChecklistBy = inspector;
+
+            _context.AssetMaintenances.Add(new AssetMaintenance
+            {
+                AssetId = asset.Id,
+                MaintenanceType = 2, // Periodic Inspection / Checklist
+                TimStamp = DateTime.Now,
+                UserId = _currentUserService.GetUserId(),
+                WorkOrderStatus = "Completed",
+                Description = $"Periodic Checklist '{checklistTitle}' verified and signed off by {inspector}. Notes: {notes ?? "All checklist items inspected and passed."}"
+            });
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Checklist verification recorded for {asset.HospitalNo ?? ("#" + asset.Id)} by {inspector}!";
             return RedirectToAction(nameof(Details), new { id = assetId });
         }
     }

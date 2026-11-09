@@ -271,13 +271,52 @@ namespace StockPortal.Controllers
             await _context.SaveChangesAsync();
 
             if (TempData != null) TempData["SuccessMessage"] = $"Asset {asset.HospitalNo ?? ("#" + asset.Id)} was dispatched to {supplier!.Name} for maintenance (Work Order #{workOrder.Id}). Custody successfully transferred to supplier.";
-            return RedirectToAction(nameof(WorkOrderDetails), new { id = workOrder.Id });
+            return RedirectToAction(nameof(VendorDispatchForm), new { id = workOrder.Id });
+        }
+
+        // GET: Maintenance/VendorDispatchForm/5 (Task 4)
+        public async Task<IActionResult> VendorDispatchForm(int id)
+        {
+            if (_currentUserService.IsEndUser()) return Forbid();
+
+            var workOrder = await _context.AssetMaintenances
+                .Include(m => m.Asset).ThenInclude(a => a!.User)
+                .Include(m => m.Asset).ThenInclude(a => a!.Room)
+                .Include(m => m.Asset).ThenInclude(a => a!.Category)
+                .Include(m => m.Supplier)
+                .Include(m => m.Technician)
+                .Include(m => m.PreviousUser)
+                .Include(m => m.PreviousRoom)
+                .Include(m => m.Ticket)
+                .FirstOrDefaultAsync(m => m.Id == id);
+
+            if (workOrder == null) return NotFound();
+
+            if (workOrder.Asset != null && !_currentUserService.CanAccessAsset(workOrder.Asset))
+            {
+                return Forbid();
+            }
+
+            // Load past maintenance history of this asset
+            var pastMaintenance = await _context.AssetMaintenances
+                .Where(m => m.AssetId == workOrder.AssetId && m.Id != workOrder.Id)
+                .Include(m => m.Technician)
+                .Include(m => m.Supplier)
+                .OrderByDescending(m => m.TimStamp)
+                .Take(20)
+                .ToListAsync();
+
+            ViewBag.PastMaintenance = pastMaintenance;
+            return View(workOrder);
         }
 
         // GET: Maintenance/ReturnFromSupplier/5
-        public async Task<IActionResult> ReturnFromSupplier(int id)
+        public async Task<IActionResult> ReturnFromSupplier(int id, int? workOrderId = null)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
+
+            int targetId = id > 0 ? id : (workOrderId ?? 0);
+            if (targetId <= 0) return NotFound();
 
             var workOrder = await _context.AssetMaintenances
                 .Include(m => m.Asset).ThenInclude(a => a!.User)
@@ -287,7 +326,7 @@ namespace StockPortal.Controllers
                 .Include(m => m.PreviousUser)
                 .Include(m => m.PreviousRoom)
                 .Include(m => m.Ticket)
-                .FirstOrDefaultAsync(m => m.Id == id);
+                .FirstOrDefaultAsync(m => m.Id == targetId);
 
             if (workOrder == null) return NotFound();
 
@@ -309,7 +348,7 @@ namespace StockPortal.Controllers
         // POST: Maintenance/ReturnFromSupplier/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ReturnFromSupplier(int id, DateTime? returnDate, string? actionTaken, decimal? cost, string? partsJson, string returnDestination, int? newUserId, int newRoomId)
+        public async Task<IActionResult> ReturnFromSupplier(int id, DateTime? returnDate, string? actionTaken, string? partsJson, string returnDestination, int? newUserId, int? newRoomId, decimal? cost = null)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
@@ -332,6 +371,10 @@ namespace StockPortal.Controllers
             DateTime actualReturnDate = returnDate ?? DateTime.Now;
             int techId = _currentUserService.GetUserId();
 
+            int targetRoomId = (newRoomId.HasValue && newRoomId.Value > 0)
+                ? newRoomId.Value
+                : (workOrder.PreviousRoomId ?? asset.RoomId ?? 1);
+
             // Validate return destination
             bool isAssigningToUser = string.Equals(returnDestination, "user", StringComparison.OrdinalIgnoreCase);
             if (isAssigningToUser && (!newUserId.HasValue || newUserId.Value <= 0))
@@ -341,7 +384,7 @@ namespace StockPortal.Controllers
 
             if (!ModelState.IsValid)
             {
-                await PopulateReturnDropdowns(newUserId ?? workOrder.PreviousUserId, newRoomId);
+                await PopulateReturnDropdowns(newUserId ?? workOrder.PreviousUserId, targetRoomId);
                 return View(workOrder);
             }
 
@@ -360,11 +403,11 @@ namespace StockPortal.Controllers
                 }
             }
 
-            // 2. Update Work Order Record
+            // 2. Update Work Order Record (Task 9: Cost removed)
             workOrder.WorkOrderStatus = "Completed";
             workOrder.ReturnDate = actualReturnDate;
             workOrder.ActionTaken = actionTaken?.Trim();
-            workOrder.Cost = cost;
+            workOrder.Cost = null;
             workOrder.PartsReplaced = cleanPartsJson;
 
             // 3. Reset periodic maintenance date if scheduled
@@ -391,7 +434,7 @@ namespace StockPortal.Controllers
                 // Assign to specific user
                 var targetUser = await _context.Users.FindAsync(newUserId!.Value);
                 asset.UserId = newUserId.Value;
-                asset.RoomId = newRoomId;
+                asset.RoomId = targetRoomId;
                 asset.CustodyTypeId = 1; // Personal
                 asset.Status = "In Service";
 
@@ -399,7 +442,7 @@ namespace StockPortal.Controllers
                 {
                     AssetId = asset.Id,
                     UserId = newUserId.Value,
-                    RoomId = newRoomId,
+                    RoomId = targetRoomId,
                     CustodyTypeId = 1,
                     AssignedOn = actualReturnDate,
                     Notes = $"Returned from supplier {workOrder.Supplier?.Name} and assigned to {targetUser?.FullName ?? "staff"} (Work Order #{workOrder.Id})"
@@ -409,7 +452,7 @@ namespace StockPortal.Controllers
             {
                 // Return to Central Stock
                 asset.UserId = null;
-                asset.RoomId = newRoomId;
+                asset.RoomId = targetRoomId;
                 asset.CustodyTypeId = 2; // Shared / Central Stock
                 asset.Status = "In Stock";
 
@@ -417,7 +460,7 @@ namespace StockPortal.Controllers
                 {
                     AssetId = asset.Id,
                     UserId = techId,
-                    RoomId = newRoomId,
+                    RoomId = targetRoomId,
                     CustodyTypeId = 2,
                     AssignedOn = actualReturnDate,
                     Notes = $"Returned from supplier {workOrder.Supplier?.Name} to Central Department Stock (Work Order #{workOrder.Id})"

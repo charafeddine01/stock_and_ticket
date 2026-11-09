@@ -21,15 +21,24 @@
             </span>
         </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
         <a href="@Url.Action("PrintTag", new { id = asset.Id })" class="btn btn-outline-dark" target="_blank">
             <i class="fa-solid fa-print me-1"></i> @Loc["Print Tag"]
         </a>
+        @if (asset.HasVendorMaintenance)
+        {
+            <a href="@Url.Action("VendorMaintenanceSticker", new { id = asset.Id })" class="btn btn-outline-info text-dark" target="_blank" title="@(Loc.IsArabic ? "طباعة ملصق الصيانة المجانية بعد البيع" : "Print Vendor Maintenance Sticker")">
+                <i class="fa-solid fa-note-sticky text-info me-1"></i> @(Loc.IsArabic ? "ملصق صيانة المورد" : "Vendor Sticker")
+            </a>
+        }
         <a href="@Url.Action("Create", "Tickets", new { assetId = asset.Id })" class="btn btn-warning text-dark">
             <i class="fa-solid fa-ticket me-1"></i> @Loc["Open Ticket"]
         </a>
         @if (canManage)
         {
+            <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#logInternalMaintenanceModal">
+                <i class="fa-solid fa-screwdriver-wrench me-1"></i> @(Loc.IsArabic ? "تسجيل صيانة داخلية" : "Log Internal Maintenance")
+            </button>
             @if (string.Equals(asset.Status, "Under Maintenance", StringComparison.OrdinalIgnoreCase))
             {
                 var activeWo = asset.MaintenanceRecords.FirstOrDefault(m => m.WorkOrderStatus == "Under Maintenance");
@@ -109,8 +118,17 @@
                     </div>
 
                     <div class="col-sm-4">
-                        <div class="text-muted small">@Loc["Purchase Price"]:</div>
-                        <div class="fw-bold text-success fs-6">@(asset.Price.HasValue ? asset.Price.Value.ToString("C2") : "N/A")</div>
+                        <div class="text-muted small">@(Loc.IsArabic ? "فئة الأصل" : "Asset Category"):</div>
+                        <div class="fw-bold text-dark fs-6">
+                            @if (asset.Category != null)
+                            {
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border">@asset.Category.DisplayName</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">-</span>
+                            }
+                        </div>
                     </div>
                     <div class="col-sm-4">
                         <div class="text-muted small">@Loc["Purchase Date"]:</div>
@@ -204,6 +222,207 @@
                         <i class="fa-solid fa-circle-info me-1"></i>
                         @(Loc.IsArabic ? "لم يتم تسجيل أي برامج مثبتة على هذا الجهاز بعد. يمكن لفريق الصيانة إضافتها من صفحة التعديل." : "No installed softwares configured for this workstation yet. Maintenance can configure installed software via Edit.")
                     </div>
+                }
+            </div>
+        </div>
+
+        <!-- Compatible Spare Parts & Consumables Card (Task 2) -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-gears text-primary me-2"></i>
+                    @(Loc.IsArabic ? "قطع الغيار والمستهلكات المتوافقة" : "Compatible Spare Parts & Consumables")
+                    <span class="badge bg-secondary ms-1">@asset.CompatibleSpareParts.Count</span>
+                </h6>
+                <div class="d-flex gap-2">
+                    @if (canManage)
+                    {
+                        <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-outline-secondary btn-sm" title="@(Loc.IsArabic ? "تعديل قطع الغيار المتوافقة" : "Manage Compatibility")">
+                            <i class="fa-solid fa-link me-1"></i> @(Loc.IsArabic ? "إدارة التوافق" : "Link Parts")
+                        </a>
+                    }
+                    <a href="@Url.Action("Index", "SpareParts")" class="btn btn-outline-primary btn-sm" target="_blank">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @Loc["Spare Parts"]
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (!asset.CompatibleSpareParts.Any())
+                {
+                    <div class="text-muted fst-italic py-2 small">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        @(Loc.IsArabic ? "لم يتم ربط أي قطع غيار متوافقة مع هذا الجهاز بعد. يمكنك تحديدها من صفحة التعديل أو من صفحة قطع الغيار." : "No compatible spare parts linked to this asset yet. You can link compatible parts via Edit or from the Reserve Stock module.")
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>@(Loc.IsArabic ? "اسم قطعة الغيار / المستهلك" : "Spare Part Name")</th>
+                                    <th>@(Loc.IsArabic ? "رقم القطعة" : "Part #")</th>
+                                    <th>@(Loc.IsArabic ? "الرصيد المتوفر" : "In Stock")</th>
+                                    <th>@(Loc.IsArabic ? "موقع الرف" : "Shelf Location")</th>
+                                    <th class="text-end">@Loc["Actions"]</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var rel in asset.CompatibleSpareParts)
+                                {
+                                    var part = rel.SparePart;
+                                    if (part != null)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold text-dark">
+                                                    @part.DisplayName
+                                                    @if (part.CanFunctionAsAsset)
+                                                    {
+                                                        <span class="badge bg-warning text-dark border border-warning ms-1" style="font-size: 0.65rem;">
+                                                            <i class="fa-solid fa-microchip me-1"></i>@(Loc.IsArabic ? "مزدوج" : "Dual")
+                                                        </span>
+                                                    }
+                                                </div>
+                                                <small class="text-muted">@part.DisplayCategory</small>
+                                            </td>
+                                            <td class="font-monospace small">@(part.PartNumber ?? "-")</td>
+                                            <td>
+                                                @if (part.Quantity > 0)
+                                                {
+                                                    <span class="badge @(part.IsLowStock ? "bg-warning text-dark" : "bg-success")">
+                                                        @part.Quantity @part.Unit
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">@(Loc.IsArabic ? "نفد المخزون" : "Out of Stock")</span>
+                                                }
+                                            </td>
+                                            <td class="small text-muted">@(part.StorageLocation ?? "-")</td>
+                                            <td class="text-end">
+                                                <a href="@Url.Action("Index", "SpareParts", new { search = part.PartNumber ?? part.Name })" class="btn btn-sm btn-outline-secondary py-0" target="_blank" title="@Loc["View Details"]">
+                                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Vendor Free After-Sale Maintenance Card (Task 5) -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-handshake-angle text-info me-2"></i>
+                    @(Loc.IsArabic ? "صيانة المورد المجانية بعد البيع (عقد الضمان)" : "Free Vendor Maintenance (After-Sale Visits)")
+                </h6>
+                <div class="d-flex gap-2">
+                    @if (asset.HasVendorMaintenance)
+                    {
+                        <a href="@Url.Action("VendorMaintenanceSticker", new { id = asset.Id })" class="btn btn-outline-primary btn-sm" target="_blank">
+                            <i class="fa-solid fa-print me-1"></i> @(Loc.IsArabic ? "طباعة ملصق الصيانة" : "Print Sticker")
+                        </a>
+                        @if (canManage)
+                        {
+                            <button type="button" class="btn btn-info text-dark btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#recordVendorVisitModal">
+                                <i class="fa-solid fa-calendar-check me-1"></i> @(Loc.IsArabic ? "تدوين زيارة مورد" : "Record Vendor Visit")
+                            </button>
+                        }
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                @if (!asset.HasVendorMaintenance)
+                {
+                    <div class="text-muted small py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            @(Loc.IsArabic ? "لم يتم تفعيل صيانة المورد المجانية بعد البيع لهذا الأصل." : "Free vendor maintenance coverage is not enabled for this asset.")
+                        </div>
+                        @if (canManage)
+                        {
+                            <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-sm btn-outline-secondary">
+                                <i class="fa-solid fa-toggle-on me-1"></i> @(Loc.IsArabic ? "تفعيل من التعديل" : "Enable via Edit")
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    int totalTargetVisits = asset.VendorMaintenanceCount ?? 4;
+                    int completedVisits = asset.VendorMaintenanceCompletedCount;
+                    int progressPercent = totalTargetVisits > 0 ? (int)Math.Min(100, Math.Round((double)completedVisits / totalTargetVisits * 100)) : 0;
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-4">
+                            <div class="text-muted small">@(Loc.IsArabic ? "فترة التغطية المجانية:" : "Coverage Period:")</div>
+                            <div class="fw-bold text-dark small">
+                                @(asset.VendorMaintenanceStartDate?.ToString("yyyy/MM/dd") ?? "Start") &rarr; @(asset.VendorMaintenanceEndDate?.ToString("yyyy/MM/dd") ?? "End")
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-muted small">@(Loc.IsArabic ? "المورد الملتزم بالصيانة:" : "Responsible Vendor:")</div>
+                            <div class="fw-bold text-dark small">@(asset.Supplier?.DisplayName ?? (Loc.IsArabic ? "مورد خارجي" : "Vendor"))</div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-muted small">@(Loc.IsArabic ? "الزيارات المنجزة:" : "Completed Visits:")</div>
+                            <div class="fw-bold text-dark small">
+                                <span class="badge @(completedVisits >= totalTargetVisits ? "bg-success" : "bg-primary")">
+                                    @completedVisits / @totalTargetVisits @(Loc.IsArabic ? "زيارة" : "Visits")
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>@(Loc.IsArabic ? "نسبة إنجاز زيارات الصيانة المجانية:" : "Maintenance Visits Progress:")</span>
+                            <span><strong>@progressPercent%</strong></span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar @(completedVisits >= totalTargetVisits ? "bg-success" : "bg-info")" role="progressbar" style="width: @progressPercent%;" aria-valuenow="@progressPercent" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    @if (asset.VendorVisitsList.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 15%;">@(Loc.IsArabic ? "الزيارة" : "Visit #")</th>
+                                        <th style="width: 25%;">@(Loc.IsArabic ? "تاريخ الزيارة" : "Date")</th>
+                                        <th style="width: 30%;">@(Loc.IsArabic ? "مهندس الصيانة" : "Engineer Name")</th>
+                                        <th style="width: 30%;">@(Loc.IsArabic ? "الملاحظات" : "Notes")</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var v in asset.VendorVisitsList.OrderBy(v => v.VisitNumber))
+                                    {
+                                        <tr>
+                                            <td class="text-center fw-bold">#@v.VisitNumber</td>
+                                            <td class="font-monospace small">@v.VisitDate.ToString("yyyy-MM-dd")</td>
+                                            <td><i class="fa-solid fa-user-gear text-primary me-1"></i> @v.EngineerName</td>
+                                            <td><small class="text-muted">@(v.Notes ?? "-")</small></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="p-3 bg-light rounded text-center text-muted small">
+                            <i class="fa-solid fa-clipboard-list me-1"></i>
+                            @(Loc.IsArabic ? "لم يتم تدوين أي زيارة صيانة حتى الآن على التطبيق. انقر على 'تدوين زيارة مورد' لإثبات الزيارة، أو اطبع الملصق لتوقيعه ورقياً." : "No visits recorded in app yet. Click 'Record Vendor Visit' to log a completed visit or print the physical sticker.")
+                        </div>
+                    }
                 }
             </div>
         </div>
@@ -336,6 +555,20 @@
                     {
                         <div class="p-2 bg-light rounded small text-muted mb-3 font-monospace" style="font-size: 0.75rem;">@asset.CalibrationNotes</div>
                     }
+                    @if (!string.IsNullOrWhiteSpace(asset.LastCalibrationData))
+                    {
+                        try
+                        {
+                            var calDoc = System.Text.Json.JsonDocument.Parse(asset.LastCalibrationData);
+                            if (calDoc.RootElement.TryGetProperty("ProtocolName", out var pName))
+                            {
+                                <div class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 mb-2 d-block text-start p-2">
+                                    <i class="fa-solid fa-certificate me-1"></i> @(Loc.IsArabic ? "البروتوكول المعتمد:" : "Protocol:") @pName.GetString()
+                                </div>
+                            }
+                        }
+                        catch { }
+                    }
                     @if (canManage)
                     {
                         <button type="button" class="btn btn-sm btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#logCalibrationModal">
@@ -352,6 +585,51 @@
                             <i class="fa-solid fa-plus me-1"></i> @(Loc.IsArabic ? "تفعيل المعايرة وتسجيل فحص" : "Enable Calibration Tracking")
                         </button>
                     }
+                }
+            </div>
+        </div>
+
+        <!-- Checklists & Action Protocols Card (Task 8) -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-list-check text-success me-2"></i>
+                    @(Loc.IsArabic ? "قوائم الفحص الدورية (Checklists)" : "Preventive Checklists")
+                </h6>
+                <a href="@Url.Action("Index", "Checklists")" class="btn btn-sm btn-link p-0 text-decoration-none" target="_blank" title="@(Loc.IsArabic ? "إدارة نماذج الفحص" : "Manage Checklists")">
+                    <i class="fa-solid fa-gear"></i>
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <div class="text-muted small">@(Loc.IsArabic ? "آخر فحص دوري معتمد:" : "Last Checklist Completed:")</div>
+                    @if (asset.LastChecklistDate.HasValue)
+                    {
+                        <div class="fw-bold text-dark small">
+                            <i class="fa-solid fa-calendar-check text-success me-1"></i> @asset.LastChecklistDate.Value.ToString("yyyy-MM-dd HH:mm")
+                        </div>
+                        <div class="small text-muted">
+                            @(Loc.IsArabic ? "بواسطة:" : "By:") <strong>@(asset.LastChecklistBy ?? "Technician")</strong>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-muted fst-italic small">@(Loc.IsArabic ? "لم يجرَ توثيق فحص بعد" : "No checklist completed yet")</div>
+                    }
+                </div>
+
+                @if (canManage)
+                {
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#markChecklistModal">
+                            <i class="fa-solid fa-check-double me-1"></i>
+                            @(Loc.IsArabic ? "تأكيد إتمام قائمة الفحص" : "Mark Checklist Done")
+                        </button>
+                        <a href="@Url.Action("PrintChecklist", "Checklists", new { categoryId = asset.CategoryId, department = asset.MaintenanceTeam })" class="btn btn-sm btn-outline-secondary" target="_blank">
+                            <i class="fa-solid fa-print me-1"></i>
+                            @(Loc.IsArabic ? "طباعة نموذج الفحص الميداني" : "Print Action Checklist")
+                        </a>
+                    </div>
                 }
             </div>
         </div>
@@ -655,24 +933,51 @@
         </div>
     </div>
 
-    <!-- Log / Renew Calibration Modal (Task 2) -->
+    <!-- Log / Renew Calibration Modal (Task 7) -->
     <div class="modal fade" id="logCalibrationModal" tabindex="-1" aria-labelledby="logCalibrationModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <form asp-action="LogCalibration" method="post">
+                <form asp-action="LogCalibrationProtocol" method="post">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="assetId" value="@asset.Id" />
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold" id="logCalibrationModalLabel">
                             <i class="fa-solid fa-award text-success me-2"></i>
-                            @(Loc.IsArabic ? "تسجيل فحص ومعايرة الأصل" : "Log Periodic Calibration Verification")
+                            @(Loc.IsArabic ? "تسجيل محضر ومعايرة الأصل بالبروتوكول الفني" : "Log Periodic Calibration Protocol")
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-info py-2 px-3 small border-0 mb-3">
                             <i class="fa-solid fa-circle-info me-1"></i>
-                            @(Loc.IsArabic ? $"تسجيل شهادة المعايرة للأصل: {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})" : $"Recording official calibration protocol for {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})")
+                            @(Loc.IsArabic ? $"محضر معايرة فني للأصل: {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})" : $"Official technical calibration protocol for {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})")
+                        </div>
+
+                        <!-- Predefined Protocol Template Selection (Task 7) -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                <i class="fa-solid fa-file-invoice text-success me-1"></i>
+                                @(Loc.IsArabic ? "اختيار بروتوكول المعايرة المعتمد للجهاز" : "Select Calibration Protocol Template") <span class="text-danger">*</span>
+                            </label>
+                            <select name="calibrationFormId" id="calProtocolSelector" class="form-select">
+                                <option value="">@(Loc.IsArabic ? "-- معايرة قياسية عامة --" : "-- Standard General Calibration --")</option>
+                                @foreach (var proto in Model.AvailableCalibrationProtocols)
+                                {
+                                    <option value="@proto.Id" data-schema="@proto.Form">@proto.Name (@proto.Department)</option>
+                                }
+                            </select>
+                            <div class="form-text small">
+                                @(Loc.IsArabic ? "يتم ملء وتوليد معايير المعايرة ونسب التفاوت كنموذج إلكتروني ويُحفظ كـ JSON." : "Select predefined protocol to fill dynamic metrology/tolerance parameters.")
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Calibration Protocol Fields Container -->
+                        <div id="dynamicCalFieldsBox" class="p-3 bg-light rounded border mb-3" style="display: none;">
+                            <h6 class="fw-bold small text-muted text-uppercase mb-2">
+                                <i class="fa-solid fa-sliders text-primary me-1"></i>
+                                @(Loc.IsArabic ? "القيم المقاسة ومعايير الدقة (معايير البروتوكول):" : "Measured Parameters & Calibration Criteria:")
+                            </h6>
+                            <div class="row g-2" id="dynamicCalFieldsRow"></div>
                         </div>
 
                         <div class="row g-2 mb-3">
@@ -697,19 +1002,264 @@
                         </div>
 
                         <div class="mb-2">
-                            <label class="form-label small fw-semibold">@(Loc.IsArabic ? "ملاحظات المعايرة والمعايير المستخدمة" : "Calibration Standards / Verification Notes")</label>
-                            <textarea name="notes" class="form-control" rows="3" placeholder="@(Loc.IsArabic ? "مثال: تم ضبط مقاييس الطاقة وخرج الموجات، ونسب التفاوت مقبولة وفق معيار IEC 60601" : "e.g. Energy discharge verified within ±1% tolerance, IEC 60601 electrical safety compliant")">@asset.CalibrationNotes</textarea>
+                            <label class="form-label small fw-semibold">@(Loc.IsArabic ? "ملاحظات وتوصيات المعايرة" : "Calibration Standards / Verification Notes")</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "مثال: تم ضبط مقاييس الطاقة وخرج الموجات، ونسب التفاوت مقبولة وفق معيار IEC 60601" : "e.g. Energy discharge verified within ±1% tolerance, IEC 60601 electrical safety compliant")">@asset.CalibrationNotes</textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
                         <button type="submit" class="btn btn-success">
                             <i class="fa-solid fa-check me-1"></i>
-                            @(Loc.IsArabic ? "حفظ وتجديد الصلاحية" : "Save & Verify Calibration")
+                            @(Loc.IsArabic ? "حفظ وتوثيق المعايرة" : "Save & Verify Calibration")
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
+    <!-- Record Vendor Maintenance Visit Modal (Task 5) -->
+    <div class="modal fade" id="recordVendorVisitModal" tabindex="-1" aria-labelledby="recordVendorVisitModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="RecordVendorMaintenanceVisit" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="assetId" value="@asset.Id" />
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="recordVendorVisitModalLabel">
+                            <i class="fa-solid fa-calendar-check text-info me-2"></i>
+                            @(Loc.IsArabic ? "تدوين زيارة صيانة مجانية للمورد" : "Record Vendor Maintenance Visit")
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-light border small mb-3">
+                            <i class="fa-solid fa-circle-info text-info me-1"></i>
+                            @(Loc.IsArabic 
+                                ? $"تدوين الزيارة رقم ({(asset.VendorMaintenanceCompletedCount + 1)}) من إجمالي ({asset.VendorMaintenanceCount ?? 4}) زيارة متفق عليها." 
+                                : $"Recording Visit #{(asset.VendorMaintenanceCompletedCount + 1)} of {asset.VendorMaintenanceCount ?? 4} agreed free visits.")
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "تاريخ الزيارة الفعلية" : "Visit Date") <span class="text-danger">*</span></label>
+                            <input type="date" name="visitDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "اسم مهندس صيانة المورد" : "Vendor Service Engineer Name") <span class="text-danger">*</span></label>
+                            <input type="text" name="engineerName" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: م. أحمد رضوان - شركة فيليبس" : "e.g. Eng. John Miller - GE Healthcare")" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "الملاحظات والإجراءات المتخذة" : "Actions Taken / Field Notes")</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="@(Loc.IsArabic ? "مثال: تم إجراء الفحص الشامل وتنظيف الفلاتر والتأكد من استقرار عمل الجهاز." : "e.g. General preventive inspection, filter cleaning, and diagnostics performed.")"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-info text-dark fw-bold">
+                            <i class="fa-solid fa-check me-1"></i> @(Loc.IsArabic ? "حفظ الزيارة في السجل" : "Record Visit")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Internal Maintenance Modal (Task 10) -->
+    <div class="modal fade" id="logInternalMaintenanceModal" tabindex="-1" aria-labelledby="logInternalMaintenanceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form asp-action="LogInternalMaintenance" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="assetId" value="@asset.Id" />
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="logInternalMaintenanceModalLabel">
+                            <i class="fa-solid fa-screwdriver-wrench text-primary me-2"></i>
+                            @(Loc.IsArabic ? "تسجيل صيانة داخلية للأصل" : "Log Internal Maintenance Work Order")
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-light border small mb-3">
+                            <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                            @(Loc.IsArabic 
+                                ? $"تسجيل عمل صيانة تم إنجازه داخلياً في المستشفى بواسطة فنيي القسم للأصل: {asset.Brand} {asset.DisplayType} ({asset.HospitalNo})." 
+                                : $"Record internal maintenance work carried out in-house by hospital technical staff for {asset.Brand} {asset.DisplayType} ({asset.HospitalNo}).")
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "الفني القائم بالصيانة" : "Assigned Technician") <span class="text-danger">*</span></label>
+                                <select name="technicianId" class="form-select" required>
+                                    @foreach (var tech in Model.AvailableTechnicians)
+                                    {
+                                        <option value="@tech.Id" selected="@(tech.Id == CurrentUser.GetUserId())">@tech.DisplayFullName (@tech.MaintenanceTeam)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "ملخص العطل / المشكلة" : "Issue / Maintenance Summary") <span class="text-danger">*</span></label>
+                                <input type="text" name="description" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: عطل في مروحة التبريد، بطء في النظام، استبدال كابل..." : "e.g. Overheating fan noise, board inspection, cable replacement...")" required />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "الإجراءات المنفذة وحل المشكلة" : "Action Taken / Resolution Details")</label>
+                            <textarea name="actionTaken" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "تفاصيل ما قام به الفني لإصلاح الجهاز..." : "Describe the internal maintenance steps taken...")"></textarea>
+                        </div>
+
+                        <!-- Spare Parts Used -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold d-flex justify-content-between">
+                                <span><i class="fa-solid fa-microchip text-primary me-1"></i> @(Loc.IsArabic ? "قطع الغيار والمستهلكات المستخدمة من المخزون" : "Parts Used from Reserve Stock")</span>
+                                <span class="text-muted small">@(Loc.IsArabic ? "سيتم خصمها من رصيد المستودع تلقائياً" : "Will deduct from stock automatically")</span>
+                            </label>
+                            @if (!Model.AvailableSpareParts.Any())
+                            {
+                                <div class="text-muted small fst-italic">@(Loc.IsArabic ? "لا توجد قطع غيار مسجلة لهذا القسم." : "No spare parts available for this department.")</div>
+                            }
+                            else
+                            {
+                                <div class="row g-2 p-2 bg-light rounded border" style="max-height: 160px; overflow-y: auto;">
+                                    @foreach (var sp in Model.AvailableSpareParts)
+                                    {
+                                        <div class="col-md-6">
+                                            <div class="form-check p-2 bg-white rounded border border-light">
+                                                <input class="form-check-input ms-1" type="checkbox" name="usedSparePartIds" value="@sp.Id" id="int_sp_@sp.Id" />
+                                                <label class="form-check-label small fw-semibold text-truncate d-block" for="int_sp_@sp.Id" title="@sp.DisplayName">
+                                                    @sp.DisplayName
+                                                    <span class="badge @(sp.Quantity > 0 ? "bg-success" : "bg-danger") ms-1">(@sp.Quantity @Loc["in stock"])</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-primary fw-bold">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> @(Loc.IsArabic ? "حفظ سجل الصيانة الداخلية" : "Save Maintenance Log")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mark Checklist Done Modal (Task 8) -->
+    <div class="modal fade" id="markChecklistModal" tabindex="-1" aria-labelledby="markChecklistModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="MarkChecklistDone" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="assetId" value="@asset.Id" />
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold" id="markChecklistModalLabel">
+                            <i class="fa-solid fa-clipboard-check text-success me-2"></i>
+                            @(Loc.IsArabic ? "تأكيد إنجاز قائمة الفحص الدوري" : "Sign Off Preventive Checklist")
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-light border small mb-3">
+                            <i class="fa-solid fa-circle-info text-success me-1"></i>
+                            @(Loc.IsArabic 
+                                ? "يتم توثيق إنجاز الفحص الدوري للأصل مع تاريخ ووقت الإتمام واسم الفاحص وتحديث السجل." 
+                                : "Documents completion of the preventive maintenance checklist with timestamp and inspector name.")
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "عنوان نموذج الفحص" : "Checklist Protocol") <span class="text-danger">*</span></label>
+                            @if (Model.AvailableChecklists.Any())
+                            {
+                                <select name="checklistTitle" class="form-select" required>
+                                    @foreach (var cl in Model.AvailableChecklists)
+                                    {
+                                        <option value="@cl.Title">@cl.Title (@cl.ChecklistType)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" name="checklistTitle" class="form-control" value="Periodic Preventive Maintenance Checklist" required />
+                            }
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "اسم المهندس / الفاحص" : "Inspector / Technician Name")</label>
+                            <input type="text" name="inspectorName" class="form-control" value="@CurrentUser.GetFullName()" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "ملاحظات الفحص والنتائج" : "Inspection Notes / Results")</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "تم التحقق من كافة بنود الفحص الميداني، والجهاز بحالة تشغيلية ممتازة." : "All checklist items inspected and passed. Hardware in optimal working order.")"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                        <button type="submit" class="btn btn-success fw-bold">
+                            <i class="fa-solid fa-check me-1"></i> @(Loc.IsArabic ? "اعتماد الفحص الآن" : "Mark as Completed")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const calSelector = document.getElementById("calProtocolSelector");
+        const dynamicBox = document.getElementById("dynamicCalFieldsBox");
+        const dynamicRow = document.getElementById("dynamicCalFieldsRow");
+
+        if (calSelector && dynamicBox && dynamicRow) {
+            function renderCalFields() {
+                const opt = calSelector.options[calSelector.selectedIndex];
+                const schemaJson = opt ? opt.getAttribute("data-schema") : null;
+                if (!schemaJson || schemaJson === "[]") {
+                    dynamicBox.style.display = "none";
+                    dynamicRow.innerHTML = "";
+                    return;
+                }
+
+                try {
+                    const fields = JSON.parse(schemaJson);
+                    if (!fields || !fields.length) {
+                        dynamicBox.style.display = "none";
+                        dynamicRow.innerHTML = "";
+                        return;
+                    }
+
+                    dynamicRow.innerHTML = "";
+                    fields.forEach(f => {
+                        const col = document.createElement("div");
+                        col.className = "col-md-6";
+                        const lbl = document.createElement("label");
+                        lbl.className = "form-label small fw-semibold text-dark";
+                        lbl.textContent = f.label || f.name;
+                        const inp = document.createElement("input");
+                        inp.type = f.type === "number" ? "number" : "text";
+                        inp.className = "form-control form-control-sm";
+                        inp.name = `cal_${f.name}`;
+                        inp.placeholder = f.placeholder || "";
+                        if (f.required) inp.required = true;
+                        col.appendChild(lbl);
+                        col.appendChild(inp);
+                        dynamicRow.appendChild(col);
+                    });
+                    dynamicBox.style.display = "block";
+                } catch (e) {
+                    dynamicBox.style.display = "none";
+                }
+            }
+
+            calSelector.addEventListener("change", renderCalFields);
+            renderCalFields();
+        }
+    });
+</script>
 }

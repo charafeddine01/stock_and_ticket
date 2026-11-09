@@ -1,5 +1,6 @@
 @model StockPortal.ViewModels.SparePartsIndexViewModel
 @using System.Text.Encodings.Web
+@using System.Text.Json
 @inject StockPortal.Services.ILocalizationService Loc
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 
@@ -25,6 +26,14 @@
             </p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+            <a href="@Url.Action("Index", "SparePartForms")" class="btn btn-outline-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
+                <i class="fa-solid fa-shapes"></i>
+                <span>@(isArabic ? "نماذج قطع الغيار" : "Part Forms")</span>
+            </a>
+            <button type="button" class="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm" onclick="openGeneralRestockModal()">
+                <i class="fa-solid fa-cart-plus"></i>
+                <span>@(isArabic ? "توريد وإضافة مخزون" : "Restock Stock")</span>
+            </button>
             <a href="@Url.Action("Transactions", "SpareParts", new { department = Model.CurrentDepartment })" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm">
                 <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>@Loc["Stock Transactions"]</span>
@@ -201,15 +210,18 @@
                                 }
                                 <th>@Loc["Stock Category"]</th>
                                 <th class="text-center">@Loc["Quantity in Stock"]</th>
-                                <th>@Loc["Unit Cost"]</th>
+                                <th>@(isArabic ? "المواصفات الفنية" : "Specifications")</th>
                                 <th>@Loc["Shelf / Storage Location"]</th>
-                                <th>@Loc["Compatible Devices / Equipment"]</th>
+                                <th>@(isArabic ? "الأجهزة المتوافقة" : "Compatible Devices")</th>
                                 <th class="text-end pe-3">@Loc["Actions"]</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var item in Model.Items)
                             {
+                                var compAssetIds = item.CompatibleAssets.Select(ca => ca.AssetId).ToList();
+                                var compAssetIdsJson = JsonSerializer.Serialize(compAssetIds);
+                                var specsJson = string.IsNullOrWhiteSpace(item.Specs) ? "{}" : item.Specs;
                                 <tr class="@(item.IsLowStock ? "table-danger bg-opacity-25" : "")">
                                     <td class="ps-3">
                                         <div class="fw-bold text-dark">
@@ -258,15 +270,62 @@
                                             <div class="text-muted" style="font-size: 0.7rem;">@(isArabic ? $"الحد: {item.MinReserveQuantity}" : $"Min: {item.MinReserveQuantity}")</div>
                                         }
                                     </td>
-                                    <td class="small fw-semibold text-muted">
-                                        @(item.UnitCost.HasValue ? $"${item.UnitCost:N2}" : "--")
+                                    <td class="small" style="max-width: 200px;">
+                                        @if (item.SparePartForm != null)
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle d-inline-block mb-1 text-truncate" style="max-width: 180px;">
+                                                <i class="fa-solid fa-shapes me-1"></i>@item.SparePartForm.Name
+                                            </span>
+                                        }
+                                        @if (item.SpecsDictionary.Any())
+                                        {
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach (var spec in item.SpecsDictionary.Take(3))
+                                                {
+                                                    <span class="badge bg-light text-dark border" title="@spec.Key: @spec.Value">@spec.Key: @spec.Value</span>
+                                                }
+                                                @if (item.SpecsDictionary.Count > 3)
+                                                {
+                                                    <span class="badge bg-light text-muted border">+@(item.SpecsDictionary.Count - 3)</span>
+                                                }
+                                            </div>
+                                        }
+                                        else if (item.SparePartForm == null)
+                                        {
+                                            <span class="text-muted small">--</span>
+                                        }
                                     </td>
                                     <td class="small">
                                         <i class="fa-solid fa-location-dot text-secondary me-1"></i>
                                         @(item.StorageLocation ?? "--")
                                     </td>
-                                    <td class="small text-muted" style="max-width: 200px;">
-                                        @(item.CompatibleEquipment ?? "--")
+                                    <td class="small" style="max-width: 220px;">
+                                        @if (item.CompatibleAssets.Any())
+                                        {
+                                            <div class="d-flex flex-wrap gap-1">
+                                                @foreach (var ca in item.CompatibleAssets.Take(3))
+                                                {
+                                                    if (ca.Asset != null)
+                                                    {
+                                                        <a href="@Url.Action("Details", "Assets", new { id = ca.AssetId })" class="badge bg-info-subtle text-dark border text-decoration-none" title="@ca.Asset.Brand @ca.Asset.Type">
+                                                            <i class="fa-solid fa-laptop-medical me-1"></i>@(ca.Asset.HospitalNo ?? ("#" + ca.Asset.Id))
+                                                        </a>
+                                                    }
+                                                }
+                                                @if (item.CompatibleAssets.Count > 3)
+                                                {
+                                                    <span class="badge bg-light text-muted border">+@(item.CompatibleAssets.Count - 3)</span>
+                                                }
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(item.CompatibleEquipment))
+                                        {
+                                            <span class="text-muted">@item.CompatibleEquipment</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">--</span>
+                                        }
                                     </td>
                                     <td class="text-end pe-3">
                                         <div class="btn-group btn-group-sm">
@@ -284,7 +343,7 @@
                                             }
 
                                             <button type="button" class="btn btn-outline-secondary" title="@Loc["Edit"]"
-                                                    onclick="openEditModal(@item.Id, '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Name))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.NameAr ?? ""))', '@item.PartNumber', '@item.Department', '@item.Category', @item.MinReserveQuantity, '@item.Unit', '@(item.UnitCost?.ToString() ?? "")', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.StorageLocation ?? ""))', @item.CanFunctionAsAsset.ToString().ToLower(), '@Html.Raw(JavaScriptEncoder.Default.Encode(item.CompatibleEquipment ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Notes ?? ""))')">
+                                                    onclick="openEditModal(@item.Id, '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Name))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.NameAr ?? ""))', '@item.PartNumber', '@item.Department', '@item.Category', @item.MinReserveQuantity, '@item.Unit', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.StorageLocation ?? ""))', @item.CanFunctionAsAsset.ToString().ToLower(), '@Html.Raw(JavaScriptEncoder.Default.Encode(item.CompatibleEquipment ?? ""))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.Notes ?? ""))', '@(item.FormId?.ToString() ?? "")', '@Html.Raw(JavaScriptEncoder.Default.Encode(specsJson))', '@Html.Raw(JavaScriptEncoder.Default.Encode(compAssetIdsJson))')">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
                                         </div>
@@ -363,21 +422,38 @@
                             </select>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">@Loc["Quantity in Stock"]</label>
                             <input type="number" name="Quantity" class="form-control" value="1" min="0" required />
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">@Loc["Minimum Reserve Level"]</label>
                             <input type="number" name="MinReserveQuantity" class="form-control" value="2" min="1" required />
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label class="form-label fw-semibold">@Loc["Unit of Measure"]</label>
                             <input type="text" name="Unit" class="form-control" value="Piece" placeholder="Piece, Box, Meter..." />
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-semibold">@Loc["Unit Cost"] ($)</label>
-                            <input type="number" step="0.01" name="UnitCost" class="form-control" placeholder="0.00" />
+
+                        <!-- Task 1: Spare Part Form Selection -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-shapes text-primary me-1"></i>
+                                @(isArabic ? "نموذج مواصفات قطعة الغيار (قائمة قابلة للبحث)" : "Spare Part Specification Template (Searchable)")
+                            </label>
+                            <select name="formId" id="addPartFormSelect" class="form-select" onchange="renderDynamicFormSpecs(this.value, 'addDynamicSpecsContainer', 'addDynamicSpecsFields')">
+                                <option value="">@(isArabic ? "-- اختر نموذج مواصفات (اختياري) --" : "-- Select Specification Template (Optional) --")</option>
+                                @foreach (var f in Model.AvailableForms)
+                                {
+                                    <option value="@f.Id" data-dept="@f.Department">@f.Name (@f.Department)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12" id="addDynamicSpecsContainer" style="display: none;">
+                            <div class="card border border-primary bg-light p-3">
+                                <h6 class="fw-bold text-primary mb-2"><i class="fa-solid fa-sliders me-1"></i> @(isArabic ? "المواصفات الفنية لقطعة الغيار (JSON Form)" : "Custom Part Specifications")</h6>
+                                <div class="row g-2" id="addDynamicSpecsFields"></div>
+                            </div>
                         </div>
 
                         <div class="col-md-6">
@@ -385,8 +461,25 @@
                             <input type="text" name="StorageLocation" class="form-control" placeholder="e.g. IT Store - Shelf B2" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">@Loc["Compatible Devices / Equipment"]</label>
+                            <label class="form-label fw-semibold">@(isArabic ? "أجهزة متوافقة (نص إضافي اختياري)" : "Compatible Equipment / General Text")</label>
                             <input type="text" name="CompatibleEquipment" class="form-control" placeholder="e.g. Dell OptiPlex, HP Workstations" />
+                        </div>
+
+                        <!-- Task 2: Many-to-Many Compatible Devices Selection -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-laptop-medical text-primary me-1"></i>
+                                @(isArabic ? "الأجهزة المتوافقة مع هذه القطعة (تحديد متعدد)" : "Compatible Hospital Devices (Many-to-Many)")
+                            </label>
+                            <select name="compatibleAssetIds" class="form-select" multiple size="4">
+                                @foreach (var asset in Model.AvailableAssets)
+                                {
+                                    <option value="@asset.Id">
+                                        @(asset.HospitalNo ?? ("#" + asset.Id)) - @asset.Brand @asset.Type @(asset.Room != null ? $" (Room {asset.Room.RoomNo})" : "")
+                                    </option>
+                                }
+                            </select>
+                            <div class="form-text small">@(isArabic ? "اضغط باستمرار على Ctrl لاختيار عدة أجهزة متوافقة. ستظهر القطعة في صفحات هذه الأجهزة تلقائياً." : "Hold Ctrl/Cmd to select multiple compatible devices. Link is bidirectional.")</div>
                         </div>
 
                         <div class="col-12">
@@ -420,7 +513,7 @@
     </div>
 </div>
 
-<!-- Modal: Restock Item -->
+<!-- Modal: Restock Item (Task 1: Searchable dropdown selection) -->
 <div class="modal fade" id="restockModal" tabindex="-1" aria-labelledby="restockModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -435,6 +528,22 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="mb-3" id="restockPartSelectWrapper">
+                        <label class="form-label fw-semibold">
+                            <i class="fa-solid fa-boxes-stacked text-primary me-1"></i>
+                            @(isArabic ? "اختر قطعة الغيار لإضافة رصيد (قائمة قابلة للبحث)" : "Select Spare Part to Restock (Searchable List)") *
+                        </label>
+                        <select id="restockItemDropdown" class="form-select" onchange="onRestockItemChanged(this)">
+                            <option value="">@(isArabic ? "-- اختر صنفاً للتوريد --" : "-- Select Item to Restock --")</option>
+                            @foreach (var p in Model.Items)
+                            {
+                                <option value="@p.Id" data-name="@p.DisplayName" data-stock="@p.Quantity" data-unit="@p.Unit">
+                                    @p.DisplayName @(!string.IsNullOrEmpty(p.PartNumber) ? $"({p.PartNumber})" : "") - [@(isArabic ? "الرصيد" : "Stock"): @p.Quantity @p.Unit]
+                                </option>
+                            }
+                        </select>
+                    </div>
+
                     <div class="p-2 bg-light rounded mb-3">
                         <div class="fw-bold text-dark fs-6" id="restockPartName">Item Name</div>
                         <div class="small text-muted">
@@ -615,17 +724,34 @@
                             </select>
                         </div>
 
-                        <div class="col-md-4">
+                        <!-- Task 1: Edit Form Template Selection -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-shapes text-primary me-1"></i>
+                                @(isArabic ? "نموذج مواصفات قطعة الغيار (JSON Form)" : "Spare Part Specification Template (JSON Form)")
+                            </label>
+                            <select name="formId" id="editPartFormSelect" class="form-select" onchange="renderDynamicFormSpecs(this.value, 'editDynamicSpecsContainer', 'editDynamicSpecsFields')">
+                                <option value="">@(isArabic ? "-- بدون نموذج (بيانات قياسية فقط) --" : "-- No Specific Template (Standard Attributes) --")</option>
+                                @foreach (var f in Model.AvailableForms)
+                                {
+                                    <option value="@f.Id" data-dept="@f.Department">@f.Name (@f.Department)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12" id="editDynamicSpecsContainer" style="display: none;">
+                            <div class="card border border-primary bg-light p-3">
+                                <h6 class="fw-bold text-primary mb-2"><i class="fa-solid fa-sliders me-1"></i> @(isArabic ? "المواصفات الفنية لقطعة الغيار (JSON Form)" : "Custom Part Specifications")</h6>
+                                <div class="row g-2" id="editDynamicSpecsFields"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">@Loc["Minimum Reserve Level"]</label>
                             <input type="number" name="MinReserveQuantity" id="editMinReserve" class="form-control" min="1" required />
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label fw-semibold">@Loc["Unit of Measure"]</label>
                             <input type="text" name="Unit" id="editUnit" class="form-control" />
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label fw-semibold">@Loc["Unit Cost"] ($)</label>
-                            <input type="number" step="0.01" name="UnitCost" id="editUnitCost" class="form-control" />
                         </div>
 
                         <div class="col-md-6">
@@ -633,8 +759,25 @@
                             <input type="text" name="StorageLocation" id="editStorageLocation" class="form-control" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">@Loc["Compatible Devices / Equipment"]</label>
+                            <label class="form-label fw-semibold">@(isArabic ? "أجهزة متوافقة (نص إضافي اختياري)" : "Compatible Equipment / General Text")</label>
                             <input type="text" name="CompatibleEquipment" id="editCompatibleEquipment" class="form-control" />
+                        </div>
+
+                        <!-- Task 2: Edit Compatible Devices Multi-Select -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-laptop-medical text-primary me-1"></i>
+                                @(isArabic ? "الأجهزة المتوافقة مع هذه القطعة (علاقة متعدد لمتعدد)" : "Compatible Hospital Devices (Many-to-Many)")
+                            </label>
+                            <select name="compatibleAssetIds" id="editCompatibleAssetsSelect" class="form-select" multiple size="4">
+                                @foreach (var asset in Model.AvailableAssets)
+                                {
+                                    <option value="@asset.Id">
+                                        @(asset.HospitalNo ?? ("#" + asset.Id)) - @asset.Brand @asset.Type @(asset.Room != null ? $" (Room {asset.Room.RoomNo})" : "")
+                                    </option>
+                                }
+                            </select>
+                            <div class="form-text small">@(isArabic ? "اضغط باستمرار على Ctrl لتحديد الأجهزة المتوافقة." : "Hold Ctrl/Cmd to select multiple compatible devices.")</div>
                         </div>
 
                         <div class="col-12">
@@ -668,11 +811,91 @@
 
 @section Scripts {
     <script>
+        const sparePartFormsData = @Html.Raw(JsonSerializer.Serialize(Model.AvailableForms.Select(f => new {
+            id = f.Id,
+            name = f.Name,
+            department = f.Department,
+            fields = f.Fields
+        })));
+
+        function renderDynamicFormSpecs(formId, containerId, fieldsContainerId, existingSpecs = {}) {
+            const container = document.getElementById(containerId);
+            const fieldsContainer = document.getElementById(fieldsContainerId);
+            if (!formId) {
+                container.style.display = 'none';
+                fieldsContainer.innerHTML = '';
+                return;
+            }
+
+            const targetForm = sparePartFormsData.find(f => f.id == formId);
+            if (!targetForm || !targetForm.fields || targetForm.fields.length === 0) {
+                container.style.display = 'none';
+                fieldsContainer.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'block';
+            fieldsContainer.innerHTML = '';
+
+            targetForm.fields.forEach(field => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-2';
+                const fieldVal = existingSpecs[field.Name] || existingSpecs[field.name] || '';
+
+                if (field.Type === 'select' && field.Options && field.Options.length > 0) {
+                    let optsHtml = `<option value="">-- ${field.Label} --</option>`;
+                    field.Options.forEach(opt => {
+                        optsHtml += `<option value="${opt}" ${fieldVal === opt ? 'selected' : ''}>${opt}</option>`;
+                    });
+                    col.innerHTML = `
+                        <label class="form-label small fw-bold text-dark">${field.Label} ${field.Required ? '<span class="text-danger">*</span>' : ''}</label>
+                        <select name="spec_${field.Name}" class="form-select form-select-sm" ${field.Required ? 'required' : ''}>
+                            ${optsHtml}
+                        </select>
+                    `;
+                } else if (field.Type === 'number') {
+                    col.innerHTML = `
+                        <label class="form-label small fw-bold text-dark">${field.Label} ${field.Required ? '<span class="text-danger">*</span>' : ''}</label>
+                        <input type="number" name="spec_${field.Name}" class="form-control form-control-sm" value="${fieldVal}" placeholder="${field.Placeholder || ''}" ${field.Required ? 'required' : ''} />
+                    `;
+                } else {
+                    col.innerHTML = `
+                        <label class="form-label small fw-bold text-dark">${field.Label} ${field.Required ? '<span class="text-danger">*</span>' : ''}</label>
+                        <input type="text" name="spec_${field.Name}" class="form-control form-control-sm" value="${fieldVal}" placeholder="${field.Placeholder || ''}" ${field.Required ? 'required' : ''} />
+                    `;
+                }
+                fieldsContainer.appendChild(col);
+            });
+        }
+
+        function openGeneralRestockModal() {
+            document.getElementById('restockPartId').value = '';
+            document.getElementById('restockPartName').textContent = '@(isArabic ? "يرجى اختيار الصنف من القائمة أعلاه" : "Please select an item from dropdown")';
+            document.getElementById('restockCurrentStock').textContent = '0';
+            document.getElementById('restockUnit').textContent = 'Piece';
+            document.getElementById('restockPartSelectWrapper').style.display = 'block';
+            document.getElementById('restockItemDropdown').value = '';
+            var modal = new bootstrap.Modal(document.getElementById('restockModal'));
+            modal.show();
+        }
+
+        function onRestockItemChanged(selectEl) {
+            const selectedOpt = selectEl.options[selectEl.selectedIndex];
+            if (selectedOpt && selectedOpt.value) {
+                document.getElementById('restockPartId').value = selectedOpt.value;
+                document.getElementById('restockPartName').textContent = selectedOpt.getAttribute('data-name');
+                document.getElementById('restockCurrentStock').textContent = selectedOpt.getAttribute('data-stock');
+                document.getElementById('restockUnit').textContent = selectedOpt.getAttribute('data-unit') || 'Piece';
+            }
+        }
+
         function openRestockModal(id, name, currentStock, unit) {
             document.getElementById('restockPartId').value = id;
             document.getElementById('restockPartName').textContent = name;
             document.getElementById('restockCurrentStock').textContent = currentStock;
             document.getElementById('restockUnit').textContent = unit || 'Piece';
+            document.getElementById('restockPartSelectWrapper').style.display = 'block';
+            document.getElementById('restockItemDropdown').value = id;
             var modal = new bootstrap.Modal(document.getElementById('restockModal'));
             modal.show();
         }
@@ -682,7 +905,6 @@
             document.getElementById('commissionPartName').textContent = name;
             document.getElementById('commissionPartSku').textContent = 'SKU / Part #: ' + (sku || 'N/A') + ' | Department: ' + dept;
             
-            // Suggest unique Hospital Tag prefix
             var prefix = 'HOSP-' + (dept ? dept.substring(0, 3) : 'AST') + '-';
             var randomSuffix = Math.floor(100 + Math.random() * 900);
             document.getElementById('commissionHospitalNo').value = prefix + randomSuffix;
@@ -691,7 +913,7 @@
             modal.show();
         }
 
-        function openEditModal(id, name, nameAr, sku, dept, category, minReserve, unit, unitCost, storage, canAsset, compat, notes) {
+        function openEditModal(id, name, nameAr, sku, dept, category, minReserve, unit, storage, canAsset, compat, notes, formId, specsJson, compAssetIdsJson) {
             document.getElementById('editPartId').value = id;
             document.getElementById('editPartName').value = name;
             document.getElementById('editPartNameAr').value = nameAr;
@@ -703,11 +925,30 @@
             document.getElementById('editCategory').value = category;
             document.getElementById('editMinReserve').value = minReserve;
             document.getElementById('editUnit').value = unit;
-            document.getElementById('editUnitCost').value = unitCost;
             document.getElementById('editStorageLocation').value = storage;
             document.getElementById('editCanAssetCheck').checked = canAsset === true;
             document.getElementById('editCompatibleEquipment').value = compat;
             document.getElementById('editNotes').value = notes;
+
+            // Form Template & Specs
+            var formSelect = document.getElementById('editPartFormSelect');
+            if (formSelect) {
+                formSelect.value = formId || '';
+                var specsObj = {};
+                try { specsObj = JSON.parse(specsJson || '{}'); } catch(e) {}
+                renderDynamicFormSpecs(formId, 'editDynamicSpecsContainer', 'editDynamicSpecsFields', specsObj);
+            }
+
+            // Compatible Assets
+            var assetsSelect = document.getElementById('editCompatibleAssetsSelect');
+            if (assetsSelect) {
+                var assetIds = [];
+                try { assetIds = JSON.parse(compAssetIdsJson || '[]'); } catch(e) {}
+                for (var i = 0; i < assetsSelect.options.length; i++) {
+                    var opt = assetsSelect.options[i];
+                    opt.selected = assetIds.includes(parseInt(opt.value));
+                }
+            }
 
             var modal = new bootstrap.Modal(document.getElementById('editPartModal'));
             modal.show();

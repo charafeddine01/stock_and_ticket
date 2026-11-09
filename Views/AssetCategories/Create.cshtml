@@ -1,0 +1,75 @@
+@model StockPortal.Models.AssetCategory
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+@{
+    ViewData["Title"] = Loc["Create Asset Category"];
+    var availableDepts = ViewBag.AvailableDepartments as string[] ?? MaintenanceTeams.All;
+    var isAr = Loc.IsArabic;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0 fw-bold text-dark">
+                        <i class="fa-solid fa-folder-plus text-primary me-2"></i> @(isAr ? "إضافة فئة أصول جديدة" : "New Asset Category")
+                    </h5>
+                    <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                        <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Back to List"]
+                    </a>
+                </div>
+            </div>
+
+            <div class="card-body p-4">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Name" class="form-label fw-bold">@(isAr ? "اسم الفئة (بالإنجليزية)" : "Category Name (English)") <span class="text-danger">*</span></label>
+                        <input asp-for="Name" class="form-control form-control-lg" placeholder="@(isAr ? "مثال: Printer, PC, PC Peripheral, Scanner" : "e.g. Printer, PC, PC Peripheral, Scanner, Infusion Pump")" required autofocus />
+                        <span asp-validation-for="Name" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="NameAr" class="form-label fw-bold">@(isAr ? "اسم الفئة بالعربية" : "Category Name (Arabic)")</label>
+                        <input asp-for="NameAr" class="form-control" placeholder="@(isAr ? "مثال: طابعة، حاسوب، ملحقات الحاسوب، ماسح ضوئي" : "e.g. طابعة، حاسوب مكتبي")" dir="rtl" />
+                        <span asp-validation-for="NameAr" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Department" class="form-label fw-bold">@Loc["Department"] <span class="text-danger">*</span></label>
+                        @if (CurrentUser.IsMaintenance())
+                        {
+                            <input type="text" class="form-control" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" readonly />
+                            <input type="hidden" asp-for="Department" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" />
+                        }
+                        else
+                        {
+                            <select asp-for="Department" class="form-select">
+                                @foreach (var dept in availableDepts)
+                                {
+                                    <option value="@dept">@dept</option>
+                                }
+                            </select>
+                        }
+                        <span asp-validation-for="Department" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="Description" class="form-label fw-semibold">@Loc["Description"]</label>
+                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="@(isAr ? "وصف موجز لنوع الأجهزة التابعة لهذه الفئة..." : "Brief description of equipment falling under this category...")"></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <a asp-action="Index" class="btn btn-outline-secondary px-4">@Loc["Cancel"]</a>
+                        <button type="submit" class="btn btn-primary fw-bold px-4">
+                            <i class="fa-solid fa-check me-1"></i> @(isAr ? "حفظ الفئة" : "Save Category")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

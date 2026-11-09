@@ -1,0 +1,441 @@
+@model StockPortal.Models.AssetMaintenance
+@inject StockPortal.Services.ILocalizationService Loc
+@{
+    Layout = null;
+    var isAr = Loc.IsArabic;
+    var asset = Model.Asset;
+    var supplier = Model.Supplier;
+    var pastLogs = ViewBag.PastMaintenance as List<StockPortal.Models.AssetMaintenance> ?? new();
+}
+
+<!DOCTYPE html>
+<html lang="@(isAr ? "ar" : "en")" dir="@(isAr ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@(isAr ? "إشعار إرسال أصل للصيانة الخارجية" : "Vendor Dispatch & Maintenance Work Order") - @(asset?.HospitalNo ?? ("#" + Model.AssetId))</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #212529;
+            padding: 24px;
+        }
+        .dispatch-sheet {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 36px;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            border: 1px solid #dee2e6;
+        }
+        .sheet-header {
+            border-bottom: 2.5px solid #0d6efd;
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+        .section-box {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 18px;
+            background: #fff;
+        }
+        .section-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #0d6efd;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 6px;
+        }
+        .qr-frame {
+            width: 105px;
+            height: 105px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 5px;
+        }
+        .dotted-line {
+            border-bottom: 1px dotted #495057;
+            display: inline-block;
+            min-width: 150px;
+            height: 18px;
+        }
+        .table-compact th {
+            background-color: #f8f9fa;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+        .table-compact td {
+            font-size: 0.84rem;
+        }
+        @@media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .dispatch-sheet {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+            }
+            .section-box {
+                border: 1px solid #000;
+                break-inside: avoid;
+            }
+            .table-compact th {
+                background-color: #eee !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 1. Print Options & Customization Toolbar (No-Print) -->
+    <div class="dispatch-sheet mb-4 no-print bg-white">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 pb-3 border-bottom mb-3">
+            <div>
+                <h5 class="fw-bold text-dark mb-1">
+                    <i class="fa-solid fa-sliders text-primary me-2"></i>
+                    @(isAr ? "خيارات الطباعة وإشعار الإرسال للمورد" : "Printable Vendor Dispatch Form Options")
+                </h5>
+                <span class="text-muted small">
+                    @(isAr ? "حدد المعلومات التي ترغب في إظهارها في النموذج المطبوع المسلّم لمندوب المورد:" : "Toggle the sections you want to include in the printed dispatch document handed to the vendor:")
+                </span>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="window.print()" class="btn btn-primary shadow-sm fw-bold">
+                    <i class="fa-solid fa-print me-1"></i> @(isAr ? "طباعة النموذج الآن" : "Print Dispatch Note")
+                </button>
+                <a href="@Url.Action("WorkOrderDetails", new { id = Model.Id })" class="btn btn-outline-secondary">
+                    <i class="fa-solid fa-arrow-left me-1"></i> @(isAr ? "العودة للتفاصيل" : "Work Order Details")
+                </a>
+            </div>
+        </div>
+
+        <!-- Dynamic Checkboxes -->
+        <div class="row g-2">
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleAssetName" data-target="sec-asset-name" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleAssetName">@(isAr ? "اسم وفئة الأصل" : "Asset Name & Category")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleSerial" data-target="sec-serial-no" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleSerial">@(isAr ? "الرقم التسلسلي (S/N)" : "Serial Number (S/N)")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleIssue" data-target="sec-main-issue" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleIssue">@(isAr ? "العطل الأساسي المشكو منه" : "Main Reported Issue")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleBuying" data-target="sec-buying-date" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleBuying">@(isAr ? "تاريخ الشراء والضمان" : "Buying Date & Warranty")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleLastMaint" data-target="sec-last-maint" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleLastMaint">@(isAr ? "تاريخ آخر صيانة سابقة" : "Last Maintenance Date")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleHistory" data-target="sec-maint-history" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleHistory">@(isAr ? "سجل الصيانة السابقة للأصل" : "Maintenance Log History")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleReplacedParts" data-target="sec-replaced-parts" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleReplacedParts">@(isAr ? "قطع الغيار المستبدلة سابقاً وتواريخها" : "Previous Parts Changed & Dates")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleNotes" data-target="sec-free-notes" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleNotes">@(isAr ? "ملاحظات الفني (نص حر)" : "Technician Free Notes")</label>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="form-check form-switch">
+                    <input class="form-check-input section-toggle" type="checkbox" id="toggleQr" data-target="sec-qr-code" checked>
+                    <label class="form-check-label small fw-semibold" for="toggleQr">@(isAr ? "رمز الاستجابة السريعة (QR)" : "Information QR Code")</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Main Printable Dispatch Document -->
+    <div class="dispatch-sheet">
+        <!-- Document Header -->
+        <div class="d-flex justify-content-between align-items-start sheet-header">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <i class="fa-solid fa-hospital text-primary fs-3"></i>
+                    <h4 class="fw-bold mb-0 text-dark">@(isAr ? "مستشفى الرعاية الطبية - إدارة الصيانة والتجهيزات" : "Medical Care Hospital - Engineering & Maintenance")</h4>
+                </div>
+                <h5 class="fw-bold text-primary mb-1">
+                    <i class="fa-solid fa-truck-ramp-box me-1"></i>
+                    @(isAr ? "إشعار وأمر إرسال أصل للصيانة الخارجية" : "External Vendor Maintenance & Dispatch Note")
+                </h5>
+                <div class="text-muted small">
+                    <span>Work Order: <strong class="font-monospace text-dark">#@Model.Id</strong></span> &bull;
+                    <span>@(isAr ? "القسم المسؤول:" : "Department:") <strong>@Loc.TargetTeam(asset?.MaintenanceTeam)</strong></span>
+                </div>
+            </div>
+
+            <div class="text-end" id="sec-qr-code">
+                <div class="qr-frame" id="qrContainer"></div>
+                <div class="font-monospace small text-muted mt-1" style="font-size: 0.72rem;">@(asset?.HospitalNo ?? ("#" + Model.AssetId))</div>
+            </div>
+        </div>
+
+        <!-- Vendor & Dispatch Meta -->
+        <div class="row g-3 mb-3">
+            <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                    <span class="text-muted small d-block">@(isAr ? "المورد / المتعهد المستلم:" : "Vendor / Maintenance Contractor:")</span>
+                    <strong class="fs-6 text-dark">@(supplier?.DisplayName ?? (isAr ? "مورد خارجي" : "External Vendor"))</strong>
+                    <div class="small text-muted mt-1">
+                        <span><i class="fa-solid fa-truck-ramp-box me-1"></i> @(isAr ? "جهة صيانة معتمدة" : "Authorized Service Partner")</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                    <span class="text-muted small d-block">@(isAr ? "تاريخ ووقت الإرسال:" : "Dispatch Date & Time:")</span>
+                    <strong class="fs-6 font-monospace text-dark">@(Model.SentDate?.ToString("yyyy-MM-dd HH:mm") ?? DateTime.Now.ToString("yyyy-MM-dd HH:mm"))</strong>
+                    <div class="small text-muted mt-1">
+                        @(isAr ? "الفني المنسق:" : "Coordinator:") <strong>@(Model.Technician?.DisplayFullName ?? "Hospital Staff")</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hardware Identity Section -->
+        <div class="section-box">
+            <div class="section-title">
+                <i class="fa-solid fa-microchip"></i>
+                <span>@(isAr ? "بيانات الأصل والجهاز الموفد" : "Hardware Equipment Identification")</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-sm-4" id="sec-asset-name">
+                    <span class="text-muted small d-block">@(isAr ? "رقم الأصل / Hospital Tag:" : "Asset Tag / Hospital No:")</span>
+                    <strong class="font-monospace text-primary fs-6">@(asset?.HospitalNo ?? ("#" + Model.AssetId))</strong>
+                    <div class="small text-dark">@(asset?.Brand) @(asset?.DisplayType)</div>
+                    @if (asset?.Category != null)
+                    {
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary border mt-1">@asset.Category.DisplayName</span>
+                    }
+                </div>
+
+                <div class="col-sm-4" id="sec-serial-no">
+                    <span class="text-muted small d-block">@(isAr ? "الرقم التسلسلي (S/N):" : "Serial Number:")</span>
+                    <strong class="font-monospace fs-6">@(asset?.SerialNo ?? "N/A")</strong>
+                    <div class="small text-muted">@Loc["Model / Version"]: @(asset?.ModelNo.HasValue == true ? asset.ModelNo.ToString() : "Standard")</div>
+                </div>
+
+                <div class="col-sm-4" id="sec-buying-date">
+                    <span class="text-muted small d-block">@(isAr ? "تاريخ الشراء والضمان:" : "Purchase & Warranty:")</span>
+                    <strong class="small">@(asset?.BuyingDate?.ToString("yyyy-MM-dd") ?? "N/A")</strong>
+                    <div class="small text-muted">
+                        @(isAr ? "الضمان:" : "Warranty:") @(asset?.WarrantyTill?.ToString("yyyy-MM-dd") ?? (isAr ? "غير مسجل" : "N/A"))
+                    </div>
+                </div>
+
+                <div class="col-sm-6" id="sec-last-maint">
+                    <span class="text-muted small d-block">@(isAr ? "تاريخ آخر صيانة سابقة:" : "Last Maintenance Performed:")</span>
+                    @{
+                        var lastCompleted = pastLogs.FirstOrDefault(m => m.WorkOrderStatus == "Completed");
+                    }
+                    <strong class="small">@(lastCompleted?.TimStamp?.ToString("yyyy-MM-dd") ?? (isAr ? "لا توجد صيانات سابقة" : "None recorded"))</strong>
+                    @if (lastCompleted != null)
+                    {
+                        <div class="small text-muted text-truncate">@lastCompleted.Description</div>
+                    }
+                </div>
+
+                <div class="col-sm-6">
+                    <span class="text-muted small d-block">@(isAr ? "الموقع والغرفة الحالية:" : "Hospital Room / Location:")</span>
+                    <strong class="small">@(Model.PreviousRoom?.DisplayName ?? asset?.Room?.DisplayName ?? "Central Department Stock")</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Issue Section -->
+        <div class="section-box" id="sec-main-issue">
+            <div class="section-title">
+                <i class="fa-solid fa-triangle-exclamation text-danger"></i>
+                <span>@(isAr ? "العطل الأساسي المشكو منه ونطاق الصيانة المطلوب" : "Main Reported Issue & Symptoms")</span>
+            </div>
+            <div class="p-3 bg-light rounded text-dark fs-6" style="white-space: pre-wrap;">@Model.Description</div>
+        </div>
+
+        <!-- Replaced Parts History Section (Task 4) -->
+        <div class="section-box" id="sec-replaced-parts">
+            <div class="section-title">
+                <i class="fa-solid fa-gears text-secondary"></i>
+                <span>@(isAr ? "سجل قطع الغيار التي تم استبدالها سابقاً في الجهاز وتواريخها" : "Previous Parts Replaced & Replacement Dates")</span>
+            </div>
+            @{
+                var partsHistory = pastLogs.Where(l => l.ParsedParts.Any()).ToList();
+            }
+            @if (!partsHistory.Any())
+            {
+                <div class="text-muted small fst-italic py-1">
+                    @(isAr ? "لم يسبق استبدال أي قطع غيار مسجلة لهذا الجهاز." : "No previous parts replacements recorded for this hardware.")
+                </div>
+            }
+            else
+            {
+                <table class="table table-bordered table-compact mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">@(isAr ? "تاريخ الاستبدال" : "Replacement Date")</th>
+                            <th style="width: 35%;">@(isAr ? "اسم قطعة الغيار" : "Replaced Part Name")</th>
+                            <th style="width: 15%;">@(isAr ? "الكمية" : "Qty")</th>
+                            <th style="width: 25%;">@(isAr ? "أمر الصيانة / المرجع" : "Work Order Ref")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var pLog in partsHistory)
+                        {
+                            foreach (var part in pLog.ParsedParts)
+                            {
+                                <tr>
+                                    <td class="font-monospace">@(pLog.ReturnDate?.ToString("yyyy-MM-dd") ?? pLog.TimStamp?.ToString("yyyy-MM-dd"))</td>
+                                    <td class="fw-semibold">@part.PartName</td>
+                                    <td>@part.Quantity</td>
+                                    <td class="small text-muted">WO #@pLog.Id (@(pLog.Supplier?.Name ?? "Internal"))</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- Maintenance History Log Section (Task 4) -->
+        <div class="section-box" id="sec-maint-history">
+            <div class="section-title">
+                <i class="fa-solid fa-clock-rotate-left text-info"></i>
+                <span>@(isAr ? "سجل الصيانة والإصلاحات السابقة للأصل" : "Asset Maintenance & Overhaul History")</span>
+            </div>
+            @if (!pastLogs.Any())
+            {
+                <div class="text-muted small fst-italic py-1">
+                    @(isAr ? "هذا الأصل جديد ولا توجد له سجلات صيانة سابقة." : "No prior maintenance history found for this equipment.")
+                </div>
+            }
+            else
+            {
+                <table class="table table-bordered table-compact mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">@(isAr ? "التاريخ" : "Date")</th>
+                            <th style="width: 20%;">@(isAr ? "نوع الصيانة" : "Type")</th>
+                            <th style="width: 40%;">@(isAr ? "ملخص العطل والإجراء المتخذ" : "Description & Actions Taken")</th>
+                            <th style="width: 20%;">@(isAr ? "القائم بالصيانة" : "Serviced By")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var log in pastLogs.Take(6))
+                        {
+                            <tr>
+                                <td class="font-monospace">@(log.TimStamp?.ToString("yyyy-MM-dd") ?? "-")</td>
+                                <td>@Loc.MaintenanceType(log.MaintenanceType)</td>
+                                <td class="small">
+                                    <div class="fw-semibold text-truncate">@log.Description</div>
+                                    @if (!string.IsNullOrWhiteSpace(log.ActionTaken))
+                                    {
+                                        <div class="text-muted" style="font-size: 0.78rem;">@log.ActionTaken</div>
+                                    }
+                                </td>
+                                <td class="small">@(log.Supplier?.DisplayName ?? log.Technician?.DisplayFullName ?? "Technical Team")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- Technician Free-Text Notes Section (Task 4) -->
+        <div class="section-box" id="sec-free-notes">
+            <div class="section-title">
+                <i class="fa-solid fa-comment-dots"></i>
+                <span>@(isAr ? "تعليمات وملاحظات الفني المسلم (نص حر)" : "Special Handling Instructions & Technician Notes")</span>
+            </div>
+            <div class="p-3 border rounded bg-white" contenteditable="true" style="min-height: 60px;">
+                @(isAr ? "يرجى الفحص وتأكيد جاهزية الجهاز وتقديم تقرير مفصل عن القطع المستبدلة إن وُجدت." : "Please inspect the unit and provide a detailed report on replaced components upon return.")
+            </div>
+        </div>
+
+        <!-- Signatures & Handover Acknowledgement -->
+        <div class="row g-4 mt-3 pt-3 border-top">
+            <div class="col-6">
+                <div class="small fw-bold text-dark mb-2">@(isAr ? "المسلّم (مسؤول صيانة المستشفى):" : "Dispatched By (Hospital Engineer):")</div>
+                <div class="small text-muted mb-1">@(isAr ? "الاسم:" : "Name:") <strong>@(Model.Technician?.DisplayFullName ?? "Hospital Engineer")</strong></div>
+                <div class="small text-muted mb-1">@(isAr ? "التوقيع:" : "Signature:") <span class="dotted-line w-50"></span></div>
+                <div class="small text-muted">@(isAr ? "التاريخ:" : "Date:") @DateTime.Now.ToString("yyyy/MM/dd")</div>
+            </div>
+            <div class="col-6">
+                <div class="small fw-bold text-dark mb-2">@(isAr ? "المستلم (مندوب شركة المورد):" : "Received By (Vendor Representative):")</div>
+                <div class="small text-muted mb-1">@(isAr ? "اسم المندوب:" : "Representative Name:") <span class="dotted-line w-50"></span></div>
+                <div class="small text-muted mb-1">@(isAr ? "التوقيع / الختم:" : "Signature / Stamp:") <span class="dotted-line w-50"></span></div>
+                <div class="small text-muted">@(isAr ? "التاريخ:" : "Date:") ____ / ____ / 202_</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Script & Interactive Toggle Logic -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Generate QR Code
+            var qrText = window.location.origin + "/Assets/Details/" + @Model.AssetId;
+            new QRCode(document.getElementById("qrContainer"), {
+                text: qrText,
+                width: 95,
+                height: 95,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            // Toggle sections
+            document.querySelectorAll(".section-toggle").forEach(cb => {
+                cb.addEventListener("change", function () {
+                    const targetId = this.getAttribute("data-target");
+                    const targetEl = document.getElementById(targetId);
+                    if (targetEl) {
+                        targetEl.style.display = this.checked ? "" : "none";
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

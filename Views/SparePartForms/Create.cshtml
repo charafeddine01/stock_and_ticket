@@ -1,0 +1,211 @@
+@model StockPortal.Models.SparePartForm
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+@{
+    ViewData["Title"] = Loc["Build Spare Part Specification Form"];
+    var availableTeams = ViewBag.AvailableTeams as string[] ?? StockPortal.Models.MaintenanceTeams.All;
+    bool isMaintenance = CurrentUser.IsMaintenance();
+    var isAr = Loc.IsArabic;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-layer-group text-primary me-2"></i> @(isAr ? "إنشاء نموذج مواصفات قطعة غيار" : "Build Spare Part Specification Form")</h5>
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                    <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Back to List"]
+                </a>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="Create" method="post" id="sparePartFormEditor">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <input type="hidden" asp-for="Form" id="hiddenFormJson" />
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Name" class="form-label fw-semibold">@(isAr ? "اسم نموذج قطعة الغيار" : "Spare Part Form / Type Name") <span class="text-danger">*</span></label>
+                            <input asp-for="Name" class="form-control" placeholder="@(isAr ? "مثال: RAM / Memory, SSD Drive, Battery Pack, Motor" : "e.g. RAM / Memory, Storage Drive / SSD, Medical Sensor, Battery")" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label asp-for="Department" class="form-label fw-semibold">@Loc["Department"] <span class="text-danger">*</span></label>
+                            @if (isMaintenance)
+                            {
+                                <input type="text" class="form-control bg-light fw-bold" value="@Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())" readonly />
+                                <input type="hidden" asp-for="Department" value="@CurrentUser.GetMaintenanceTeam()" />
+                            }
+                            else
+                            {
+                                <select asp-for="Department" class="form-select">
+                                    @foreach (var t in availableTeams)
+                                    {
+                                        <option value="@t">@Loc.TargetTeam(t)</option>
+                                    }
+                                </select>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Visual Field Builder -->
+                    <div class="card bg-light border mb-4">
+                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark"><i class="fa-solid fa-list-check text-primary me-2"></i> @(isAr ? "حقول المواصفات الفنية لقطعة الغيار" : "Specification Fields")</h6>
+                                <small class="text-muted">@(isAr ? "حدد الحقول التي ستظهر للمهندس عند إضافة مخزون لقطعة الغيار هذه" : "Define the specification fields displayed when adding stock for this part")</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" id="btnAddField">
+                                <i class="fa-solid fa-plus me-1"></i> @Loc["Add Field"]
+                            </button>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="fieldsContainer" class="d-flex flex-column gap-3">
+                                <!-- Dynamic Fields rendered by JS -->
+                            </div>
+                            <div id="noFieldsAlert" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-cubes fa-2x mb-2 text-secondary opacity-50"></i>
+                                <div>@(isAr ? "لم يتم إضافة أي حقول بعد. اضغط على 'إضافة حقل' للبدء." : "No fields added yet. Click 'Add Field' above to define specifications.")</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <a asp-action="Index" class="btn btn-outline-secondary px-4">@Loc["Cancel"]</a>
+                        <button type="submit" class="btn btn-primary fw-bold px-4" id="btnSubmit">
+                            <i class="fa-solid fa-check me-1"></i> @(isAr ? "حفظ نموذج قطعة الغيار" : "Save Spare Part Form")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const isAr = @(isAr ? "true" : "false");
+    let fields = [];
+
+    const fieldsContainer = document.getElementById('fieldsContainer');
+    const noFieldsAlert = document.getElementById('noFieldsAlert');
+    const hiddenFormJson = document.getElementById('hiddenFormJson');
+    const formEditor = document.getElementById('sparePartFormEditor');
+
+    function renderFields() {
+        fieldsContainer.innerHTML = '';
+        if (fields.length === 0) {
+            noFieldsAlert.style.display = 'block';
+            return;
+        }
+        noFieldsAlert.style.display = 'none';
+
+        fields.forEach((field, index) => {
+            const card = document.createElement('div');
+            card.className = 'card border shadow-sm';
+            card.innerHTML = `
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge bg-secondary-subtle text-secondary fw-bold">${isAr ? 'حقل #' + (index + 1) : 'Field #' + (index + 1)}</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeField(${index})">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">${isAr ? 'المعرّف التقني' : 'Field ID (Name)'} *</label>
+                            <input type="text" class="form-control form-control-sm" value="${field.name || ''}" placeholder="e.g. Capacity" onchange="updateField(${index}, 'name', this.value)" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">${isAr ? 'تسمية الحقل (العنوان)' : 'Label (Display)'} *</label>
+                            <input type="text" class="form-control form-control-sm" value="${field.label || ''}" placeholder="e.g. Storage Capacity" onchange="updateField(${index}, 'label', this.value)" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">${isAr ? 'نوع الحقل' : 'Input Type'} *</label>
+                            <select class="form-select form-select-sm" onchange="updateFieldType(${index}, this.value)">
+                                <option value="text" ${field.type === 'text' ? 'selected' : ''}>${isAr ? 'نص حر' : 'Text'}</option>
+                                <option value="select" ${field.type === 'select' ? 'selected' : ''}>${isAr ? 'قائمة اختيار' : 'Dropdown Select'}</option>
+                                <option value="number" ${field.type === 'number' ? 'selected' : ''}>${isAr ? 'رقم' : 'Number'}</option>
+                                <option value="textarea" ${field.type === 'textarea' ? 'selected' : ''}>${isAr ? 'نص متعدد الأسطر' : 'Textarea'}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check mb-1">
+                                <input type="checkbox" class="form-check-input" id="req_${index}" ${field.required ? 'checked' : ''} onchange="updateField(${index}, 'required', this.checked)" />
+                                <label class="form-check-label small fw-semibold" for="req_${index}">${isAr ? 'مطلوب إلزامي' : 'Required'}</label>
+                            </div>
+                        </div>
+                        ${field.type === 'select' ? `
+                            <div class="col-12 mt-2">
+                                <label class="form-label small fw-bold">${isAr ? 'خيارات القائمة (مفصولة بفواصل)' : 'Dropdown Options (comma-separated)'} *</label>
+                                <input type="text" class="form-control form-control-sm" value="${(field.options || []).join(', ')}" placeholder="e.g. 8 GB, 16 GB, 32 GB, 64 GB" onchange="updateOptions(${index}, this.value)" />
+                            </div>
+                        ` : `
+                            <div class="col-12 mt-2">
+                                <label class="form-label small">${isAr ? 'نص توضيحي (Placeholder)' : 'Placeholder'}</label>
+                                <input type="text" class="form-control form-control-sm" value="${field.placeholder || ''}" placeholder="e.g. e.g. 3200 MHz" onchange="updateField(${index}, 'placeholder', this.value)" />
+                            </div>
+                        `}
+                    </div>
+                </div>
+            `;
+            fieldsContainer.appendChild(card);
+        });
+    }
+
+    window.updateField = function(index, prop, val) {
+        fields[index][prop] = val;
+    };
+
+    window.updateFieldType = function(index, typeVal) {
+        fields[index].type = typeVal;
+        if (typeVal === 'select' && (!fields[index].options || fields[index].options.length === 0)) {
+            fields[index].options = ['Option 1', 'Option 2'];
+        }
+        renderFields();
+    };
+
+    window.updateOptions = function(index, strVal) {
+        fields[index].options = strVal.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    };
+
+    window.removeField = function(index) {
+        fields.splice(index, 1);
+        renderFields();
+    };
+
+    document.getElementById('btnAddField').addEventListener('click', function() {
+        fields.push({
+            name: 'Field_' + (fields.length + 1),
+            label: isAr ? 'حقل مواصفة ' + (fields.length + 1) : 'Spec ' + (fields.length + 1),
+            type: 'text',
+            required: false,
+            options: [],
+            placeholder: ''
+        });
+        renderFields();
+    });
+
+    formEditor.addEventListener('submit', function(e) {
+        if (fields.length === 0) {
+            e.preventDefault();
+            alert(isAr ? 'يرجى إضافة حقل مواصفة واحد على الأقل.' : 'Please add at least one specification field.');
+            return false;
+        }
+
+        // Validate field names
+        for (let i = 0; i < fields.length; i++) {
+            if (!fields[i].name || !fields[i].name.trim()) {
+                e.preventDefault();
+                alert(isAr ? 'جميع الحقول يجب أن تحتوي على معرّف تقني.' : 'All fields must have a valid field name.');
+                return false;
+            }
+        }
+
+        hiddenFormJson.value = JSON.stringify(fields);
+    });
+
+    renderFields();
+</script>
+}

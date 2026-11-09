@@ -662,6 +662,9 @@ namespace StockPortal.Data
 
             // Seed Reserve Stock, Consumables & Spare Parts (Task 5)
             EnsureSparePartsSeedData(context);
+
+            // Seed Categories, Spare Part Forms, Calibration Protocols & Checklists (Tasks 1, 2, 5, 6, 7, 8)
+            EnsureNewFeaturesSeedData(context);
         }
 
         private static void EnsureArabicSchema(StockDbContext context)
@@ -759,6 +762,72 @@ namespace StockPortal.Data
                             notes TEXT NULL,
                             timestamp TEXT NOT NULL
                         );");
+
+                    // Task 1, 2, 5, 6, 7, 8 Schema Additions for SQLite
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN categoryID INTEGER NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN has_vendor_maintenance INTEGER NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_start TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_end TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_count INTEGER NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_completed INTEGER NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_visits TEXT NULL DEFAULT '[]';");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN last_calibration_data TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN last_checklist_date TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN last_checklist_by TEXT NULL;");
+
+                    TryExecuteSql(context, "ALTER TABLE spare_parts ADD COLUMN form_id INTEGER NULL;");
+                    TryExecuteSql(context, "ALTER TABLE spare_parts ADD COLUMN specs TEXT NULL DEFAULT '{}';");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS asset_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            name_ar TEXT NULL,
+                            department TEXT NOT NULL,
+                            description TEXT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS spare_part_forms (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            department TEXT NOT NULL,
+                            form TEXT NOT NULL,
+                            created_at TEXT NOT NULL
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS asset_compatible_spare_parts (
+                            asset_id INTEGER NOT NULL,
+                            spare_part_id INTEGER NOT NULL,
+                            assigned_at TEXT NOT NULL,
+                            PRIMARY KEY (asset_id, spare_part_id)
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS calibration_forms (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            department TEXT NOT NULL,
+                            category_id INTEGER NULL,
+                            form TEXT NOT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL
+                        );");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS checklist_forms (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            title TEXT NOT NULL,
+                            department TEXT NOT NULL,
+                            category_id INTEGER NULL,
+                            checklist_type TEXT NOT NULL,
+                            items_json TEXT NOT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL
+                        );");
                 }
                 else
                 {
@@ -852,6 +921,76 @@ namespace StockPortal.Data
                             `quantity_after` int NOT NULL,
                             `notes` varchar(1024) NULL,
                             `timestamp` datetime NOT NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    // Task 1, 2, 5, 6, 7, 8 Schema Additions for MySQL
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `categoryID` int NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `has_vendor_maintenance` tinyint(1) NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_start` date NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_end` date NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_count` int NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_completed` int NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_visits` LONGTEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `last_calibration_data` LONGTEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `last_checklist_date` datetime NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `last_checklist_by` varchar(255) NULL;");
+
+                    TryExecuteSql(context, "ALTER TABLE `spare_parts` ADD COLUMN IF NOT EXISTS `form_id` int NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `spare_parts` ADD COLUMN IF NOT EXISTS `specs` LONGTEXT NULL;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `asset_categories` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `name_ar` varchar(255) NULL,
+                            `department` varchar(50) NOT NULL,
+                            `description` varchar(1024) NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            `created_at` datetime NOT NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `spare_part_forms` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `department` varchar(50) NOT NULL,
+                            `form` LONGTEXT NOT NULL,
+                            `created_at` datetime NOT NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `asset_compatible_spare_parts` (
+                            `asset_id` int NOT NULL,
+                            `spare_part_id` int NOT NULL,
+                            `assigned_at` datetime NOT NULL,
+                            PRIMARY KEY (`asset_id`, `spare_part_id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `calibration_forms` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `department` varchar(50) NOT NULL,
+                            `category_id` int NULL,
+                            `form` LONGTEXT NOT NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            `created_at` datetime NOT NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `checklist_forms` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `title` varchar(255) NOT NULL,
+                            `department` varchar(50) NOT NULL,
+                            `category_id` int NULL,
+                            `checklist_type` varchar(50) NOT NULL,
+                            `items_json` LONGTEXT NOT NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            `created_at` datetime NOT NULL,
                             PRIMARY KEY (`id`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
                 }
@@ -1375,6 +1514,293 @@ namespace StockPortal.Data
                             Timestamp = DateTime.Now
                         });
                     }
+                    context.SaveChanges();
+                }
+            }
+            catch {}
+        }
+
+        private static void EnsureNewFeaturesSeedData(StockDbContext context)
+        {
+            try
+            {
+                // 1. Seed Asset Categories (Task 6)
+                if (!context.AssetCategories.Any())
+                {
+                    var categories = new System.Collections.Generic.List<AssetCategory>
+                    {
+                        // IT Categories
+                        new AssetCategory { Name = "PC", NameAr = "حاسوب مكتبي", Department = MaintenanceTeams.IT, Description = "Desktop workstations, micro-PCs, and towers", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Laptop", NameAr = "حاسوب محمول", Department = MaintenanceTeams.IT, Description = "Notebooks, Ultrabooks, and mobile workstations", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Printer", NameAr = "طابعة", Department = MaintenanceTeams.IT, Description = "Laser, thermal, and multifunction network printers", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Scanner", NameAr = "ماسح ضوئي", Department = MaintenanceTeams.IT, Description = "Document scanners, flatbed and barcode scanners", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "PC Peripheral", NameAr = "ملحقات الحاسوب (ماوس ولوحة مفاتيح وشاشات)", Department = MaintenanceTeams.IT, Description = "Keyboards, mice, monitors, headsets, webcams, docking stations", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Server", NameAr = "خادم شبكة", Department = MaintenanceTeams.IT, Description = "Rack-mount, tower and virtualization servers", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Network Switch", NameAr = "موزع شبكة / سويتش", Department = MaintenanceTeams.IT, Description = "Core, distribution and PoE access edge switches", CreatedAt = DateTime.Now },
+
+                        // Biomedical Categories
+                        new AssetCategory { Name = "Infusion Pump", NameAr = "مضخة تسريب محاليل", Department = MaintenanceTeams.Biomedical, Description = "Volumetric infusion and syringe drug delivery pumps", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Patient Monitor", NameAr = "شاشة مراقبة علامات حيوية", Department = MaintenanceTeams.Biomedical, Description = "Multi-parameter physiological bedside and transport monitors", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "ECG Machine", NameAr = "جهاز تخطيط قلب كهربائي", Department = MaintenanceTeams.Biomedical, Description = "12-lead diagnostic resting electrocardiographs", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Defibrillator", NameAr = "جهاز صدمات القلب الكهربائي", Department = MaintenanceTeams.Biomedical, Description = "Manual, AED, and pacing biphasic defibrillators", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Ultrasound", NameAr = "جهاز تصوير بالموجات فوق الصوتية", Department = MaintenanceTeams.Biomedical, Description = "Diagnostic ultrasound imaging systems and consoles", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Ventilator", NameAr = "جهاز تنفس اصطناعي", Department = MaintenanceTeams.Biomedical, Description = "Intensive care and transport mechanical ventilators", CreatedAt = DateTime.Now },
+
+                        // General Maintenance Categories
+                        new AssetCategory { Name = "HVAC / Air Conditioner", NameAr = "أنظمة التكييف والتهوية", Department = MaintenanceTeams.General, Description = "Central chillers, AHUs, split AC units and fan coils", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Electric Generator", NameAr = "مولد كهربائي احتياطي", Department = MaintenanceTeams.General, Description = "Emergency standby diesel generators and ATS units", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Medical Refrigerator", NameAr = "ثلاجة طبية وحفظ أدوية", Department = MaintenanceTeams.General, Description = "Blood bank, laboratory and pharmaceutical cold storage", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Elevator", NameAr = "مصعد كهربائي", Department = MaintenanceTeams.General, Description = "Patient bed elevators and service traction lifts", CreatedAt = DateTime.Now },
+                        new AssetCategory { Name = "Water Pump", NameAr = "مضخة مياه", Department = MaintenanceTeams.General, Description = "Sanitary water booster and circulation pumps", CreatedAt = DateTime.Now }
+                    };
+
+                    context.AssetCategories.AddRange(categories);
+                    context.SaveChanges();
+                }
+
+                // Associate existing assets with matching categories if not assigned
+                var allCategories = context.AssetCategories.ToList();
+                var unassignedAssets = context.Assets.Where(a => a.CategoryId == null).ToList();
+                foreach (var asset in unassignedAssets)
+                {
+                    var cat = allCategories.FirstOrDefault(c =>
+                        (!string.IsNullOrEmpty(asset.Type) && (c.Name.Equals(asset.Type, StringComparison.OrdinalIgnoreCase) || asset.Type.Contains(c.Name, StringComparison.OrdinalIgnoreCase))) ||
+                        (!string.IsNullOrEmpty(asset.Brand) && c.Name.Contains(asset.Brand, StringComparison.OrdinalIgnoreCase)));
+                    if (cat != null)
+                    {
+                        asset.CategoryId = cat.Id;
+                    }
+                    else
+                    {
+                        // Fall back to first category of asset's department
+                        var deptCat = allCategories.FirstOrDefault(c => c.Department == asset.MaintenanceTeam);
+                        if (deptCat != null) asset.CategoryId = deptCat.Id;
+                    }
+                }
+                context.SaveChanges();
+
+                // 2. Seed Spare Part Forms (Task 1)
+                if (!context.SparePartForms.Any())
+                {
+                    var spForms = new System.Collections.Generic.List<SparePartForm>
+                    {
+                        new SparePartForm
+                        {
+                            Name = "RAM / Memory Module",
+                            Department = MaintenanceTeams.IT,
+                            Form = @"[
+                                {""name"":""Gen"",""label"":""Memory Generation"",""type"":""select"",""options"":[""DDR4"",""DDR5"",""DDR3""],""required"":true},
+                                {""name"":""Capacity"",""label"":""Module Capacity"",""type"":""select"",""options"":[""8 GB"",""16 GB"",""32 GB"",""64 GB""],""required"":true},
+                                {""name"":""Speed"",""label"":""Frequency Speed"",""type"":""text"",""required"":false,""placeholder"":""e.g. 3200 MHz / 4800 MT/s""},
+                                {""name"":""FormFactor"",""label"":""Form Factor"",""type"":""select"",""options"":[""UDIMM (Desktop)"",""SO-DIMM (Laptop)"",""RDIMM ECC (Server)""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new SparePartForm
+                        {
+                            Name = "Storage Drive / SSD",
+                            Department = MaintenanceTeams.IT,
+                            Form = @"[
+                                {""name"":""DriveType"",""label"":""Storage Architecture"",""type"":""select"",""options"":[""NVMe M.2 PCIe 4.0"",""SATA III 2.5-inch"",""SAS Enterprise 12Gbps""],""required"":true},
+                                {""name"":""Capacity"",""label"":""Storage Size"",""type"":""select"",""options"":[""256 GB"",""512 GB"",""1 TB"",""2 TB"",""4 TB""],""required"":true},
+                                {""name"":""Endurance"",""label"":""Endurance (TBW)"",""type"":""text"",""required"":false,""placeholder"":""e.g. 600 TBW""}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new SparePartForm
+                        {
+                            Name = "Biomedical Sensor & Probe",
+                            Department = MaintenanceTeams.Biomedical,
+                            Form = @"[
+                                {""name"":""SensorType"",""label"":""Sensor Application"",""type"":""select"",""options"":[""SpO2 Finger Sensor"",""ECG 5-Lead Trunk Cable"",""NIBP Blood Pressure Cuff"",""Skin Temperature Probe""],""required"":true},
+                                {""name"":""ConnectorPin"",""label"":""Connector Configuration"",""type"":""text"",""required"":true,""placeholder"":""e.g. 14-Pin Oximax / Sub-D 15""},
+                                {""name"":""Sterilization"",""label"":""Sterilization Compatibility"",""type"":""select"",""options"":[""Autoclavable"",""Alcohol Wipe Disinfectable"",""Disposable Single-Use""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new SparePartForm
+                        {
+                            Name = "Medical Device Battery Pack",
+                            Department = MaintenanceTeams.Biomedical,
+                            Form = @"[
+                                {""name"":""Chemistry"",""label"":""Battery Chemistry"",""type"":""select"",""options"":[""Lithium-ion Rechargeable"",""NiMH High-Drain"",""Sealed Lead-Acid (SLA)""],""required"":true},
+                                {""name"":""Voltage"",""label"":""Rated Voltage"",""type"":""text"",""required"":true,""placeholder"":""e.g. 11.1 V / 14.8 V""},
+                                {""name"":""Capacity"",""label"":""Capacity (mAh / Wh)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 4400 mAh (48 Wh)""}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new SparePartForm
+                        {
+                            Name = "Electric Motor & Fan Assembly",
+                            Department = MaintenanceTeams.General,
+                            Form = @"[
+                                {""name"":""MotorHP"",""label"":""Power Output (HP / kW)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 1.5 HP (1.1 kW)""},
+                                {""name"":""Voltage"",""label"":""Operating Voltage"",""type"":""select"",""options"":[""220V Single-Phase"",""380V 3-Phase 50Hz"",""Dual Voltage 220/380V""],""required"":true},
+                                {""name"":""RPM"",""label"":""Rated Speed (RPM)"",""type"":""text"",""required"":false,""placeholder"":""e.g. 1450 RPM""}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        }
+                    };
+
+                    context.SparePartForms.AddRange(spForms);
+                    context.SaveChanges();
+                }
+
+                // 3. Seed Calibration Forms (Task 7)
+                if (!context.CalibrationForms.Any())
+                {
+                    var calForms = new System.Collections.Generic.List<CalibrationForm>
+                    {
+                        new CalibrationForm
+                        {
+                            Name = "Infusion Pump Flow Rate & Occlusion Protocol",
+                            Department = MaintenanceTeams.Biomedical,
+                            Form = @"[
+                                {""name"":""TestFlowRate"",""label"":""Test Flow Rate Setpoint (ml/h)"",""type"":""select"",""options"":[""20 ml/h"",""100 ml/h"",""500 ml/h""],""required"":true},
+                                {""name"":""MeasuredFlowRate"",""label"":""Measured Delivered Rate (ml/h)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 99.4 ml/h""},
+                                {""name"":""AccuracyDeviation"",""label"":""Flow Accuracy Deviation (%)"",""type"":""text"",""required"":true,""placeholder"":""e.g. -0.6% (Tolerance: +/- 5%)""},
+                                {""name"":""OcclusionPressure"",""label"":""Downstream Occlusion Trip (mmHg)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 620 mmHg (Nominal: 600 +/- 100)""},
+                                {""name"":""AirInLineAlarm"",""label"":""Air-in-Line Bubble Detection"",""type"":""select"",""options"":[""Pass - Alarm within 50 uL"",""Fail - Did Not Alarm""],""required"":true},
+                                {""name"":""StandardEquipment"",""label"":""Calibration Analyzer Used"",""type"":""text"",""required"":true,""placeholder"":""e.g. Fluke IDA-5 Infusion Device Analyzer (S/N FLK-9021)""},
+                                {""name"":""OverallStatus"",""label"":""Protocol Outcome"",""type"":""select"",""options"":[""Certified & Compliant"",""Conditional Pass"",""Failed - Requires Service""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new CalibrationForm
+                        {
+                            Name = "Patient Monitor NIBP & SpO2 Verification Protocol",
+                            Department = MaintenanceTeams.Biomedical,
+                            Form = @"[
+                                {""name"":""TargetNIBP"",""label"":""Simulator NIBP Target (Sys/Dia)"",""type"":""select"",""options"":[""120 / 80 mmHg (Mean 93)"",""80 / 50 mmHg (Mean 60)"",""200 / 150 mmHg (Mean 167)""],""required"":true},
+                                {""name"":""MeasuredNIBP"",""label"":""Measured NIBP (Sys/Dia)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 121 / 81 mmHg""},
+                                {""name"":""LeakRate"",""label"":""Pneumatic Leak Rate (mmHg/min)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 1.2 mmHg/min (Limit: < 6.0)""},
+                                {""name"":""SpO2Simulated"",""label"":""SpO2 Simulator Setting"",""type"":""select"",""options"":[""98% SpO2 / 60 BPM"",""85% SpO2 / 80 BPM"",""70% SpO2 / 100 BPM""],""required"":true},
+                                {""name"":""SpO2Measured"",""label"":""Monitor SpO2 Indication (%)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 98%""},
+                                {""name"":""SafetyLeakage"",""label"":""Enclosure Leakage Current (uA)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 35 uA (IEC 62353 Limit: < 100 uA)""},
+                                {""name"":""StandardEquipment"",""label"":""Metrology Standard Instrument"",""type"":""text"",""required"":true,""placeholder"":""e.g. Rigel 288+ / ProSim 8 Vital Signs Simulator""},
+                                {""name"":""OverallStatus"",""label"":""Protocol Result"",""type"":""select"",""options"":[""Certified & Compliant"",""Calibrated with Adjustment"",""Out of Tolerance - Failed""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new CalibrationForm
+                        {
+                            Name = "Defibrillator Energy Discharge & Synchronization Protocol",
+                            Department = MaintenanceTeams.Biomedical,
+                            Form = @"[
+                                {""name"":""EnergySelected"",""label"":""Selected Discharge Energy (Joules)"",""type"":""select"",""options"":[""50 Joules"",""100 Joules"",""150 Joules"",""200 Joules""],""required"":true},
+                                {""name"":""EnergyDelivered"",""label"":""Delivered Energy into 50 Ohm (J)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 198.5 Joules (Nominal 200 +/- 15%)""},
+                                {""name"":""ChargeTime"",""label"":""Charge Time to Maximum (Seconds)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 4.2 Seconds (Limit: < 7.0 s)""},
+                                {""name"":""SyncDelay"",""label"":""Cardioversion Sync Delay (ms)"",""type"":""text"",""required"":true,""placeholder"":""e.g. 28 ms (Limit: < 60 ms)""},
+                                {""name"":""StandardEquipment"",""label"":""Defibrillator Analyzer Used"",""type"":""text"",""required"":true,""placeholder"":""e.g. Fluke Impulse 7000DP Defibrillator Analyzer""},
+                                {""name"":""OverallStatus"",""label"":""Defibrillator Certification"",""type"":""select"",""options"":[""Certified for Emergency Clinical Use"",""Failed Discharge Test""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new CalibrationForm
+                        {
+                            Name = "Pressure & Temperature Sensor Protocol",
+                            Department = MaintenanceTeams.General,
+                            Form = @"[
+                                {""name"":""Range"",""label"":""Pressure Range"",""type"":""text"",""required"":true,""placeholder"":""e.g. 0 to 10 Bar""},
+                                {""name"":""Reference"",""label"":""Reference Standard Value"",""type"":""text"",""required"":true,""placeholder"":""e.g. 5.00 Bar""},
+                                {""name"":""Measured"",""label"":""Sensor Indicated Value"",""type"":""text"",""required"":true,""placeholder"":""e.g. 5.03 Bar""},
+                                {""name"":""OverallStatus"",""label"":""Verification Status"",""type"":""select"",""options"":[""Certified Compliant"",""Recalibrated"",""Failed""],""required"":true}
+                            ]",
+                            CreatedAt = DateTime.Now
+                        }
+                    };
+
+                    context.CalibrationForms.AddRange(calForms);
+                    context.SaveChanges();
+                }
+
+                // 4. Seed Checklist Forms (Task 8)
+                if (!context.ChecklistForms.Any())
+                {
+                    var pcCat = context.AssetCategories.FirstOrDefault(c => c.Name == "PC");
+                    var printerCat = context.AssetCategories.FirstOrDefault(c => c.Name == "Printer");
+                    var pumpCat = context.AssetCategories.FirstOrDefault(c => c.Name == "Infusion Pump");
+                    var monitorCat = context.AssetCategories.FirstOrDefault(c => c.Name == "Patient Monitor");
+                    var acCat = context.AssetCategories.FirstOrDefault(c => c.Name == "HVAC / Air Conditioner");
+
+                    var checkLists = new System.Collections.Generic.List<ChecklistForm>
+                    {
+                        new ChecklistForm
+                        {
+                            Title = "Quarterly Workstation & PC Preventive Health Checklist",
+                            Department = MaintenanceTeams.IT,
+                            CategoryId = pcCat?.Id,
+                            ChecklistType = "Periodic Maintenance",
+                            ItemsJson = @"[""Inspect power cord, surge protector and surge ground indicator"",""Open chassis and clean dust accumulation from CPU heatsink and cooling fans"",""Inspect motherboard electrolytic capacitors for swelling or leakage"",""Execute SMART diagnostic drive health analysis on SSD/HDD"",""Verify hospital antivirus definitions and OS critical security patch compliance"",""Test network LAN port, patch cord clip, and speed negotiation (1000 Mbps)"",""Sanitize keyboard, mouse and chassis surfaces""]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new ChecklistForm
+                        {
+                            Title = "Network Printer Periodic Servicing & Quality Checklist",
+                            Department = MaintenanceTeams.IT,
+                            CategoryId = printerCat?.Id,
+                            ChecklistType = "Periodic Maintenance",
+                            ItemsJson = @"[""Clean pickup rollers, separation pads and paper feed paths"",""Inspect fuser roller and transfer belt for scratches or wear"",""Empty or replace toner waste collector box"",""Print diagnostic test pattern and verify color alignment"",""Verify network Ethernet cable connection and static IP accessibility"",""Check paper cassette tray guide alignment and dampness""]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new ChecklistForm
+                        {
+                            Title = "Infusion Pump Semi-Annual Safety & Function Checklist",
+                            Department = MaintenanceTeams.Biomedical,
+                            CategoryId = pumpCat?.Id,
+                            ChecklistType = "Calibration",
+                            ItemsJson = @"[""Visual inspection of housing, door latch, hinges, and IV pole clamp"",""Check AC power plug, hospital grade cord integrity and battery charging LED"",""Verify drop sensor lens cleanliness and anti-free-flow clip mechanism"",""Execute self-diagnostic memory and display segment test"",""Perform downstream occlusion pressure sensor trigger verification"",""Test battery autonomy by running on internal battery for 15 minutes"",""Verify clinical flow rate accuracy using certified graduated burette / analyzer"",""Affix updated electrical safety and calibration inspection sticker""]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new ChecklistForm
+                        {
+                            Title = "Bedside Patient Monitor Periodic Safety & Maintenance Checklist",
+                            Department = MaintenanceTeams.Biomedical,
+                            CategoryId = monitorCat?.Id,
+                            ChecklistType = "Periodic Maintenance",
+                            ItemsJson = @"[""Inspect chassis, display touchscreen, and articulated wall mount arm"",""Clean NIBP pneumatic internal air filter and inspect hose connectors"",""Check SpO2 finger probe cable, optical emitter and detector condition"",""Inspect ECG 5-lead trunk cable and individual snaps for pin damage"",""Verify acoustic alarm audio volume and visual top alarm flasher"",""Test internal battery backup by disconnecting mains power"",""Perform electrical safety leakage test conforming to IEC 62353"",""Verify network central station telemetry signal stability""]",
+                            CreatedAt = DateTime.Now
+                        },
+                        new ChecklistForm
+                        {
+                            Title = "Central HVAC & AHU Preventive Maintenance Checklist",
+                            Department = MaintenanceTeams.General,
+                            CategoryId = acCat?.Id,
+                            ChecklistType = "Periodic Maintenance",
+                            ItemsJson = @"[""Wash or replace primary pre-filters and inspect secondary HEPA filters"",""Clean evaporator cooling coils and treat condensate drain pan with biocide"",""Inspect fan blower belts, tension, and pulleys for cracks and slippage"",""Check motor bearings lubrication and listen for abnormal bearing vibration"",""Measure operating current (Amps) on all electrical compressor phases"",""Check refrigerant suction and discharge pressure readings"",""Verify room thermostat calibration and air duct dampers operation""]",
+                            CreatedAt = DateTime.Now
+                        }
+                    };
+
+                    context.ChecklistForms.AddRange(checkLists);
+                    context.SaveChanges();
+                }
+
+                // 5. Seed some initial asset-sparepart compatibility for demonstration (Task 2)
+                if (!context.AssetCompatibleSpareParts.Any())
+                {
+                    var pcAsset = context.Assets.FirstOrDefault(a => a.Type == "Desktop Workstation" || a.Type == "Laptop" || (a.Category != null && a.Category.Name == "PC"));
+                    var ramPart = context.SpareParts.FirstOrDefault(p => p.Name.Contains("RAM") || p.Name.Contains("Memory") || p.Name.Contains("DDR"));
+                    var ssdPart = context.SpareParts.FirstOrDefault(p => p.Name.Contains("SSD") || p.Name.Contains("Storage"));
+                    if (pcAsset != null)
+                    {
+                        if (ramPart != null)
+                        {
+                            context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart { AssetId = pcAsset.Id, SparePartId = ramPart.Id });
+                        }
+                        if (ssdPart != null)
+                        {
+                            context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart { AssetId = pcAsset.Id, SparePartId = ssdPart.Id });
+                        }
+                    }
+
+                    var monitorAsset = context.Assets.FirstOrDefault(a => a.Type == "Patient Monitor" || (a.Category != null && a.Category.Name == "Patient Monitor"));
+                    var spo2Part = context.SpareParts.FirstOrDefault(p => p.Name.Contains("SpO2") || p.Name.Contains("Sensor") || p.Name.Contains("Lead"));
+                    if (monitorAsset != null && spo2Part != null)
+                    {
+                        context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart { AssetId = monitorAsset.Id, SparePartId = spo2Part.Id });
+                    }
+
                     context.SaveChanges();
                 }
             }

@@ -78,6 +78,8 @@ namespace StockPortal.Controllers
             }
 
             var items = await query
+                .Include(p => p.SparePartForm)
+                .Include(p => p.CompatibleAssets).ThenInclude(ca => ca.Asset)
                 .OrderBy(p => p.Department)
                 .ThenBy(p => p.Name)
                 .ToListAsync();
@@ -96,6 +98,32 @@ namespace StockPortal.Controllers
 
             var allScopeItems = await scopeQuery.ToListAsync();
 
+            // Available forms for this department (Task 1)
+            var formsQuery = _context.SparePartForms.AsQueryable();
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+                formsQuery = formsQuery.Where(f => f.Department == myTeam);
+            }
+            else if (!string.IsNullOrWhiteSpace(activeDept) && !string.Equals(activeDept, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                formsQuery = formsQuery.Where(f => f.Department == activeDept);
+            }
+            var availableForms = await formsQuery.OrderBy(f => f.Name).ToListAsync();
+
+            // Available assets for compatibility (Task 2)
+            var assetsQuery = _context.Assets.AsQueryable();
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+                assetsQuery = assetsQuery.Where(a => a.MaintenanceTeam == myTeam);
+            }
+            else if (!string.IsNullOrWhiteSpace(activeDept) && !string.Equals(activeDept, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                assetsQuery = assetsQuery.Where(a => a.MaintenanceTeam == activeDept);
+            }
+            var availableAssets = await assetsQuery.OrderBy(a => a.HospitalNo ?? a.SerialNo ?? a.Type).ToListAsync();
+
             var vm = new SparePartsIndexViewModel
             {
                 Items = items,
@@ -108,6 +136,8 @@ namespace StockPortal.Controllers
                 LowStockCount = allScopeItems.Count(p => p.IsLowStock),
                 DualNatureCount = allScopeItems.Count(p => p.CanFunctionAsAsset),
                 AvailableDepartments = MaintenanceTeams.All.ToList(),
+                AvailableForms = availableForms,
+                AvailableAssets = availableAssets,
                 Users = await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(),
                 Rooms = await _context.Rooms.OrderBy(r => r.RoomNo).ToListAsync()
             };
@@ -118,7 +148,7 @@ namespace StockPortal.Controllers
         // POST: /SpareParts/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(SparePart model)
+        public async Task<IActionResult> Create(SparePart model, int? formId, int[]? compatibleAssetIds, IFormCollection formCollection)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
@@ -135,12 +165,55 @@ namespace StockPortal.Controllers
                 return RedirectToAction(nameof(Index), new { department = model.Department });
             }
 
+            model.FormId = (formId.HasValue && formId.Value > 0) ? formId.Value : null;
+
+            // Extract dynamic specs from selected SparePartForm (Task 1)
+            var specsDict = new Dictionary<string, string>();
+            if (model.FormId.HasValue)
+            {
+                var selectedForm = await _context.SparePartForms.FindAsync(model.FormId.Value);
+                if (selectedForm != null)
+                {
+                    foreach (var field in selectedForm.Fields)
+                    {
+                        var formVal = formCollection[$"spec_{field.Name}"].ToString();
+                        if (string.IsNullOrWhiteSpace(formVal))
+                        {
+                            formVal = formCollection[$"specs[{field.Name}]"].ToString();
+                        }
+                        if (!string.IsNullOrWhiteSpace(formVal))
+                        {
+                            specsDict[field.Name] = formVal.Trim();
+                        }
+                    }
+                }
+            }
+            model.Specs = JsonSerializer.Serialize(specsDict);
+
+            // Task 9: Cost removed across application except adding asset
+            model.UnitCost = null;
+
             model.CreatedAt = DateTime.Now;
             model.UpdatedAt = DateTime.Now;
             model.IsActive = true;
 
             _context.SpareParts.Add(model);
             await _context.SaveChangesAsync();
+
+            // Save compatible devices (Task 2)
+            if (compatibleAssetIds != null && compatibleAssetIds.Length > 0)
+            {
+                foreach (var aid in compatibleAssetIds.Where(id => id > 0).Distinct())
+                {
+                    _context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart
+                    {
+                        AssetId = aid,
+                        SparePartId = model.Id,
+                        AssignedAt = DateTime.Now
+                    });
+                }
+                await _context.SaveChangesAsync();
+            }
 
             // If initial stock quantity is greater than zero, log initial replenishment
             if (model.Quantity > 0)
@@ -166,11 +239,13 @@ namespace StockPortal.Controllers
         // POST: /SpareParts/Edit
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(SparePart model)
+        public async Task<IActionResult> Edit(SparePart model, int? formId, int[]? compatibleAssetIds, IFormCollection formCollection)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
-            var part = await _context.SpareParts.FindAsync(model.Id);
+            var part = await _context.SpareParts
+                .Include(p => p.CompatibleAssets)
+                .FirstOrDefaultAsync(p => p.Id == model.Id);
             if (part == null || !part.IsActive) return NotFound();
 
             if (_currentUserService.IsMaintenance())
@@ -192,11 +267,57 @@ namespace StockPortal.Controllers
             part.Category = model.Category;
             part.MinReserveQuantity = model.MinReserveQuantity;
             part.Unit = model.Unit;
-            part.UnitCost = model.UnitCost;
+            // Task 9: Cost removed across application except adding asset
+            part.UnitCost = null;
             part.StorageLocation = model.StorageLocation;
             part.CanFunctionAsAsset = model.CanFunctionAsAsset;
             part.CompatibleEquipment = model.CompatibleEquipment;
             part.Notes = model.Notes;
+            part.FormId = (formId.HasValue && formId.Value > 0) ? formId.Value : null;
+
+            // Extract dynamic specs (Task 1)
+            var specsDict = new Dictionary<string, string>();
+            if (part.FormId.HasValue)
+            {
+                var selectedForm = await _context.SparePartForms.FindAsync(part.FormId.Value);
+                if (selectedForm != null)
+                {
+                    foreach (var field in selectedForm.Fields)
+                    {
+                        var formVal = formCollection[$"spec_{field.Name}"].ToString();
+                        if (string.IsNullOrWhiteSpace(formVal))
+                        {
+                            formVal = formCollection[$"specs[{field.Name}]"].ToString();
+                        }
+                        if (!string.IsNullOrWhiteSpace(formVal))
+                        {
+                            specsDict[field.Name] = formVal.Trim();
+                        }
+                    }
+                }
+            }
+            part.Specs = JsonSerializer.Serialize(specsDict);
+
+            // Synchronize compatible devices (Task 2)
+            var existingLinks = await _context.AssetCompatibleSpareParts.Where(cp => cp.SparePartId == part.Id).ToListAsync();
+            var newIds = (compatibleAssetIds ?? Array.Empty<int>()).Where(id => id > 0).ToHashSet();
+
+            // Remove unselected
+            var toRemove = existingLinks.Where(l => !newIds.Contains(l.AssetId)).ToList();
+            _context.AssetCompatibleSpareParts.RemoveRange(toRemove);
+
+            // Add new
+            var existingAssetIds = existingLinks.Select(l => l.AssetId).ToHashSet();
+            foreach (var aid in newIds.Where(id => !existingAssetIds.Contains(id)))
+            {
+                _context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart
+                {
+                    AssetId = aid,
+                    SparePartId = part.Id,
+                    AssignedAt = DateTime.Now
+                });
+            }
+
             part.UpdatedAt = DateTime.Now;
 
             await _context.SaveChangesAsync();

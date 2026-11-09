@@ -4,6 +4,7 @@
     ViewData["Title"] = CurrentUser.IsEndUser() ? "My Assigned Equipment" : "Stock & IT Asset Inventory";
     var rooms = ViewBag.Rooms as List<StockPortal.Models.Room> ?? new();
     var types = ViewBag.Types as List<string> ?? new();
+    var categories = ViewBag.Categories as List<StockPortal.Models.AssetCategory> ?? new();
     var selectedWarranty = ViewBag.SelectedWarranty as string;
     bool canManage = CurrentUser.CanManageAssets();
     var isArabic = Loc.IsArabic;
@@ -47,6 +48,15 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <select name="categoryId" class="form-select" onchange="this.form.submit()">
+                    <option value="">@(isArabic ? "كافة الفئات" : "All Categories")</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c.Id" selected="@(ViewBag.SelectedCategoryId == c.Id)">@c.DisplayName</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
                 <select name="calibration" class="form-select" onchange="this.form.submit()">
                     <option value="">@(isArabic ? "المعايرة الدورية (الكل)" : "All Calibration")</option>
                     <option value="required" selected="@(ViewBag.SelectedCalibration == "required")">@(isArabic ? "تتطلب معايرة" : "Requires Calibration")</option>
@@ -68,7 +78,7 @@
         <div>
             <h6 class="mb-0 fw-bold">@(CurrentUser.IsEndUser() ? Loc["My Custody Equipment"] : Loc["Inventory Assets List"])</h6>
             <small class="text-muted">
-                @(CurrentUser.IsEndUser() ? $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]}" : $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]} • {Loc["Total Asset Value"]}: {Model.Sum(a => a.Price ?? 0).ToString("C0", System.Globalization.CultureInfo.CurrentUICulture)}")
+                @(CurrentUser.IsEndUser() ? $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]}" : $"{Loc["Showing"]} {Model.Count()} {Loc["registered items"]}")
             </small>
         </div>
         @{
@@ -122,6 +132,7 @@
                     <tr>
                         <th>@Loc["Asset Tag / Hospital No"]</th>
                         <th>@Loc["Target Maintenance Team"]</th>
+                        <th>@(isArabic ? "الفئة" : "Category")</th>
                         <th>@Loc["Brand & Model"]</th>
                         <th>@Loc["Equipment Type"]</th>
                         <th>@Loc["Location / Room"]</th>
@@ -155,6 +166,16 @@
                                 <span class="badge @(item.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : item.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-primary")">
                                     @Loc.TargetTeam(item.MaintenanceTeam)
                                 </span>
+                            </td>
+                            <td>
+                                @if (item.Category != null)
+                                {
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border">@item.Category.DisplayName</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">-</span>
+                                }
                             </td>
                             <td>
                                 <div class="fw-semibold">@(item.Brand ?? "Unbranded")</div>

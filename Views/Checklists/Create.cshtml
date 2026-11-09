@@ -1,0 +1,148 @@
+@model StockPortal.Models.ChecklistForm
+@inject StockPortal.Services.ILocalizationService Loc
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+@{
+    ViewData["Title"] = Loc.IsArabic ? "إنشاء نموذج فحص دوري جديد" : "Create Preventive Checklist";
+    var isAr = Loc.IsArabic;
+    var departments = ViewBag.Departments as string[] ?? StockPortal.Models.MaintenanceTeams.All;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <h5 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-list-check text-success me-2"></i>
+                    @(isAr ? "إنشاء نموذج فحص دوري (Checklist)" : "Create Preventive Checklist Template")
+                </h5>
+                <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
+                    <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Back to List"]
+                </a>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="Create" method="post" id="checklistForm">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <label asp-for="Title" class="form-label fw-bold">@(isAr ? "عنوان نموذج الفحص" : "Checklist Title") <span class="text-danger">*</span></label>
+                            <input asp-for="Title" class="form-control form-control-lg" placeholder="@(isAr ? "مثال: فحص الصيانة الدورية لأجهزة الحاسوب والمحطات" : "e.g. Periodic Preventive Maintenance Checklist for Vital Signs Monitors")" required autofocus />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label asp-for="Department" class="form-label fw-bold">@Loc["Department"] <span class="text-danger">*</span></label>
+                            @if (CurrentUser.IsAdmin())
+                            {
+                                <select asp-for="Department" class="form-select">
+                                    @foreach (var d in departments)
+                                    {
+                                        <option value="@d">@Loc.TargetTeam(d)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control bg-light" value="@Model.Department" readonly />
+                                <input type="hidden" asp-for="Department" />
+                            }
+                        </div>
+
+                        <div class="col-md-4">
+                            <label asp-for="CategoryId" class="form-label fw-bold">@(isAr ? "فئة الأصل المرتبطة" : "Linked Asset Category")</label>
+                            <select asp-for="CategoryId" class="form-select" asp-items="ViewBag.Categories">
+                                <option value="">@(isAr ? "-- لكافة الأجهزة (عام) --" : "-- General (All Assets) --")</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label asp-for="ChecklistType" class="form-label fw-bold">@(isAr ? "نطاق الفحص" : "Inspection Scope")</label>
+                            <select asp-for="ChecklistType" class="form-select">
+                                <option value="Periodic Maintenance">@(isAr ? "صيانة دورية وقائية" : "Periodic Maintenance")</option>
+                                <option value="Calibration">@(isAr ? "معايرة دورية" : "Calibration Verification")</option>
+                                <option value="Safety Inspection">@(isAr ? "فحص سلامة وأمان" : "Safety & Environmental Inspection")</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Action Items Builder -->
+                    <div class="card bg-light border-0 mb-4">
+                        <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center py-2">
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="fa-solid fa-list-ol text-success me-1"></i>
+                                @(isAr ? "بنود وإجراءات الفحص والتدقيق (Action Items)" : "Checklist Inspection Actions") <span class="text-danger">*</span>
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="btnAddItem">
+                                <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة بند فحص" : "Add Inspection Item")
+                            </button>
+                        </div>
+                        <div class="card-body pt-1">
+                            <p class="small text-muted mb-3">
+                                @(isAr 
+                                    ? "حدد قائمة الخطوات والإجراءات التي سيتأكد منها الفني ويؤشر عليها عند فحص كل جهاز." 
+                                    : "Specify the actions, verification checks, and tests technicians will audit and tick for each asset.")
+                            </p>
+                            <div id="itemsContainer" class="d-flex flex-column gap-2">
+                                @foreach (var item in Model.Items)
+                                {
+                                    <div class="input-group checklist-item-row shadow-sm">
+                                        <span class="input-group-text bg-white border-end-0 text-success"><i class="fa-regular fa-square-check"></i></span>
+                                        <input type="text" name="actionItems" class="form-control" value="@item" placeholder="@(isAr ? "اكتب بند الفحص هنا..." : "Type checklist action item...")" required />
+                                        <button type="button" class="btn btn-outline-danger btn-remove-item" title="@(isAr ? "حذف البند" : "Remove")">
+                                            <i class="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                        <a asp-action="Index" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
+                        <button type="submit" class="btn btn-success px-4 fw-bold">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> @(isAr ? "حفظ نموذج الفحص" : "Save Checklist Template")
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const container = document.getElementById("itemsContainer");
+        const btnAdd = document.getElementById("btnAddItem");
+        const isAr = document.documentElement.dir === 'rtl' || document.documentElement.lang.startsWith('ar');
+
+        function attachRemove(btn) {
+            btn.addEventListener("click", function () {
+                if (container.querySelectorAll(".checklist-item-row").length > 1) {
+                    btn.closest(".checklist-item-row").remove();
+                } else {
+                    alert(isAr ? "يجب أن يحتوي نموذج الفحص على بند واحد على الأقل." : "Checklist must contain at least one item.");
+                }
+            });
+        }
+
+        container.querySelectorAll(".btn-remove-item").forEach(attachRemove);
+
+        btnAdd.addEventListener("click", function () {
+            const row = document.createElement("div");
+            row.className = "input-group checklist-item-row shadow-sm";
+            row.innerHTML = `
+                <span class="input-group-text bg-white border-end-0 text-success"><i class="fa-regular fa-square-check"></i></span>
+                <input type="text" name="actionItems" class="form-control" placeholder="${isAr ? 'اكتب بند الفحص هنا...' : 'Type checklist action item...'}" required />
+                <button type="button" class="btn btn-outline-danger btn-remove-item" title="${isAr ? 'حذف البند' : 'Remove'}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+            container.appendChild(row);
+            attachRemove(row.querySelector(".btn-remove-item"));
+            row.querySelector("input").focus();
+        });
+    });
+</script>
+}

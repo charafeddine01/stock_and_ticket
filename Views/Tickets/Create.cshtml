@@ -97,6 +97,39 @@
                 <form asp-action="Create" method="post" id="createTicketForm" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    @if (ViewBag.ActiveTicketWarning != null)
+                    {
+                        <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation fs-4 text-danger flex-shrink-0"></i>
+                                <div>
+                                    <strong class="text-danger">@(Loc.IsArabic ? "لا يمكن فتح تذكرة جديدة لهذا الجهاز:" : "Active Ticket Conflict:")</strong>
+                                    <div class="mt-1 small">@ViewBag.ActiveTicketWarning</div>
+                                </div>
+                            </div>
+                            @if (ViewBag.ExistingActiveTicketId != null)
+                            {
+                                <a href="@Url.Action("Details", "Tickets", new { id = ViewBag.ExistingActiveTicketId })" class="btn btn-danger btn-sm text-nowrap ms-3">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة النشطة" : "View Active Ticket")
+                                </a>
+                            }
+                        </div>
+                    }
+
+                    <div id="clientSideActiveTicketAlert" class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" style="display: none;" role="alert">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-ban fs-4 text-danger flex-shrink-0"></i>
+                            <div>
+                                <strong class="text-danger">@(Loc.IsArabic ? "تنبيه: هذا الجهاز لديه تذكرة قيد المعالجة حالياً!" : "Warning: Active Ticket Already In Progress!")</strong>
+                                <div class="mt-1 small" id="clientSideActiveTicketMsg"></div>
+                            </div>
+                        </div>
+                        <a href="#" id="clientSideActiveTicketLink" class="btn btn-danger btn-sm text-nowrap ms-3" target="_blank">
+                            <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة" : "View Ticket")
+                        </a>
+                    </div>
+
                     <input type="hidden" asp-for="OpenedBy" value="@currentUserId" />
                     <!-- Hidden target team input submitted with the form -->
                     <input type="hidden" asp-for="TargetTeam" id="hiddenTargetTeam" value="IT" />
@@ -458,7 +491,7 @@
 
                     <div class="d-flex justify-content-end gap-2 border-top pt-3">
                         <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
-                        <button type="submit" class="btn btn-primary px-4 fw-bold">
+                        <button type="submit" id="submitTicketBtn" class="btn btn-primary px-4 fw-bold">
                             <i class="fa-solid fa-paper-plane me-1"></i> @Loc["Submit Ticket"]
                         </button>
                     </div>
@@ -566,7 +599,9 @@
             maintenanceTeam: (a.MaintenanceTeam || a.maintenanceTeam || "IT").toUpperCase(),
             installedSoftwares: a.InstalledSoftwares || a.installedSoftwares || "[]",
             installedSoftwaresList: a.InstalledSoftwaresList || a.installedSoftwaresList || [],
-            display: a.Display || a.display || ""
+            display: a.Display || a.display || "",
+            hasActiveTicket: Boolean(a.HasActiveTicket || a.hasActiveTicket),
+            activeTicketId: a.ActiveTicketId || a.activeTicketId || null
         }));
 
         let myPersonalAssets = [...currentAssets];
@@ -759,13 +794,17 @@
 
             filtered.forEach(item => {
                 const isSelected = (String(item.id) === String(currentlySelectedAssetId));
+                const hasActive = Boolean(item.hasActiveTicket && item.activeTicketId);
                 const itemDiv = document.createElement("div");
-                itemDiv.className = `asset-option-item p-2 rounded mb-1 cursor-pointer ${isSelected ? "selected bg-primary bg-opacity-10 border-primary" : ""}`;
+                itemDiv.className = `asset-option-item p-2 rounded mb-1 cursor-pointer ${isSelected ? "selected bg-primary bg-opacity-10 border-primary" : ""} ${hasActive ? "border-danger border-opacity-50 bg-danger bg-opacity-10" : ""}`;
                 itemDiv.setAttribute("data-id", item.id);
                 itemDiv.setAttribute("role", "option");
                 itemDiv.setAttribute("aria-selected", isSelected ? "true" : "false");
 
                 const deptBadgeHtml = `<span class="badge ${getDeptBadgeClass(item.maintenanceTeam)} small">${getDeptShortLabel(item.maintenanceTeam)}</span>`;
+                const activeBadgeHtml = hasActive
+                    ? `<span class="badge bg-danger text-white small ms-1 flex-shrink-0"><i class="fa-solid fa-clock-rotate-left me-1"></i>${isAr ? `تذكرة #${item.activeTicketId}` : `Active #${item.activeTicketId}`}</span>`
+                    : ``;
 
                 let subDetails = [];
                 if (item.serialNo) {
@@ -781,6 +820,7 @@
                             <span class="badge bg-light text-dark border font-monospace fw-bold">${escapeHtml(item.hospitalNo || "#" + item.id)}</span>
                             <span class="fw-semibold text-truncate small text-dark">${escapeHtml(item.brand)}</span>
                             <span class="text-muted small text-truncate">(${escapeHtml(item.displayType || item.type)})</span>
+                            ${activeBadgeHtml}
                         </div>
                         <div class="d-flex align-items-center gap-1 flex-shrink-0">
                             ${deptBadgeHtml}
@@ -829,17 +869,50 @@
                     assetTriggerIcon.className = `${getDeptIconClass(item.maintenanceTeam)} fs-5 flex-shrink-0`;
                 }
                 if (assetTriggerText) {
+                    const activeBadgeInTrigger = (item.hasActiveTicket && item.activeTicketId)
+                        ? `<span class="badge bg-danger text-white small flex-shrink-0 ms-1"><i class="fa-solid fa-clock-rotate-left me-1"></i>${isAr ? `تذكرة #${item.activeTicketId}` : `Active #${item.activeTicketId}`}</span>`
+                        : ``;
+
                     assetTriggerText.innerHTML = `
                         <div class="d-flex align-items-center gap-2 overflow-hidden text-truncate">
                             <span class="badge bg-light text-dark border font-monospace fw-bold">${escapeHtml(item.hospitalNo || "#" + item.id)}</span>
                             <strong class="text-dark text-truncate small">${escapeHtml(item.brand)}</strong>
                             <span class="text-muted small text-truncate d-none d-sm-inline">(${escapeHtml(item.displayType || item.type)})</span>
+                            ${activeBadgeInTrigger}
                             <span class="badge ${getDeptBadgeClass(item.maintenanceTeam)} small ms-auto flex-shrink-0">${getDeptShortLabel(item.maintenanceTeam)}</span>
                         </div>
                     `;
                 }
                 if (assetTriggerClearBtn) assetTriggerClearBtn.style.display = "inline-block";
                 if (assetOptGeneral) assetOptGeneral.classList.remove("bg-secondary", "bg-opacity-25");
+            }
+
+            // Task 11: Real-time validation for active ticket conflict
+            const clientAlert = document.getElementById("clientSideActiveTicketAlert");
+            const clientAlertMsg = document.getElementById("clientSideActiveTicketMsg");
+            const clientAlertLink = document.getElementById("clientSideActiveTicketLink");
+            const submitBtn = document.getElementById("submitTicketBtn") || document.querySelector("button[type='submit']");
+
+            if (item && item.hasActiveTicket && item.activeTicketId) {
+                if (clientAlert && clientAlertMsg && clientAlertLink) {
+                    clientAlertMsg.textContent = isAr 
+                        ? `الجهاز [${item.display || item.hospitalNo}] مرتبط بتذكرة نشطة حالياً برقم #${item.activeTicketId}. لا يمكن فتح تذكرة جديدة حتى يتم إغلاق التذكرة السابقة.`
+                        : `Asset [${item.display || item.hospitalNo}] already has an active open ticket (#${item.activeTicketId}). You cannot open another ticket until it is closed or canceled.`;
+                    clientAlertLink.href = `/Tickets/Details/${item.activeTicketId}`;
+                    clientAlert.style.display = "flex";
+                }
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.classList.add("opacity-50");
+                    submitBtn.title = isAr ? "لا يمكن الإرسال لوجود تذكرة نشطة على هذا الجهاز" : "Cannot submit: an active ticket already exists for this device";
+                }
+            } else {
+                if (clientAlert) clientAlert.style.display = "none";
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove("opacity-50");
+                    submitBtn.title = "";
+                }
             }
 
             closeDropdown();
@@ -1183,7 +1256,9 @@
                             maintenanceTeam: (a.maintenanceTeam || "IT").toUpperCase(),
                             installedSoftwares: a.installedSoftwares || "[]",
                             installedSoftwaresList: a.installedSoftwaresList || [],
-                            display: a.display || ""
+                            display: a.display || "",
+                            hasActiveTicket: Boolean(a.hasActiveTicket),
+                            activeTicketId: a.activeTicketId || null
                         }));
                     } else {
                         currentAssets = [];
@@ -1500,6 +1575,23 @@
             }
         } else {
             selectAssetItem(null);
+        }
+
+        // Task 11: Block submission if chosen asset has an active ticket
+        const createTicketForm = document.getElementById("createTicketForm");
+        if (createTicketForm) {
+            createTicketForm.addEventListener("submit", function(e) {
+                if (currentlySelectedAssetId) {
+                    const sel = currentAssets.find(a => String(a.id) === String(currentlySelectedAssetId));
+                    if (sel && sel.hasActiveTicket && sel.activeTicketId) {
+                        e.preventDefault();
+                        alert(isAr 
+                            ? `تنبيه: لا يمكن إرسال تذكرة جديدة لهذا الجهاز لوجود تذكرة نشطة حالياً برقم #${sel.activeTicketId}.` 
+                            : `Warning: Cannot submit ticket. An active ticket (#${sel.activeTicketId}) is already in progress for this asset.`);
+                        return false;
+                    }
+                }
+            });
         }
 
         // Initialize state

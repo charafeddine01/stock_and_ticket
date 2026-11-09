@@ -589,7 +589,7 @@
 
                         <div class="mb-3">
                             <label class="form-label fw-semibold">@Loc["Parts Replaced / Materials (JSON or Text)"]</label>
-                            <input type="text" name="partsReplaced" class="form-control font-monospace" placeholder='e.g. {"Part": "1TB SSD", "Cost": 75}' />
+                            <input type="text" name="partsReplaced" class="form-control font-monospace" placeholder='e.g. {"Part": "1TB SSD", "Quantity": 1}' />
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -694,9 +694,9 @@
                                 @{
                                     var currentUserId = CurrentUser.GetUserId();
                                     var assignedTechId = ticket.Handler?.TechUserId;
-                                    var candidateTechs = Model.DepartmentEmployees.Any()
-                                        ? Model.DepartmentEmployees
-                                        : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam)).ToList();
+                                    var candidateTechs = Model.DepartmentEmployees
+                                        .Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))
+                                        .ToList();
                                     var orderedTechs = candidateTechs
                                         .OrderByDescending(u => u.Id == currentUserId || u.Id == assignedTechId)
                                         .ThenBy(u => u.FullName)
