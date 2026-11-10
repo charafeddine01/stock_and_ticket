@@ -101,28 +101,43 @@ namespace StockPortal.Middleware
                 return;
             }
 
-            // 6. Physical user is ACTIVE. Check optional session identity switch (testing feature)
+            // 6. Check physical user admin privileges for optional testing profile switch
+            bool isPhysicalAdmin = string.Equals(pcUser.Role, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
+                                   (pcUser.Role != null && (pcUser.Role.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) || pcUser.Role.Contains("SYSADMIN", StringComparison.OrdinalIgnoreCase)));
+
             User matchedUser = pcUser;
             var sessionUserId = context.Session.GetInt32("ActiveUserId");
 
             if (sessionUserId.HasValue)
             {
-                var switchedUser = await dbContext.Users
-                    .Include(u => u.Department)
-                    .FirstOrDefaultAsync(u => u.Id == sessionUserId.Value);
-
-                if (switchedUser != null && switchedUser.IsActive == true)
+                // Production Phase Security Guard:
+                // Only physical Administrators are permitted to switch profiles for testing.
+                if (isPhysicalAdmin)
                 {
-                    matchedUser = switchedUser;
+                    var switchedUser = await dbContext.Users
+                        .Include(u => u.Department)
+                        .FirstOrDefaultAsync(u => u.Id == sessionUserId.Value);
+
+                    if (switchedUser != null && switchedUser.IsActive == true)
+                    {
+                        matchedUser = switchedUser;
+                    }
+                    else
+                    {
+                        context.Session.Remove("ActiveUserId");
+                    }
                 }
                 else
                 {
+                    // Non-admin physical user attempting to use ActiveUserId: clear session immediately
                     context.Session.Remove("ActiveUserId");
                 }
             }
 
             // 7. AUTO-LOGIN: User found and ACTIVE!
             context.Items["CurrentUser"] = matchedUser;
+            context.Items["PhysicalUser"] = pcUser;
+            context.Items["IsPhysicalAdmin"] = isPhysicalAdmin;
 
             var claims = new List<Claim>
             {
@@ -130,7 +145,9 @@ namespace StockPortal.Middleware
                 new Claim(ClaimTypes.Name, matchedUser.FullName ?? matchedUser.DomainUser ?? cleanUsername),
                 new Claim(ClaimTypes.Role, matchedUser.Role ?? SystemRoles.EndUser),
                 new Claim("DomainUser", matchedUser.DomainUser ?? cleanUsername),
-                new Claim("Department", matchedUser.Department?.Name ?? "General")
+                new Claim("Department", matchedUser.Department?.Name ?? "General"),
+                new Claim("PhysicalUserRole", pcUser.Role ?? SystemRoles.EndUser),
+                new Claim("IsPhysicalAdmin", isPhysicalAdmin ? "true" : "false")
             };
 
             if (!string.IsNullOrWhiteSpace(matchedUser.MaintenanceTeam))

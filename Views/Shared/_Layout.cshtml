@@ -121,16 +121,18 @@
                 // Admin sees all open tickets across all teams
 
                 openTicketsCount = ticketsQuery.Count();
-                var maintAssetsQuery = DbContext.Assets.Where(a => a.Status == "Under Maintenance" || a.CustodyTypeId == 3);
+
+                // Task 3: Maintenance log sidebar badge should show only the count of devices currently in maintenance
+                var activeMaintOrdersQuery = DbContext.AssetMaintenances.Where(m => m.WorkOrderStatus == "Under Maintenance");
                 if (CurrentUser.IsMaintenance())
                 {
                     var myTeam = CurrentUser.GetMaintenanceTeam();
                     if (!string.IsNullOrWhiteSpace(myTeam))
                     {
-                        maintAssetsQuery = maintAssetsQuery.Where(a => a.MaintenanceTeam == myTeam);
+                        activeMaintOrdersQuery = activeMaintOrdersQuery.Where(m => m.Asset != null && m.Asset.MaintenanceTeam == myTeam);
                     }
                 }
-                assetsAtMaintenanceCount = maintAssetsQuery.Count();
+                assetsAtMaintenanceCount = activeMaintOrdersQuery.Select(m => m.AssetId).Where(id => id.HasValue).Distinct().Count();
 
                 if (CurrentUser.IsAdmin())
                 {
@@ -535,6 +537,22 @@
                     </div>
                 </div>
 
+                <!-- Active Testing Profile Banner (Admins Only) -->
+                @if (Context.Session.GetInt32("ActiveUserId") != null && CurrentUser.CanSwitchProfile())
+                {
+                    <form method="post" asp-action="SwitchUser" asp-controller="Account" class="d-inline m-0 p-0">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="0" />
+                        <input type="hidden" name="returnUrl" value="@Context.Request.Path" />
+                        <button type="submit" class="btn btn-sm btn-warning py-1 px-2 text-dark fw-bold rounded-pill shadow-sm d-flex align-items-center gap-1" title="@Loc["Reset to Default Windows User"]">
+                            <i class="fa-solid fa-flask"></i>
+                            <span class="d-none d-lg-inline small">@Loc["Testing"]:</span>
+                            <span class="small text-truncate" style="max-width: 120px;">@(userObj?.DisplayFullName ?? CurrentUser.GetFullName())</span>
+                            <i class="fa-solid fa-xmark text-danger ms-1"></i>
+                        </button>
+                    </form>
+                }
+
                 <!-- Domain User Pill -->
                 <div class="dropdown">
                     <button class="btn btn-sm btn-light border dropdown-toggle d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -557,7 +575,10 @@
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-user me-2 text-primary"></i> @Loc["My Profile & Equipment"]</a></li>
-                        <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-users me-2 text-warning"></i> @Loc["Switch User (Testing)"]</a></li>
+                        @if (CurrentUser.CanSwitchProfile())
+                        {
+                            <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-users me-2 text-warning"></i> @Loc["Switch User (Testing)"]</a></li>
+                        }
                     </ul>
                 </div>
 

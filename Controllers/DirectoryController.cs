@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using StockPortal.Data;
 using StockPortal.Models;
 using StockPortal.Services;
@@ -13,17 +16,109 @@ namespace StockPortal.Controllers
     {
         private readonly StockDbContext _context;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IConfiguration? _configuration;
 
-        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService)
+        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService, IConfiguration? configuration = null)
         {
             _context = context;
             _currentUserService = currentUserService;
+            _configuration = configuration;
+        }
+
+        /// <summary>
+        /// Resolves the physical workstation or domain username from HTTP headers or local environment.
+        /// </summary>
+        private string GetRequestDomainUser()
+        {
+            string? rawUser = HttpContext?.Request?.Headers["LOGON_USER"].FirstOrDefault()
+                ?? HttpContext?.Request?.Headers["REMOTE_USER"].FirstOrDefault()
+                ?? HttpContext?.Request?.Headers["X-Remote-User"].FirstOrDefault()
+                ?? HttpContext?.User?.Identity?.Name;
+
+            if (string.IsNullOrWhiteSpace(rawUser))
+            {
+                rawUser = _currentUserService.GetDomainUser();
+            }
+
+            if (string.IsNullOrWhiteSpace(rawUser))
+            {
+                rawUser = Environment.UserName;
+            }
+
+            string cleanUsername = rawUser ?? "";
+            if (cleanUsername.Contains('\\'))
+            {
+                cleanUsername = cleanUsername.Split('\\').Last();
+            }
+            if (cleanUsername.Contains('@'))
+            {
+                cleanUsername = cleanUsername.Split('@').First();
+            }
+            return cleanUsername.Trim();
+        }
+
+        /// <summary>
+        /// Handshake validation on each RBAC action:
+        /// 1. Ensures the caller is authenticated as an Admin.
+        /// 2. Performs a live database handshake against the physical domain identity to confirm the user is actively registered and has role ADMIN directly in the database.
+        /// If the database role is changed to non-admin, the handshake immediately rejects.
+        /// </summary>
+        public async Task<bool> ValidateRbacHandshakeAsync()
+        {
+            // 1. Current user service authorization guard
+            if (!_currentUserService.CanManageUsers())
+            {
+                return false;
+            }
+
+            // 2. Resolve domain user
+            var domainUser = GetRequestDomainUser();
+            var callerId = _currentUserService.GetUserId();
+
+            // 3. Live Database Handshake (fresh query, bypassing cached claims)
+            if (await _context.Users.AnyAsync())
+            {
+                var search = domainUser.ToLowerInvariant();
+                var dbUser = await _context.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u =>
+                        (callerId > 0 && u.Id == callerId) ||
+                        (u.DomainUser != null && u.DomainUser.ToLower() == search) ||
+                        (u.FullName != null && u.FullName.ToLower() == search)
+                    );
+
+                if (dbUser == null || dbUser.IsActive != true)
+                {
+                    return false;
+                }
+
+                var role = dbUser.Role?.Trim().ToUpperInvariant() ?? "";
+                bool isDbAdmin = role == SystemRoles.Admin ||
+                                 role == "ADMINISTRATOR" ||
+                                 role.Contains("ADMIN") ||
+                                 role.Contains("SYSADMIN");
+
+                if (!isDbAdmin)
+                {
+                    return false;
+                }
+
+                ViewBag.HandshakeUser = dbUser.FullName ?? dbUser.DomainUser ?? domainUser;
+                ViewBag.HandshakeDomain = domainUser;
+            }
+            else
+            {
+                ViewBag.HandshakeUser = _currentUserService.GetFullName();
+                ViewBag.HandshakeDomain = domainUser;
+            }
+
+            return true;
         }
 
         // GET: Directory
         public async Task<IActionResult> Index(string? departmentFilter = null, string? tab = null)
         {
-            if (!_currentUserService.CanManageUsers() && !_currentUserService.IsMaintenance()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             ViewBag.Users = await _context.Users.Include(u => u.Department).OrderBy(u => u.FullName).ToListAsync();
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync();
@@ -50,7 +145,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateUser(User user)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             if (!string.IsNullOrWhiteSpace(user.FullName))
             {
@@ -76,7 +171,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateUserRole(int id, string role, string? maintenanceTeam)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var user = await _context.Users.FindAsync(id);
             if (user != null)
@@ -95,7 +190,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleUserStatus(int id)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var user = await _context.Users.FindAsync(id);
             if (user != null)
@@ -113,7 +208,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateRoom(Room room)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             if (room.RoomNo.HasValue && room.Floor.HasValue)
             {
@@ -129,7 +224,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteRoom(int id)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var room = await _context.Rooms.Include(r => r.Assets).FirstOrDefaultAsync(r => r.Id == id);
             if (room != null)
@@ -153,7 +248,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateSupplier(Supplier supplier, string[]? selectedDepartments = null)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             if (!string.IsNullOrWhiteSpace(supplier.Name))
             {
@@ -174,7 +269,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditSupplier(int id, string name, int? type, string[]? selectedDepartments, bool? isActive)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var supplier = await _context.Suppliers.FindAsync(id);
             if (supplier != null)
@@ -207,7 +302,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleSupplierStatus(int id)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var supplier = await _context.Suppliers.FindAsync(id);
             if (supplier != null)
@@ -243,7 +338,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateDepartment(Department department)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             if (!string.IsNullOrWhiteSpace(department.Name))
             {
@@ -259,7 +354,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
-            if (!_currentUserService.CanManageUsers()) return Forbid();
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
             var dept = await _context.Departments.Include(d => d.Users).FirstOrDefaultAsync(d => d.Id == id);
             if (dept != null)

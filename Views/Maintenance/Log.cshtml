@@ -1,65 +1,106 @@
 @model StockPortal.Models.AssetMaintenance
 @{
     ViewData["Title"] = Loc["Log Maintenance Work Order"];
+    var isAr = Loc.IsArabic;
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3">
                 <h5 class="mb-0 fw-bold"><i class="fa-solid fa-wrench text-warning me-2"></i> @Loc["Record Work Order"]</h5>
             </div>
             <div class="card-body p-4">
-                <form asp-action="Log" method="post">
+                <form asp-action="Log" method="post" id="maintenanceLogForm">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                    <input type="hidden" asp-for="PartsReplaced" id="logPartsReplacedJson" value="@Model?.PartsReplaced" />
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-12">
                             <label asp-for="AssetId" class="form-label fw-semibold">@Loc["Target Hardware Asset"]</label>
                             <select asp-for="AssetId" class="form-select" asp-items="ViewBag.Assets" required>
-                                <option value="">@(Loc.IsArabic ? "-- اختر الأصل / الجهاز --" : "-- Select Equipment --")</option>
+                                <option value="">@(isAr ? "-- اختر الأصل / الجهاز --" : "-- Select Equipment --")</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
                             <label asp-for="MaintenanceType" class="form-label fw-semibold">@Loc["Service Scope"]</label>
                             <select asp-for="MaintenanceType" class="form-select">
-                                <option value="2">@(Loc.IsArabic ? "صيانة وقائية / فحص دوري" : "Preventive / Periodic Inspection")</option>
-                                <option value="1">@(Loc.IsArabic ? "إصلاح عطل طارئ / علاجي" : "Breakdown / Corrective Repair")</option>
+                                <option value="2">@(isAr ? "صيانة وقائية / فحص دوري" : "Preventive / Periodic Inspection")</option>
+                                <option value="1">@(isAr ? "إصلاح عطل طارئ / علاجي" : "Breakdown / Corrective Repair")</option>
                             </select>
-                            <div class="form-text small">@(Loc.IsArabic ? "تسجيل الفحص الوقائي يحدث تاريخ الفحص القادم تلقائياً." : "Logging a Preventive checkup automatically resets the asset's next periodic due date.")</div>
+                            <div class="form-text small">@(isAr ? "تسجيل الفحص الوقائي يحدث تاريخ الفحص القادم تلقائياً." : "Logging a Preventive checkup automatically resets the asset's next periodic due date.")</div>
                         </div>
 
                         <div class="col-md-6">
-                            <label asp-for="TicketId" class="form-label fw-semibold">@(Loc.IsArabic ? "تذكرة الدعم المرتبطة (اختياري)" : "Linked Helpdesk Ticket (Optional)")</label>
+                            <label asp-for="TicketId" class="form-label fw-semibold">@(isAr ? "تذكرة الدعم المرتبطة (اختياري)" : "Linked Helpdesk Ticket (Optional)")</label>
                             <select asp-for="TicketId" class="form-select" asp-items="ViewBag.Tickets">
-                                <option value="">@(Loc.IsArabic ? "-- صيانة مستقلة (بدون تذكرة) --" : "-- Standalone Maintenance (No Ticket) --")</option>
+                                <option value="">@(isAr ? "-- صيانة مستقلة (بدون تذكرة) --" : "-- Standalone Maintenance (No Ticket) --")</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
                             <label asp-for="UserId" class="form-label fw-semibold">@Loc["Responsible Technician / Staff"]</label>
                             <select asp-for="UserId" class="form-select" asp-items="ViewBag.Technicians" required>
-                                <option value="">@(Loc.IsArabic ? "-- اختر الفني المسؤول --" : "-- Select Technician --")</option>
+                                <option value="">@(isAr ? "-- اختر الفني المسؤول --" : "-- Select Technician --")</option>
                             </select>
                         </div>
 
                         <div class="col-md-6">
                             <label asp-for="SupplierId" class="form-label fw-semibold">@Loc["Third-Party Supplier / Vendor (Optional)"]</label>
                             <select asp-for="SupplierId" class="form-select" asp-items="ViewBag.Suppliers">
-                                <option value="">@(Loc.IsArabic ? "-- فريق الصيانة الداخلي فقط --" : "-- Internal Staff Only --")</option>
+                                <option value="">@(isAr ? "-- فريق الصيانة الداخلي فقط --" : "-- Internal Staff Only --")</option>
                             </select>
                         </div>
 
                         <div class="col-12">
                             <label asp-for="Description" class="form-label fw-semibold">@Loc["Maintenance Action & Work Performed"]</label>
-                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="@(Loc.IsArabic ? "اشرح الإجراءات المنفذة، نتائج الفحص، المعايرة، أو الاختبارات..." : "Describe actions performed, diagnostic results, recalibrations, or testing...")" required></textarea>
+                            <textarea asp-for="Description" class="form-control" rows="3" placeholder="@(isAr ? "اشرح الإجراءات المنفذة، نتائج الفحص، المعايرة، أو الاختبارات..." : "Describe actions performed, diagnostic results, recalibrations, or testing...")" required></textarea>
                         </div>
 
+                        <!-- Dynamic Replaced Parts Form (Managed by application, translates to JSON) -->
                         <div class="col-12">
-                            <label asp-for="PartsReplaced" class="form-label fw-semibold">@Loc["Parts Replaced / Materials (JSON or Text)"]</label>
-                            <input asp-for="PartsReplaced" class="form-control font-monospace" placeholder='e.g. {"Part": "Battery Pack", "Cost": 120, "SN": "BT-9921"}' />
+                            <div class="card bg-light border-0 rounded-3 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <span class="fw-bold text-dark">
+                                            <i class="fa-solid fa-microchip text-primary me-1"></i>
+                                            @(isAr ? "قطع الغيار والمستهلكات المستبدلة" : "Replaced Parts & Consumables")
+                                        </span>
+                                        <span class="badge bg-primary-subtle text-primary ms-1 small">@(isAr ? "إدارة تلقائية (JSON)" : "App Managed")</span>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary fw-semibold" id="btnAddLogPartRow">
+                                        <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة قطعة مستبدلة" : "Add Replaced Part")
+                                    </button>
+                                </div>
+                                <p class="text-muted small mb-2">
+                                    @(isAr 
+                                        ? "أدخل بيانات القطع المستبدلة في الخانات أدناه، وسيتولى النظام ترجمتها وتخزينها تلقائياً بصيغة JSON منظمة." 
+                                        : "Fill in the part details below; the application will automatically translate and store them in clean JSON format.")
+                                </p>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered bg-white align-middle mb-1" id="logPartsTable">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th style="width: 38%;">@(isAr ? "اسم القطعة / الصنف" : "Part / Component Name") <span class="text-danger">*</span></th>
+                                                <th style="width: 26%;">@(isAr ? "رقم القطعة / الكود" : "Part # / SKU")</th>
+                                                <th style="width: 14%;">@(isAr ? "الكمية" : "Quantity")</th>
+                                                <th style="width: 16%;">@(isAr ? "سيريال / ملاحظات" : "Serial / Notes")</th>
+                                                <th style="width: 6%;" class="text-center"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="logPartsTableBody">
+                                            <!-- Dynamic rows inserted via JavaScript -->
+                                        </tbody>
+                                    </table>
+                                    <div id="noLogPartsAlert" class="text-center py-2 text-muted small bg-white border border-dashed rounded">
+                                        <i class="fa-solid fa-circle-info me-1"></i>
+                                        @(isAr ? "لم يتم تسجيل أي قطع غيار مستبدلة (انقر على 'إضافة قطعة مستبدلة' إن وُجدت)." : "No parts replaced (click 'Add Replaced Part' if components were swapped).")
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -72,3 +113,87 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    const isAr = @(isAr ? "true" : "false");
+    const logPartsTableBody = document.getElementById("logPartsTableBody");
+    const noLogPartsAlert = document.getElementById("noLogPartsAlert");
+    const btnAddLogPartRow = document.getElementById("btnAddLogPartRow");
+    const logPartsReplacedJson = document.getElementById("logPartsReplacedJson");
+    const maintenanceLogForm = document.getElementById("maintenanceLogForm");
+
+    function updateLogPartsAlert() {
+        if (!logPartsTableBody || !noLogPartsAlert) return;
+        noLogPartsAlert.style.display = logPartsTableBody.children.length === 0 ? "block" : "none";
+    }
+
+    function addLogPartRow(item) {
+        if (!logPartsTableBody) return;
+        item = item || {};
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm l-part-name" placeholder="${isAr ? 'اسم القطعة (مثال: بطارية، مزود طاقة، لوحة أم)' : 'e.g. Battery Pack, Power Supply'}" value="${item.partName || ''}" required />
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm l-part-sku font-monospace" placeholder="${isAr ? 'كود القطعة' : 'e.g. DP/N 0XXV21'}" value="${item.partNumber || ''}" />
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm l-part-qty text-center" min="1" value="${item.quantity || 1}" required />
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm l-part-notes" placeholder="${isAr ? 'سيريال / ملاحظات' : 'SN / Notes'}" value="${item.notes || ''}" />
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger p-1" onclick="removeLogPartRow(this)" title="${isAr ? 'حذف' : 'Remove'}">
+                    <i class="fa-solid fa-trash fa-xs"></i>
+                </button>
+            </td>
+        `;
+        logPartsTableBody.appendChild(tr);
+        updateLogPartsAlert();
+    }
+
+    window.removeLogPartRow = function(btn) {
+        btn.closest("tr").remove();
+        updateLogPartsAlert();
+    };
+
+    if (btnAddLogPartRow) {
+        btnAddLogPartRow.addEventListener("click", function() {
+            addLogPartRow();
+        });
+    }
+
+    // Pre-populate if existing model has partsReplaced JSON
+    try {
+        const initialVal = logPartsReplacedJson ? logPartsReplacedJson.value : '';
+        if (initialVal && initialVal.trim().startsWith("[")) {
+            const parsed = JSON.parse(initialVal);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                parsed.forEach(p => addLogPartRow(p));
+            }
+        }
+    } catch (e) { }
+
+    if (maintenanceLogForm) {
+        maintenanceLogForm.addEventListener("submit", function() {
+            const rows = logPartsTableBody.querySelectorAll("tr");
+            const parts = [];
+            rows.forEach(tr => {
+                const name = tr.querySelector(".l-part-name").value.trim();
+                if (name) {
+                    parts.push({
+                        partName: name,
+                        partNumber: tr.querySelector(".l-part-sku").value.trim(),
+                        quantity: parseInt(tr.querySelector(".l-part-qty").value) || 1,
+                        notes: tr.querySelector(".l-part-notes").value.trim()
+                    });
+                }
+            });
+            logPartsReplacedJson.value = parts.length > 0 ? JSON.stringify(parts) : "";
+        });
+    }
+</script>
+}

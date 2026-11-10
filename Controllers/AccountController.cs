@@ -21,11 +21,17 @@ namespace StockPortal.Controllers
             _currentUserService = currentUserService;
         }
 
-        // POST: Account/SwitchUser (Only allowed via POST with Anti-Forgery Token, URL GET tampering blocked)
+        // POST: Account/SwitchUser (Only allowed for Admin users via POST with Anti-Forgery Token, URL GET tampering blocked)
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SwitchUser(int id, string? returnUrl)
         {
+            // Production Phase Security Guard: Only Admins can switch profiles
+            if (!_currentUserService.CanSwitchProfile())
+            {
+                return Forbid();
+            }
+
             if (id > 0)
             {
                 var user = await _context.Users.FindAsync(id);
@@ -54,33 +60,75 @@ namespace StockPortal.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // GET: Account/Profile
-        public async Task<IActionResult> Profile()
+        // GET: Account/Profile (or Account/Profile?id=123 for Admin inspection)
+        public async Task<IActionResult> Profile(int? id = null)
         {
-            var user = _currentUserService.GetCurrentUser();
-            if (user == null)
+            var currentUser = _currentUserService.GetCurrentUser();
+            if (currentUser == null)
             {
                 return RedirectToAction("Index", "Home");
             }
 
+            // Production Phase Security Guard:
+            // Non-admin users can ONLY access their own profile. Only Admins can view/inspect other users' profiles.
+            User targetUser = currentUser;
+            bool canSwitchProfile = _currentUserService.CanSwitchProfile();
+
+            if (id.HasValue && id.Value > 0 && id.Value != currentUser.Id)
+            {
+                if (!canSwitchProfile && !_currentUserService.IsAdmin())
+                {
+                    return Forbid();
+                }
+
+                var specifiedUser = await _context.Users
+                    .Include(u => u.Department)
+                    .FirstOrDefaultAsync(u => u.Id == id.Value);
+
+                if (specifiedUser == null)
+                {
+                    return NotFound();
+                }
+
+                targetUser = specifiedUser;
+            }
+
             var myAssets = await _context.Assets
-                .Where(a => a.UserId == user.Id)
+                .Where(a => a.UserId == targetUser.Id)
                 .Include(a => a.Room)
                 .Include(a => a.CustodyType)
                 .ToListAsync();
 
             var myTickets = await _context.Tickets
-                .Where(t => t.OpenedBy == user.Id || t.OnBehalfOf == user.Id)
+                .Where(t => t.OpenedBy == targetUser.Id || t.OnBehalfOf == targetUser.Id)
                 .Include(t => t.Asset)
                 .Include(t => t.Status)
                 .OrderByDescending(t => t.OpenedDT)
                 .ToListAsync();
 
+            var clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            var clientMac = NetworkInfoHelper.GetClientMacAddress(HttpContext, clientIp);
+
+            ViewBag.ClientIp = clientIp;
+            ViewBag.ClientMac = clientMac;
             ViewBag.MyAssets = myAssets;
             ViewBag.MyTickets = myTickets;
-            ViewBag.AllUsers = await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync();
+            ViewBag.CanSwitchProfile = canSwitchProfile;
+            ViewBag.IsViewingSelf = (targetUser.Id == currentUser.Id);
 
-            return View(user);
+            if (canSwitchProfile)
+            {
+                ViewBag.AllUsers = await _context.Users
+                    .Where(u => u.IsActive == true)
+                    .OrderBy(u => u.FullName)
+                    .ToListAsync();
+            }
+            else
+            {
+                ViewBag.AllUsers = new List<User>();
+            }
+
+            return View(targetUser);
         }
 
         // GET: Account/AccessDenied

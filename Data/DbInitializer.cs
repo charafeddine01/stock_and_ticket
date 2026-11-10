@@ -698,7 +698,12 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN installed_softwares TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN affected_software TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN pc_name TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN ip_address TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN mac_address TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE ticket_msg ADD COLUMN ip_address TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE ticket_msg ADD COLUMN mac_address TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN closed_by_users TEXT NULL;");
+                    TryExecuteSql(context, "UPDATE tickets SET status = 5 WHERE closedDT IS NOT NULL AND status != 4 AND status != 5;");
                     TryExecuteSql(context, "ALTER TABLE ticket_attachments ADD COLUMN messageID INTEGER NULL;");
 
                     // Device Forms Installable Softwares Schema
@@ -855,7 +860,12 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `installed_softwares` LONGTEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `affected_software` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `pc_name` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `ip_address` varchar(100) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `mac_address` varchar(100) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `ticket_msg` ADD COLUMN IF NOT EXISTS `ip_address` varchar(100) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `ticket_msg` ADD COLUMN IF NOT EXISTS `mac_address` varchar(100) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `closed_by_users` LONGTEXT NULL;");
+                    TryExecuteSql(context, "UPDATE `tickets` SET `status` = 5 WHERE `closedDT` IS NOT NULL AND `status` != 4 AND `status` != 5;");
                     TryExecuteSql(context, "ALTER TABLE `ticket_attachments` ADD COLUMN IF NOT EXISTS `messageID` int NULL;");
 
                     // Device Forms Installable Softwares Schema
@@ -1524,17 +1534,6 @@ namespace StockPortal.Data
         {
             try
             {
-                // Ensure Admin user (Abbas / domain admin) has role 'ADMIN' so Admin can manage users and see everything
-                string currentPcUser = string.IsNullOrWhiteSpace(Environment.UserName) ? "Abbas" : Environment.UserName;
-                TryExecuteSql(context, "UPDATE users SET role = 'ADMIN' WHERE role LIKE '%Admin%' OR role LIKE '%Manager%' OR role LIKE '%SysAdmin%' OR fullName LIKE '%Abbas%';");
-                var adminUser = context.Users.FirstOrDefault(u => u.DomainUser == currentPcUser || (u.FullName != null && u.FullName.Contains("Abbas")));
-                if (adminUser != null && adminUser.Role != SystemRoles.Admin)
-                {
-                    adminUser.Role = SystemRoles.Admin;
-                    adminUser.IsActive = true;
-                    context.SaveChanges();
-                }
-
                 // 1. Seed Asset Categories (Task 6)
                 if (!context.AssetCategories.Any())
                 {

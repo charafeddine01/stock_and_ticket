@@ -6,7 +6,14 @@
     var isAr = Loc.IsArabic;
     var categories = ViewBag.Categories as List<StockPortal.Models.AssetCategory> ?? new();
     var departments = ViewBag.Departments as string[] ?? StockPortal.Models.MaintenanceTeams.All;
+    var checklistTypes = ViewBag.ChecklistTypes as List<string> ?? new();
     bool canManage = CurrentUser.CanManageAssets();
+    string? selectedDept = ViewBag.SelectedDepartment as string;
+    int? selectedCat = ViewBag.SelectedCategoryId as int?;
+    string? searchStr = ViewBag.Search as string;
+    string? selectedType = ViewBag.SelectedType as string;
+    bool? selectedStatus = ViewBag.SelectedStatus as bool?;
+    bool hasActiveFilters = !string.IsNullOrWhiteSpace(searchStr) || (CurrentUser.IsAdmin() && !string.IsNullOrWhiteSpace(selectedDept)) || selectedCat.HasValue || !string.IsNullOrWhiteSpace(selectedType) || selectedStatus.HasValue;
 }
 
 <div class="container-fluid py-3">
@@ -40,33 +47,122 @@
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-body p-3">
             <form method="get" class="row g-2 align-items-center">
+                <div class="col-md-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white text-muted border-end-0"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" id="checklistSearchInput" name="search" class="form-control border-start-0" placeholder="@(isAr ? "بحث بالعنوان أو الوصف..." : "Search checklist title...")" value="@searchStr" autocomplete="off" onchange="this.form.submit()" />
+                    </div>
+                </div>
+
                 @if (CurrentUser.IsAdmin())
                 {
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <select name="department" class="form-select" onchange="this.form.submit()">
                             <option value="">@(isAr ? "كافة الأقسام" : "All Departments")</option>
                             @foreach (var dept in departments)
                             {
-                                <option value="@dept" selected="@(ViewBag.SelectedDepartment == dept)">@Loc.TargetTeam(dept)</option>
+                                <option value="@dept" selected="@(selectedDept == dept)">@Loc.TargetTeam(dept)</option>
                             }
                         </select>
                     </div>
                 }
-                <div class="col-md-4">
+
+                <div class="@(CurrentUser.IsAdmin() ? "col-md-3" : "col-md-4")">
                     <select name="categoryId" class="form-select" onchange="this.form.submit()">
-                        <option value="">@(isAr ? "كافة فئات الأصول" : "All Asset Categories")</option>
-                        @foreach (var cat in categories)
+                        <option value="">@(isAr ? "كافة فئات الأجهزة" : "All Asset Categories")</option>
+                        @if (!string.IsNullOrWhiteSpace(selectedDept) || CurrentUser.IsMaintenance())
                         {
-                            <option value="@cat.Id" selected="@(ViewBag.SelectedCategoryId == cat.Id)">@cat.DisplayName (@cat.Department)</option>
+                            @foreach (var cat in categories)
+                            {
+                                <option value="@cat.Id" selected="@(selectedCat == cat.Id)">@cat.DisplayName</option>
+                            }
+                        }
+                        else
+                        {
+                            @foreach (var group in categories.GroupBy(c => c.Department))
+                            {
+                                <optgroup label="@Loc.TargetTeam(group.Key)">
+                                    @foreach (var cat in group)
+                                    {
+                                        <option value="@cat.Id" selected="@(selectedCat == cat.Id)">@cat.DisplayName</option>
+                                    }
+                                </optgroup>
+                            }
                         }
                     </select>
                 </div>
+
                 <div class="col-md-2">
-                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary w-100">
-                        <i class="fa-solid fa-rotate-left me-1"></i> @Loc["Reset"]
-                    </a>
+                    <select name="checklistType" class="form-select" onchange="this.form.submit()">
+                        <option value="">@(isAr ? "كافة أنواع الفحص" : "All Inspection Scopes")</option>
+                        @foreach (var t in checklistTypes)
+                        {
+                            <option value="@t" selected="@(selectedType == t)">@t</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-1">
+                    <select name="isActive" class="form-select px-2" onchange="this.form.submit()">
+                        <option value="">@(isAr ? "الحالة" : "Status")</option>
+                        <option value="true" selected="@(selectedStatus == true)">@(isAr ? "نشط" : "Active")</option>
+                        <option value="false" selected="@(selectedStatus == false)">@(isAr ? "معطل" : "Inactive")</option>
+                    </select>
+                </div>
+
+                <div class="@(CurrentUser.IsAdmin() ? "col-md-1" : "col-md-2")">
+                    @if (hasActiveFilters)
+                    {
+                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary w-100" title="@Loc["Reset"]">
+                            <i class="fa-solid fa-rotate-left me-1"></i> @Loc["Reset"]
+                        </a>
+                    }
                 </div>
             </form>
+
+            @if (hasActiveFilters)
+            {
+                <div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top small text-muted flex-wrap">
+                    <span class="fw-semibold"><i class="fa-solid fa-filter text-primary me-1"></i>@(isAr ? "الفلاتر النشطة:" : "Active Filters:")</span>
+                    @if (!string.IsNullOrWhiteSpace(searchStr))
+                    {
+                        <span class="badge bg-light text-dark border">
+                            Keyword: "@searchStr"
+                        </span>
+                    }
+                    @if (CurrentUser.IsAdmin() && !string.IsNullOrWhiteSpace(selectedDept))
+                    {
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle">
+                            Dept: @Loc.TargetTeam(selectedDept)
+                        </span>
+                    }
+                    @if (selectedCat.HasValue)
+                    {
+                        var catName = categories.FirstOrDefault(c => c.Id == selectedCat.Value)?.DisplayName ?? $"Category #{selectedCat.Value}";
+                        <span class="badge bg-info bg-opacity-10 text-info-emphasis border border-info-subtle">
+                            Cat: @catName
+                        </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selectedType))
+                    {
+                        <span class="badge bg-light text-dark border">
+                            Type: @selectedType
+                        </span>
+                    }
+                    @if (selectedStatus.HasValue)
+                    {
+                        <span class="badge @(selectedStatus.Value ? "bg-success" : "bg-secondary")">
+                            @(selectedStatus.Value ? "Active" : "Inactive")
+                        </span>
+                    }
+                    <span class="badge bg-secondary-subtle text-dark ms-1">
+                        @Model.Count() @(isAr ? "نموذج مطابق" : "templates found")
+                    </span>
+                    <a href="@Url.Action("Index")" class="text-decoration-none text-danger small ms-auto">
+                        <i class="fa-solid fa-xmark me-1"></i>@(isAr ? "إلغاء الفلاتر" : "Clear All")
+                    </a>
+                </div>
+            }
         </div>
     </div>
 
@@ -158,3 +254,25 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const searchInput = document.getElementById("checklistSearchInput");
+        if (searchInput) {
+            let debounceTimer;
+            searchInput.addEventListener("input", function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    this.form.submit();
+                }, 400);
+            });
+            if (searchInput.value) {
+                const len = searchInput.value.length;
+                searchInput.focus();
+                searchInput.setSelectionRange(len, len);
+            }
+        }
+    });
+</script>
+}

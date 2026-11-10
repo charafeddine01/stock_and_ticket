@@ -519,5 +519,172 @@ namespace StockPortal.Tests
             Assert.Equal(2, model.Count);
             Assert.All(model, f => Assert.Equal(MaintenanceTeams.IT, f.Department));
         }
+
+        // ==========================================
+        // Production Phase Profile Testing & Access Control Tests
+        // ==========================================
+
+        [Fact]
+        public async Task AccountController_SwitchUser_Forbidden_ForNonAdminUser()
+        {
+            using var context = CreateInMemoryDbContext();
+            var targetUser = new User { Id = 50, FullName = "Admin Target", Role = SystemRoles.Admin, IsActive = true };
+            context.Users.Add(targetUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanSwitchProfile()).Returns(false);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(false);
+
+            var controller = new AccountController(context, mockUserService.Object);
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+            var result = await controller.SwitchUser(50, null);
+
+            Assert.IsType<ForbidResult>(result);
+        }
+
+        [Fact]
+        public async Task AccountController_SwitchUser_Allowed_ForAdminUser()
+        {
+            using var context = CreateInMemoryDbContext();
+            var targetUser = new User { Id = 60, FullName = "Dr. Tester", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(targetUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanSwitchProfile()).Returns(true);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+
+            var controller = new AccountController(context, mockUserService.Object);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Session = new TestSession();
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                httpContext,
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>());
+
+            var result = await controller.SwitchUser(60, null);
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Index", redirectResult.ActionName);
+            Assert.Equal(60, httpContext.Session.GetInt32("ActiveUserId"));
+        }
+
+        [Fact]
+        public async Task AccountController_Profile_Forbidden_WhenNonAdminAccessesAnotherUserProfile()
+        {
+            using var context = CreateInMemoryDbContext();
+            var currentUser = new User { Id = 10, FullName = "Nurse Mary", Role = SystemRoles.EndUser, IsActive = true };
+            var otherUser = new User { Id = 20, FullName = "Doctor Who", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.AddRange(currentUser, otherUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetCurrentUser()).Returns(currentUser);
+            mockUserService.Setup(s => s.CanSwitchProfile()).Returns(false);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(false);
+
+            var controller = new AccountController(context, mockUserService.Object);
+
+            var result = await controller.Profile(id: 20);
+
+            Assert.IsType<ForbidResult>(result);
+        }
+
+        [Fact]
+        public async Task AccountController_Profile_Allowed_WhenAdminAccessesAnotherUserProfile()
+        {
+            using var context = CreateInMemoryDbContext();
+            var adminUser = new User { Id = 1, FullName = "Super Admin", Role = SystemRoles.Admin, IsActive = true };
+            var targetUser = new User { Id = 20, FullName = "Doctor Who", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.AddRange(adminUser, targetUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetCurrentUser()).Returns(adminUser);
+            mockUserService.Setup(s => s.CanSwitchProfile()).Returns(true);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(true);
+
+            var controller = new AccountController(context, mockUserService.Object);
+
+            var result = await controller.Profile(id: 20);
+
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<User>(viewResult.Model);
+            Assert.Equal(20, model.Id);
+            Assert.False((bool)controller.ViewBag.IsViewingSelf);
+            Assert.True((bool)controller.ViewBag.CanSwitchProfile);
+            var allUsers = Assert.IsAssignableFrom<List<User>>(controller.ViewBag.AllUsers);
+            Assert.NotEmpty(allUsers);
+        }
+
+        [Fact]
+        public async Task AccountController_Profile_ReturnsSelfProfile_ForNormalUser()
+        {
+            using var context = CreateInMemoryDbContext();
+            var currentUser = new User { Id = 10, FullName = "Nurse Mary", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(currentUser);
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetCurrentUser()).Returns(currentUser);
+            mockUserService.Setup(s => s.CanSwitchProfile()).Returns(false);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(false);
+
+            var controller = new AccountController(context, mockUserService.Object);
+
+            var result = await controller.Profile(id: null);
+
+            var viewResult = Assert.IsType<ViewResult>(result);
+            var model = Assert.IsType<User>(viewResult.Model);
+            Assert.Equal(10, model.Id);
+            Assert.True((bool)controller.ViewBag.IsViewingSelf);
+            Assert.False((bool)controller.ViewBag.CanSwitchProfile);
+            var allUsers = Assert.IsAssignableFrom<List<User>>(controller.ViewBag.AllUsers);
+            Assert.Empty(allUsers);
+        }
+
+        [Fact]
+        public void CurrentUserService_CanSwitchProfile_RespectsPhysicalAdminStatus()
+        {
+            var adminUser = new User { Id = 1, FullName = "Physical Admin", Role = SystemRoles.Admin };
+            var switchedEndUser = new User { Id = 2, FullName = "Switched User", Role = SystemRoles.EndUser };
+
+            var mockAccessor = new Mock<IHttpContextAccessor>();
+            var httpContext = new DefaultHttpContext();
+            httpContext.Items["CurrentUser"] = switchedEndUser;
+            httpContext.Items["PhysicalUser"] = adminUser;
+            httpContext.Items["IsPhysicalAdmin"] = true;
+            mockAccessor.Setup(a => a.HttpContext).Returns(httpContext);
+
+            var service = new CurrentUserService(mockAccessor.Object);
+
+            // Current role is EndUser, but physical user is Admin -> CanSwitchProfile should be TRUE
+            Assert.False(service.IsAdmin());
+            Assert.True(service.CanSwitchProfile());
+            Assert.Equal(adminUser, service.GetPhysicalUser());
+        }
+
+        [Fact]
+        public void CurrentUserService_CanSwitchProfile_FalseForNormalEndUser()
+        {
+            var normalUser = new User { Id = 5, FullName = "Normal EndUser", Role = SystemRoles.EndUser };
+
+            var mockAccessor = new Mock<IHttpContextAccessor>();
+            var httpContext = new DefaultHttpContext();
+            httpContext.Items["CurrentUser"] = normalUser;
+            httpContext.Items["PhysicalUser"] = normalUser;
+            httpContext.Items["IsPhysicalAdmin"] = false;
+            mockAccessor.Setup(a => a.HttpContext).Returns(httpContext);
+
+            var service = new CurrentUserService(mockAccessor.Object);
+
+            Assert.False(service.IsAdmin());
+            Assert.False(service.CanSwitchProfile());
+        }
     }
 }

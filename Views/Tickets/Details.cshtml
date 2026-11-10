@@ -5,6 +5,13 @@
     var ticket = Model.Ticket;
     bool isClosed = ticket.StatusId == 5 || ticket.ClosedDT.HasValue;
     bool canManage = CurrentUser.CanManageTicket(ticket);
+    bool canSeeNetworkInfo = CurrentUser.IsAdmin() || CurrentUser.IsMaintenance();
+    var responsibleTeam = ticket.Asset?.MaintenanceTeam ?? ticket.TargetTeam ?? StockPortal.Models.MaintenanceTeams.IT;
+    var responsibleTechs = Model.DepartmentEmployees.Where(t => t.BelongsToResponsibleDepartment(responsibleTeam)).ToList();
+    if (!responsibleTechs.Any())
+    {
+        responsibleTechs = Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(responsibleTeam)).ToList();
+    }
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -25,6 +32,12 @@
             @if (!string.IsNullOrWhiteSpace(ticket.PcName))
             {
                 <span class="badge bg-secondary fs-6 font-monospace"><i class="fa-solid fa-desktop me-1"></i> @ticket.PcName</span>
+            }
+            @if (canSeeNetworkInfo && (!string.IsNullOrWhiteSpace(ticket.IpAddress) || !string.IsNullOrWhiteSpace(ticket.MacAddress)))
+            {
+                <span class="badge bg-dark bg-opacity-75 text-white fs-6 font-monospace" title="@(Loc.IsArabic ? "عنوان IP و MAC لمصدر إنشاء التذكرة (خاص بالصيانة والدعم الفني)" : "Ticket Origin IP & MAC (Visible to Maintenance & IT)")">
+                    <i class="fa-solid fa-network-wired me-1 text-info"></i>@(ticket.IpAddress ?? "N/A") &bull; @(ticket.MacAddress ?? "N/A")
+                </span>
             }
             @switch (ticket.Priority)
             {
@@ -160,7 +173,15 @@
                                             @(msg.User?.DisplayFullName ?? (Loc.IsArabic ? "موظف" : "Staff Member"))
                                             <span class="text-muted fw-normal small">(@(msg.User?.DisplayRole ?? (Loc.IsArabic ? "موظف" : "Staff")))</span>
                                         </div>
-                                        <small class="text-muted">@msg.TimeStamp?.ToString("MMM dd, yyyy HH:mm")</small>
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (canSeeNetworkInfo && (!string.IsNullOrEmpty(msg.IpAddress) || !string.IsNullOrEmpty(msg.MacAddress)))
+                                            {
+                                                <span class="badge bg-light border text-muted font-monospace small py-1 px-2" title="@(Loc.IsArabic ? "عنوان IP و MAC لمصدر الرسالة" : "Origin IP & MAC")">
+                                                    <i class="fa-solid fa-network-wired text-info me-1"></i>@(msg.IpAddress ?? "N/A") &bull; @(msg.MacAddress ?? "N/A")
+                                                </span>
+                                            }
+                                            <small class="text-muted">@msg.TimeStamp?.ToString("MMM dd, yyyy HH:mm")</small>
+                                        </div>
                                     </div>
                                     <div class="p-3 bg-light rounded text-dark shadow-xs">
                                         @if (!string.IsNullOrWhiteSpace(msg.Msg))
@@ -354,7 +375,7 @@
                         <div class="input-group">
                             <select name="techUserId" class="form-select">
                                 <option value="">@(Loc.IsArabic ? "-- غير معين (قائمة مهام القسم) --" : "-- Unassigned (Department Queue) --")</option>
-                                @foreach (var tech in (Model.DepartmentEmployees.Any() ? Model.DepartmentEmployees : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))))
+                                @foreach (var tech in responsibleTechs)
                                 {
                                     <option value="@tech.Id" selected="@(tech.Id == ticket.Handler?.TechUserId)">
                                         @tech.DisplayFullName (@tech.DisplayRole)
@@ -363,7 +384,7 @@
                             </select>
                             <button type="submit" class="btn btn-outline-primary">@Loc["Assign"]</button>
                         </div>
-                        <div class="form-text small text-muted">@(Loc.IsArabic ? $"إسناد التذكرة إلى أخصائي في فريق {Loc.TargetTeam(ticket.TargetTeam)}." : $"Assign or reassign to a specialist in the responsible {ticket.TargetTeam} department.")</div>
+                        <div class="form-text small text-muted">@(Loc.IsArabic ? $"إسناد التذكرة إلى أخصائي في فريق {Loc.TargetTeam(responsibleTeam)}." : $"Assign or reassign to a specialist in the responsible {responsibleTeam} department.")</div>
                     </form>
                 }
                 else
@@ -391,6 +412,21 @@
                         <span class="fw-semibold text-dark">@(ticket.ClosedDT?.ToString("MMM dd, yyyy HH:mm") ?? (Loc.IsArabic ? "قيد المعالجة" : "Pending Resolution"))</span>
                     </div>
                 </div>
+
+                @if (canSeeNetworkInfo && (!string.IsNullOrWhiteSpace(ticket.IpAddress) || !string.IsNullOrWhiteSpace(ticket.MacAddress)))
+                {
+                    <div class="pt-2 border-top small">
+                        <div class="text-muted fw-bold mb-1"><i class="fa-solid fa-network-wired text-info me-1"></i> @(Loc.IsArabic ? "بيانات شبكة العميل (خاص بالصيانة):" : "Client Origin Network (Maint):")</div>
+                        <div class="d-flex justify-content-between text-muted mb-1 font-monospace">
+                            <span>@(Loc.IsArabic ? "IP المصدر:" : "Origin IP:"):</span>
+                            <span class="fw-semibold text-primary">@(ticket.IpAddress ?? "N/A")</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted font-monospace">
+                            <span>@(Loc.IsArabic ? "MAC المصدر:" : "Origin MAC:"):</span>
+                            <span class="fw-semibold text-dark">@(ticket.MacAddress ?? "N/A")</span>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
 
@@ -541,60 +577,114 @@
 {
     <!-- Modal: Log Maintenance from Ticket -->
     <div class="modal fade" id="maintenanceModal" tabindex="-1" aria-labelledby="maintenanceModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form asp-action="LogMaintenance" method="post">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content border-0 shadow">
+                <form asp-action="LogMaintenance" method="post" id="logMaintenanceForm">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="ticketId" value="@ticket.Id" />
                     <input type="hidden" name="assetId" value="@(ticket.AssetId ?? 1)" />
+                    <input type="hidden" name="partsReplaced" id="ticketPartsReplacedJson" value="" />
 
-                    <div class="modal-header">
-                        <h5 class="modal-title fw-bold" id="maintenanceModalLabel">@Loc["Log Maintenance Work Order"]</h5>
+                    <div class="modal-header bg-warning bg-opacity-10">
+                        <h5 class="modal-title fw-bold text-dark" id="maintenanceModalLabel">
+                            <i class="fa-solid fa-wrench text-warning me-2"></i> @Loc["Log Maintenance Work Order"]
+                        </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@Loc["Service Scope"]</label>
-                            <select name="maintenanceType" class="form-select">
-                                <option value="1">@(Loc.IsArabic ? "إصلاح عطل طارئ / علاجي" : "Breakdown / Corrective Repair")</option>
-                                <option value="2">@(Loc.IsArabic ? "فحص دوري / صيانة وقائية" : "Preventive / Periodic Inspection")</option>
-                            </select>
-                        </div>
+                    <div class="modal-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@Loc["Service Scope"]</label>
+                                <select name="maintenanceType" class="form-select">
+                                    <option value="1">@(Loc.IsArabic ? "إصلاح عطل طارئ / علاجي" : "Breakdown / Corrective Repair")</option>
+                                    <option value="2">@(Loc.IsArabic ? "فحص دوري / صيانة وقائية" : "Preventive / Periodic Inspection")</option>
+                                </select>
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@Loc["Assigned Technician"]</label>
-                            <select name="technicianId" class="form-select" required>
-                                @foreach (var tech in (Model.DepartmentEmployees.Any() ? Model.DepartmentEmployees : Model.Technicians.Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))))
-                                {
-                                    <option value="@tech.Id" selected="@(tech.Id == (ticket.Handler?.TechUserId ?? 1))">@tech.DisplayFullName (@tech.DisplayRole)</option>
-                                }
-                            </select>
-                        </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@Loc["Assigned Technician"]</label>
+                                <select name="technicianId" class="form-select" required>
+                                    @foreach (var tech in responsibleTechs)
+                                    {
+                                        <option value="@tech.Id" selected="@(tech.Id == (ticket.Handler?.TechUserId ?? tech.Id))">@tech.DisplayFullName (@tech.DisplayRole)</option>
+                                    }
+                                </select>
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@Loc["Third-Party Supplier / Vendor (Optional)"]</label>
-                            <select name="supplierId" class="form-select">
-                                <option value="">-- @(Loc.IsArabic ? "فريق الصيانة الداخلي للمستشفى" : "In-House IT Staff") --</option>
-                                @foreach (var sup in Model.Suppliers)
-                                {
-                                    <option value="@sup.Id">@sup.DisplayName</option>
-                                }
-                            </select>
-                        </div>
+                            <div class="col-md-12">
+                                <label class="form-label fw-semibold">@Loc["Third-Party Supplier / Vendor (Optional)"]</label>
+                                <select name="supplierId" class="form-select">
+                                    <option value="">-- @(Loc.IsArabic ? "فريق الصيانة الداخلي للمستشفى" : "In-House IT Staff") --</option>
+                                    @foreach (var sup in Model.Suppliers)
+                                    {
+                                        <option value="@sup.Id">@sup.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@Loc["Maintenance Action & Work Performed"]</label>
-                            <textarea name="description" class="form-control" rows="3" placeholder="@(Loc.IsArabic ? "اشرح الفحص والتشخيص، الإصلاحات، المعايرة، أو الإجراءات المنفذة..." : "Describe diagnosis, repairs, calibration, or actions taken...")" required></textarea>
-                        </div>
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">@Loc["Maintenance Action & Work Performed"] <span class="text-danger">*</span></label>
+                                <textarea name="description" class="form-control" rows="2" placeholder="@(Loc.IsArabic ? "اشرح الفحص والتشخيص، الإصلاحات، المعايرة، أو الإجراءات المنفذة..." : "Describe diagnosis, repairs, calibration, or actions taken...")" required></textarea>
+                            </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@Loc["Parts Replaced / Materials (JSON or Text)"]</label>
-                            <input type="text" name="partsReplaced" class="form-control font-monospace" placeholder='e.g. {"Part": "1TB SSD", "Quantity": 1}' />
+                            <!-- Replaced Parts & Consumables (Application-Managed UI translated to JSON) -->
+                            <div class="col-12">
+                                <div class="border rounded-3 p-3 bg-light bg-opacity-50">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <span class="fw-bold text-dark">
+                                                <i class="fa-solid fa-microchip text-primary me-1"></i>
+                                                @(Loc.IsArabic ? "قطع الغيار والمستهلكات المستبدلة" : "Replaced Parts & Consumables")
+                                            </span>
+                                            <span class="badge bg-primary-subtle text-primary ms-1 small">@(Loc.IsArabic ? "إدارة تلقائية (JSON)" : "App Managed")</span>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddTicketPartRow">
+                                            <i class="fa-solid fa-plus me-1"></i> @(Loc.IsArabic ? "إضافة قطعة مستبدلة" : "Add Replaced Part")
+                                        </button>
+                                    </div>
+                                    <p class="text-muted small mb-2">
+                                        @(Loc.IsArabic 
+                                            ? "أدخل بيانات القطع المستبدلة في الخانات أدناه، وسيتولى النظام ترجمتها وتخزينها تلقائياً بصيغة JSON دون الحاجة لكتابة كود يدوي." 
+                                            : "Fill the text boxes for each replaced component. The application automatically translates your entries into structured JSON.")
+                                    </p>
+
+                                    <!-- Available Spare Parts Autocomplete Datalist -->
+                                    <datalist id="ticketSparePartsDatalist">
+                                        @foreach (var p in Model.AvailableSpareParts)
+                                        {
+                                            <option value="@p.Name" data-sku="@p.PartNumber">@p.Name (@p.PartNumber) - Stock: @p.Quantity</option>
+                                        }
+                                    </datalist>
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered bg-white align-middle mb-1" id="ticketPartsTable">
+                                            <thead class="table-light small">
+                                                <tr>
+                                                    <th style="width: 38%;">@(Loc.IsArabic ? "اسم القطعة / الصنف" : "Part / Component Name") <span class="text-danger">*</span></th>
+                                                    <th style="width: 26%;">@(Loc.IsArabic ? "رقم القطعة / الكود" : "Part # / SKU")</th>
+                                                    <th style="width: 14%;">@(Loc.IsArabic ? "الكمية" : "Quantity")</th>
+                                                    <th style="width: 16%;">@(Loc.IsArabic ? "سيريال / ملاحظات" : "Serial / Notes")</th>
+                                                    <th style="width: 6%;" class="text-center"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="ticketPartsTableBody">
+                                                <!-- Dynamic rows inserted via JavaScript -->
+                                            </tbody>
+                                        </table>
+                                        <div id="noTicketPartsAlert" class="text-center py-2 text-muted small bg-white border border-dashed rounded">
+                                            <i class="fa-solid fa-circle-info me-1"></i>
+                                            @(Loc.IsArabic ? "لم يتم تحديد أي قطع غيار مستبدلة (انقر على 'إضافة قطعة مستبدلة' إن وُجدت)." : "No parts replaced (click 'Add Replaced Part' if components were swapped).")
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
+                    <div class="modal-footer bg-light">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
-                        <button type="submit" class="btn btn-warning text-dark fw-semibold">@Loc["Save Maintenance Record"]</button>
+                        <button type="submit" class="btn btn-warning text-dark fw-bold px-4">
+                            <i class="fa-solid fa-check me-1"></i> @Loc["Save Maintenance Record"]
+                        </button>
                     </div>
                 </form>
             </div>
@@ -694,9 +784,7 @@
                                 @{
                                     var currentUserId = CurrentUser.GetUserId();
                                     var assignedTechId = ticket.Handler?.TechUserId;
-                                    var candidateTechs = Model.DepartmentEmployees
-                                        .Where(t => t.BelongsToResponsibleDepartment(ticket.TargetTeam))
-                                        .ToList();
+                                    var candidateTechs = responsibleTechs;
                                     var orderedTechs = candidateTechs
                                         .OrderByDescending(u => u.Id == currentUserId || u.Id == assignedTechId)
                                         .ThenBy(u => u.FullName)
@@ -913,6 +1001,93 @@
         rows.forEach(function(row) {
             var text = (row.getAttribute('data-name') || '').toLowerCase();
             row.style.display = (!query || text.indexOf(query) >= 0) ? '' : 'none';
+        });
+    }
+
+    // --- Dynamic Replaced Parts Form (Translates text boxes to JSON) ---
+    const ticketPartsTableBody = document.getElementById("ticketPartsTableBody");
+    const noTicketPartsAlert = document.getElementById("noTicketPartsAlert");
+    const btnAddTicketPartRow = document.getElementById("btnAddTicketPartRow");
+    const ticketPartsReplacedJson = document.getElementById("ticketPartsReplacedJson");
+    const logMaintenanceForm = document.getElementById("logMaintenanceForm");
+
+    function updateTicketPartsAlert() {
+        if (!ticketPartsTableBody || !noTicketPartsAlert) return;
+        noTicketPartsAlert.style.display = ticketPartsTableBody.children.length === 0 ? "block" : "none";
+    }
+
+    function addTicketPartRow(item) {
+        if (!ticketPartsTableBody) return;
+        item = item || {};
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm t-part-name" list="ticketSparePartsDatalist" placeholder="${isAr ? 'اسم القطعة (مثال: شاشة، بطارية، قرص SSD)' : 'e.g. 1TB NVMe SSD'}" value="${item.partName || ''}" required onchange="onTicketPartSelected(this)" />
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm t-part-sku font-monospace" placeholder="${isAr ? 'كود القطعة' : 'e.g. DP/N 0XXV21'}" value="${item.partNumber || ''}" />
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm t-part-qty text-center" min="1" value="${item.quantity || 1}" required />
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm t-part-notes" placeholder="${isAr ? 'سيريال / ملاحظات' : 'SN / Notes'}" value="${item.notes || ''}" />
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger p-1" onclick="removeTicketPartRow(this)" title="${isAr ? 'حذف' : 'Remove'}">
+                    <i class="fa-solid fa-trash fa-xs"></i>
+                </button>
+            </td>
+        `;
+        ticketPartsTableBody.appendChild(tr);
+        updateTicketPartsAlert();
+    }
+
+    window.removeTicketPartRow = function(btn) {
+        btn.closest("tr").remove();
+        updateTicketPartsAlert();
+    };
+
+    window.onTicketPartSelected = function(input) {
+        const val = input.value.trim();
+        const datalist = document.getElementById("ticketSparePartsDatalist");
+        if (datalist) {
+            const opt = datalist.querySelector(`option[value="${val}"]`);
+            if (opt) {
+                const sku = opt.getAttribute("data-sku");
+                if (sku) {
+                    const row = input.closest("tr");
+                    const skuInput = row.querySelector(".t-part-sku");
+                    if (skuInput && !skuInput.value) {
+                        skuInput.value = sku;
+                    }
+                }
+            }
+        }
+    };
+
+    if (btnAddTicketPartRow) {
+        btnAddTicketPartRow.addEventListener("click", function() {
+            addTicketPartRow();
+        });
+    }
+
+    if (logMaintenanceForm) {
+        logMaintenanceForm.addEventListener("submit", function() {
+            const rows = ticketPartsTableBody.querySelectorAll("tr");
+            const parts = [];
+            rows.forEach(tr => {
+                const name = tr.querySelector(".t-part-name").value.trim();
+                if (name) {
+                    parts.push({
+                        partName: name,
+                        partNumber: tr.querySelector(".t-part-sku").value.trim(),
+                        quantity: parseInt(tr.querySelector(".t-part-qty").value) || 1,
+                        notes: tr.querySelector(".t-part-notes").value.trim()
+                    });
+                }
+            });
+            ticketPartsReplacedJson.value = parts.length > 0 ? JSON.stringify(parts) : "";
         });
     }
 </script>

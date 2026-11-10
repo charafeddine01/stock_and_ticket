@@ -186,16 +186,19 @@ namespace StockPortal.Controllers
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            // Filter strictly for responsible department employees (e.g. IT, BIOMEDICAL, GENERAL) (Task 12)
+            // Task 2: Determine responsible department strictly according to the asset's department (or ticket target team)
+            var responsibleTeam = ticket.Asset?.MaintenanceTeam ?? ticket.TargetTeam ?? MaintenanceTeams.IT;
+
+            // Filter strictly for responsible department employees (e.g. IT, BIOMEDICAL, GENERAL)
             var departmentEmployees = allUsers
-                .Where(u => u.BelongsToResponsibleDepartment(ticket.TargetTeam))
+                .Where(u => u.BelongsToResponsibleDepartment(responsibleTeam))
                 .ToList();
 
             var vm = new TicketDetailsViewModel
             {
                 Ticket = ticket,
                 Statuses = await _context.TicketStatuses.ToListAsync(),
-                Technicians = allUsers,
+                Technicians = departmentEmployees, // Show only the responsible team members
                 DepartmentEmployees = departmentEmployees,
                 Suppliers = targetSuppliers,
                 AvailableSpareParts = availableSpareParts,
@@ -213,11 +216,11 @@ namespace StockPortal.Controllers
             var currentUserId = _currentUserService.GetUserId();
             await PopulateDropdowns(assetId, currentUserId, currentUserId);
 
-            // Task 11: Check if an active ticket exists for this asset
+            // Task 11: Check if an active ticket exists for this asset (Status != Closed/Canceled and ClosedDT is null)
             if (assetId.HasValue && assetId.Value > 0)
             {
                 var existingActiveTicket = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == assetId.Value && t.StatusId != 4 && t.StatusId != 5);
+                    .FirstOrDefaultAsync(t => t.AssetId == assetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
                 if (existingActiveTicket != null)
                 {
                     ViewBag.ActiveTicketWarning = $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. Please resolve or view the existing ticket before opening a new one.";
@@ -253,7 +256,7 @@ namespace StockPortal.Controllers
             if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
             {
                 var existingActiveTicket = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == ticket.AssetId.Value && t.StatusId != 4 && t.StatusId != 5);
+                    .FirstOrDefaultAsync(t => t.AssetId == ticket.AssetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
                 if (existingActiveTicket != null)
                 {
                     ModelState.AddModelError("AssetId", $"Cannot open a new ticket for this asset. Active ticket #{existingActiveTicket.Id} is currently open.");
@@ -285,6 +288,12 @@ namespace StockPortal.Controllers
                         ticket.TargetTeam = MaintenanceTeams.IT;
                     }
                 }
+
+                // Task 1: Capture client IP and MAC address where the ticket is created
+                var clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+                var clientMac = NetworkInfoHelper.GetClientMacAddress(HttpContext, clientIp);
+                ticket.IpAddress = clientIp;
+                ticket.MacAddress = clientMac;
 
                 ticket.OpenedDT = DateTime.Now;
                 ticket.StatusId = 1; // opened
@@ -350,7 +359,9 @@ namespace StockPortal.Controllers
                         TicketId = ticket.Id,
                         UserId = ticket.OpenedBy,
                         Msg = fullMsg,
-                        TimeStamp = DateTime.Now
+                        TimeStamp = DateTime.Now,
+                        IpAddress = clientIp,
+                        MacAddress = clientMac
                     };
                     _context.TicketMessages.Add(initialTicketMsg);
                 }
@@ -475,7 +486,7 @@ namespace StockPortal.Controllers
             if (asset != null)
             {
                 var existingActive = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == asset.Id && t.StatusId != 4 && t.StatusId != 5);
+                    .FirstOrDefaultAsync(t => t.AssetId == asset.Id && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
                 if (existingActive != null)
                 {
                     TempData["ErrorMessage"] = $"An active ticket (#{existingActive.Id}) already exists for this equipment. Redirecting to existing ticket.";
@@ -516,6 +527,10 @@ namespace StockPortal.Controllers
             }
 
             // 4. Create Ticket
+            var clientIp = !string.IsNullOrWhiteSpace(model.ClientIp) ? model.ClientIp : NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            var clientMac = NetworkInfoHelper.GetClientMacAddress(HttpContext, clientIp);
+            var pcName = asset?.HospitalNo ?? (!string.IsNullOrWhiteSpace(model.DetectedPcName) ? model.DetectedPcName : Environment.MachineName);
+
             var ticket = new Ticket
             {
                 AssetId = asset?.Id,
@@ -525,14 +540,16 @@ namespace StockPortal.Controllers
                 Priority = model.Priority > 0 ? model.Priority : 2,
                 StatusId = 1, // Opened
                 OpenedDT = DateTime.Now,
-                TargetTeam = asset?.MaintenanceTeam ?? MaintenanceTeams.IT
+                TargetTeam = asset?.MaintenanceTeam ?? MaintenanceTeams.IT,
+                PcName = pcName,
+                IpAddress = clientIp,
+                MacAddress = clientMac
             };
 
             _context.Tickets.Add(ticket);
             await _context.SaveChangesAsync();
 
             // 5. Construct Telemetry Report Message
-            var pcName = asset?.HospitalNo ?? (!string.IsNullOrWhiteSpace(model.DetectedPcName) ? model.DetectedPcName : Environment.MachineName);
             var roomDesc = selectedRoom != null ? $"Room {selectedRoom.RoomNo} (Floor {selectedRoom.Floor})" : "Unspecified";
             var userDesc = assignedUser?.FullName ?? (currentUser?.FullName ?? "Unassigned");
             var hardwareDesc = asset != null 
@@ -547,7 +564,6 @@ namespace StockPortal.Controllers
             sb.AppendLine($"• Equipment: {hardwareDesc}");
             sb.AppendLine($"• Reporter: {currentUser?.FullName ?? "System"} ({currentUser?.DomainUser ?? Environment.UserName})");
             sb.AppendLine($"• Department: {currentUser?.Department?.Name ?? "General"}");
-            sb.AppendLine($"• Client Host / IP: {model.ClientIp}");
             sb.AppendLine($"• Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
             _context.TicketMessages.Add(new TicketMsg
@@ -555,7 +571,9 @@ namespace StockPortal.Controllers
                 TicketId = ticket.Id,
                 UserId = ticket.OpenedBy,
                 Msg = sb.ToString(),
-                TimeStamp = DateTime.Now
+                TimeStamp = DateTime.Now,
+                IpAddress = clientIp,
+                MacAddress = clientMac
             });
 
             // 6. User Manual Notes (if entered)
@@ -802,7 +820,10 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AssignTechnician(int ticketId, int techUserId, string? returnUrl = null)
         {
-            var ticket = await _context.Tickets.Include(t => t.Handler).FirstOrDefaultAsync(t => t.Id == ticketId);
+            var ticket = await _context.Tickets
+                .Include(t => t.Asset)
+                .Include(t => t.Handler)
+                .FirstOrDefaultAsync(t => t.Id == ticketId);
             if (ticket == null) return NotFound();
 
             var currentUserId = _currentUserService.GetUserId();
@@ -824,9 +845,10 @@ namespace StockPortal.Controllers
             }
 
             var techUser = techUserId > 0 ? await _context.Users.FindAsync(techUserId) : null;
-            if (techUser != null && techUser.Role == SystemRoles.Maintenance && !string.Equals(techUser.MaintenanceTeam, ticket.TargetTeam, StringComparison.OrdinalIgnoreCase))
+            var responsibleTeam = ticket.Asset?.MaintenanceTeam ?? ticket.TargetTeam ?? MaintenanceTeams.IT;
+            if (techUser != null && !techUser.BelongsToResponsibleDepartment(responsibleTeam))
             {
-                TempData["ErrorMessage"] = $"Selected technician does not belong to the responsible {ticket.TargetTeam} department.";
+                TempData["ErrorMessage"] = $"Selected technician does not belong to the responsible {responsibleTeam} department.";
                 if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl)) return Redirect(returnUrl);
                 return RedirectToAction(nameof(Details), new { id = ticketId });
             }
@@ -1000,12 +1022,17 @@ namespace StockPortal.Controllers
 
             var cleanMsg = !string.IsNullOrWhiteSpace(msg) ? msg.Trim() : (hasScreenshots ? "📸 [Attached screenshot / error evidence]" : "");
 
+            var clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            var clientMac = NetworkInfoHelper.GetClientMacAddress(HttpContext, clientIp);
+
             var newMsg = new TicketMsg
             {
                 TicketId = ticketId,
                 UserId = userId,
                 Msg = cleanMsg,
-                TimeStamp = DateTime.Now
+                TimeStamp = DateTime.Now,
+                IpAddress = clientIp,
+                MacAddress = clientMac
             };
             _context.TicketMessages.Add(newMsg);
 
@@ -1021,6 +1048,40 @@ namespace StockPortal.Controllers
             return RedirectToAction(nameof(Details), new { id = ticketId });
         }
 
+        /// <summary>
+        /// Normalizes parts replaced input into a valid JSON array string.
+        /// If raw text is provided by user or legacy caller, wraps it into a valid ReplacedPartItem JSON structure.
+        /// </summary>
+        public static string? NormalizePartsJson(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+
+            var trimmed = input.Trim();
+            if (trimmed == "[]" || trimmed == "{}") return null;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(trimmed);
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    if (doc.RootElement.GetArrayLength() == 0) return null;
+                    return trimmed;
+                }
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    return $"[{trimmed}]";
+                }
+            }
+            catch
+            {
+                // Convert plain text into a structured JSON array
+                var item = new ReplacedPartItem { PartName = trimmed, Quantity = 1 };
+                return JsonSerializer.Serialize(new List<ReplacedPartItem> { item });
+            }
+
+            return trimmed;
+        }
+
         // POST: Tickets/LogMaintenance
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -1034,6 +1095,8 @@ namespace StockPortal.Controllers
                 return Forbid();
             }
 
+            var cleanParts = NormalizePartsJson(partsReplaced);
+
             var maintenance = new AssetMaintenance
             {
                 TicketId = ticketId,
@@ -1042,7 +1105,7 @@ namespace StockPortal.Controllers
                 SupplierId = supplierId,
                 MaintenanceType = maintenanceType,
                 Description = description,
-                PartsReplaced = partsReplaced,
+                PartsReplaced = cleanParts,
                 TimStamp = DateTime.Now
             };
 
@@ -1262,7 +1325,7 @@ namespace StockPortal.Controllers
             }
 
             var activeTickets = await _context.Tickets
-                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5)
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null)
                 .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
                 .ToListAsync();
             var activeTicketsDict = activeTickets
@@ -1486,7 +1549,7 @@ namespace StockPortal.Controllers
         private async Task PopulateDropdowns(int? selectedAssetId = null, int? defaultUserId = null, int? currentUserId = null)
         {
             var activeTickets = await _context.Tickets
-                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5)
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null)
                 .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
                 .ToListAsync();
             var activeTicketsDict = activeTickets

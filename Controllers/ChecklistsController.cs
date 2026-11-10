@@ -24,7 +24,7 @@ namespace StockPortal.Controllers
         }
 
         // GET: Checklists
-        public async Task<IActionResult> Index(string? department = null, int? categoryId = null)
+        public async Task<IActionResult> Index(string? department = null, int? categoryId = null, string? search = null, string? checklistType = null, bool? isActive = null)
         {
             var query = _context.ChecklistForms
                 .Include(c => c.Category)
@@ -41,15 +41,53 @@ namespace StockPortal.Controllers
                 query = query.Where(c => c.Department == department);
             }
 
-            if (categoryId.HasValue)
+            if (categoryId.HasValue && categoryId.Value > 0)
             {
                 query = query.Where(c => c.CategoryId == categoryId.Value);
             }
 
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim();
+                query = query.Where(c => c.Title.Contains(term) || (c.ItemsJson != null && c.ItemsJson.Contains(term)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(checklistType))
+            {
+                query = query.Where(c => c.ChecklistType == checklistType);
+            }
+
+            if (isActive.HasValue)
+            {
+                query = query.Where(c => c.IsActive == isActive.Value);
+            }
+
+            // Task 4: Filter category dropdown strictly to categories belonging to the selected/user's department
+            var catQuery = _context.AssetCategories.Where(c => c.IsActive);
+            if (!string.IsNullOrWhiteSpace(department))
+            {
+                catQuery = catQuery.Where(c => c.Department == department);
+            }
+            var categories = await catQuery.OrderBy(c => c.Name).ToListAsync();
+
+            var checklistTypes = await _context.ChecklistForms
+                .Select(c => c.ChecklistType)
+                .Where(t => !string.IsNullOrEmpty(t))
+                .Distinct()
+                .ToListAsync();
+
+            if (!checklistTypes.Contains("Periodic Maintenance")) checklistTypes.Add("Periodic Maintenance");
+            if (!checklistTypes.Contains("Calibration Inspection")) checklistTypes.Add("Calibration Inspection");
+            if (!checklistTypes.Contains("Safety & Quality Audit")) checklistTypes.Add("Safety & Quality Audit");
+
             ViewBag.SelectedDepartment = department;
             ViewBag.SelectedCategoryId = categoryId;
-            ViewBag.Categories = await _context.AssetCategories.Where(c => c.IsActive).OrderBy(c => c.Name).ToListAsync();
+            ViewBag.Search = search;
+            ViewBag.SelectedType = checklistType;
+            ViewBag.SelectedStatus = isActive;
+            ViewBag.Categories = categories;
             ViewBag.Departments = MaintenanceTeams.All;
+            ViewBag.ChecklistTypes = checklistTypes.Distinct().OrderBy(t => t).ToList();
 
             var list = await query.OrderByDescending(c => c.Id).ToListAsync();
             return View(list);

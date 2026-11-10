@@ -7,10 +7,16 @@
     var activeTab = (ViewBag.ActiveTab as string) ?? "users";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <h4 class="fw-bold mb-0">@Loc["Master Directory & Configuration"]</h4>
         <small class="text-muted">@Loc["Manage hospital departments, staff users, physical room locations, and authorized vendors"]</small>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 d-flex align-items-center gap-2" title="@(Loc.IsArabic ? "تم التحقق التلقائي من هوية النطاق وصلاحيات قاعدة البيانات المباشرة" : "Automatic Domain & Live Database Admin Handshake Verified")">
+            <i class="fa-solid fa-shield-check text-success"></i>
+            <span>@(Loc.IsArabic ? $"المصادقة النشطة: {ViewBag.HandshakeUser ?? "Admin"}" : $"Domain & Live DB Verified: {ViewBag.HandshakeUser ?? "Admin"}")</span>
+        </span>
     </div>
 </div>
 

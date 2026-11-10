@@ -158,7 +158,7 @@
                 <div class="col-md-4">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                        <input type="text" name="search" class="form-control form-control-sm border-start-0" placeholder="@(isArabic ? "بحث بالاسم، رقم القطعة، الأجهزة المتوافقة..." : "Search name, SKU, compatible devices...")" value="@Model.Search" />
+                        <input type="text" id="sparePartSearchInput" name="search" class="form-control form-control-sm border-start-0" placeholder="@(isArabic ? "بحث بالاسم، رقم القطعة، الأجهزة المتوافقة..." : "Search name, SKU, compatible devices...")" value="@Model.Search" autocomplete="off" onchange="this.form.submit()" />
                     </div>
                 </div>
 
@@ -180,12 +180,11 @@
                     </div>
                 </div>
 
-                <div class="col-md-2 d-flex gap-2 justify-content-end">
-                    <button type="submit" class="btn btn-sm btn-primary flex-grow-1">@Loc["Filter"]</button>
+                <div class="col-md-2 d-flex justify-content-end">
                     @if (!string.IsNullOrWhiteSpace(Model.Search) || !string.IsNullOrWhiteSpace(Model.SelectedCategory) || Model.OnlyLowStock)
                     {
-                        <a href="@Url.Action("Index", "SpareParts", new { department = Model.CurrentDepartment })" class="btn btn-sm btn-outline-secondary" title="@Loc["Reset Filters"]">
-                            <i class="fa-solid fa-rotate-left"></i>
+                        <a href="@Url.Action("Index", "SpareParts", new { department = Model.CurrentDepartment })" class="btn btn-sm btn-outline-secondary w-100" title="@Loc["Reset Filters"]">
+                            <i class="fa-solid fa-rotate-left me-1"></i> @Loc["Reset"]
                         </a>
                     }
                 </div>
@@ -810,6 +809,24 @@
 
 @section Scripts {
     <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const searchInput = document.getElementById("sparePartSearchInput");
+            if (searchInput) {
+                let debounceTimer;
+                searchInput.addEventListener("input", function () {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        this.form.submit();
+                    }, 400);
+                });
+                if (searchInput.value) {
+                    const len = searchInput.value.length;
+                    searchInput.focus();
+                    searchInput.setSelectionRange(len, len);
+                }
+            }
+        });
+
         const sparePartFormsData = @Html.Raw(JsonSerializer.Serialize(Model.AvailableForms.Select(f => new {
             id = f.Id,
             name = f.Name,

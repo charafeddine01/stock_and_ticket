@@ -15,6 +15,8 @@ namespace StockPortal.Services
         string? GetMaintenanceTeam();
         string GetDepartmentName();
         bool IsAuthenticated();
+        User? GetPhysicalUser();
+        bool CanSwitchProfile();
 
         // RBAC Role Helpers
         bool IsAdmin();
@@ -146,6 +148,45 @@ namespace StockPortal.Services
         public bool IsAuthenticated()
         {
             return GetCurrentUser() != null || (_httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false);
+        }
+
+        public User? GetPhysicalUser()
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null) return null;
+
+            if (context.Items.TryGetValue("PhysicalUser", out var u) && u is User user)
+            {
+                return user;
+            }
+
+            return null;
+        }
+
+        public bool CanSwitchProfile()
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context != null)
+            {
+                if (context.Items.TryGetValue("IsPhysicalAdmin", out var obj) && obj is bool isPhysicalAdmin)
+                {
+                    return isPhysicalAdmin;
+                }
+
+                var claim = context.User.FindFirst("IsPhysicalAdmin");
+                if (claim != null && bool.TryParse(claim.Value, out bool val))
+                {
+                    return val;
+                }
+            }
+
+            var physicalUser = GetPhysicalUser();
+            if (physicalUser != null)
+            {
+                return CheckIsAdminRole(physicalUser.Role);
+            }
+
+            return IsAdmin();
         }
 
         public bool IsAdmin()

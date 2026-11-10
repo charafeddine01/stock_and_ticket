@@ -297,19 +297,19 @@ namespace StockPortal.Models
             if (string.IsNullOrWhiteSpace(targetTeam)) return true;
             var normTeam = targetTeam.Trim().ToUpperInvariant();
 
-            // 1. Direct match on MaintenanceTeam
-            if (!string.IsNullOrWhiteSpace(MaintenanceTeam) && string.Equals(MaintenanceTeam.Trim(), normTeam, StringComparison.OrdinalIgnoreCase))
+            // 1. Direct match on MaintenanceTeam: specialized technicians belong strictly to their designated maintenance team
+            if (!string.IsNullOrWhiteSpace(MaintenanceTeam))
             {
-                return true;
+                return string.Equals(MaintenanceTeam.Trim(), normTeam, StringComparison.OrdinalIgnoreCase);
             }
 
             // 2. Administrators have cross-department oversight
-            if (!string.IsNullOrWhiteSpace(Role) && (string.Equals(Role.Trim(), SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) || Role.Contains("Admin", StringComparison.OrdinalIgnoreCase) || Role.Contains("Manager", StringComparison.OrdinalIgnoreCase)))
+            if (!string.IsNullOrWhiteSpace(Role) && (string.Equals(Role.Trim(), SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) || Role.Contains("Admin", StringComparison.OrdinalIgnoreCase)))
             {
                 return true;
             }
 
-            // 3. User's Department matches the maintenance target team
+            // 3. User's Department matches the maintenance target team (only when user has no explicit MaintenanceTeam assigned)
             if (Department != null && !string.IsNullOrWhiteSpace(Department.Name))
             {
                 var dName = Department.Name;
@@ -740,6 +740,16 @@ namespace StockPortal.Models
         [Display(Name = "Client PC Name")]
         public string? PcName { get; set; }
 
+        [Column("ip_address")]
+        [StringLength(100)]
+        [Display(Name = "Client IP Address")]
+        public string? IpAddress { get; set; }
+
+        [Column("mac_address")]
+        [StringLength(100)]
+        [Display(Name = "Client MAC Address")]
+        public string? MacAddress { get; set; }
+
         [Column("closed_by_users")]
         [Display(Name = "Technicians Who Resolved / Closed")]
         public string? ClosedByUsers { get; set; } = "[]";
@@ -844,6 +854,14 @@ namespace StockPortal.Models
 
         [Column("timeStamp")]
         public DateTime? TimeStamp { get; set; } = DateTime.Now;
+
+        [Column("ip_address")]
+        [StringLength(100)]
+        public string? IpAddress { get; set; }
+
+        [Column("mac_address")]
+        [StringLength(100)]
+        public string? MacAddress { get; set; }
 
         public virtual ICollection<TicketAttachment> Attachments { get; set; } = new List<TicketAttachment>();
     }

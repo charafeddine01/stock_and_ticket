@@ -473,7 +473,7 @@ namespace StockPortal.Controllers
             if (workOrder.TicketId.HasValue)
             {
                 var ticket = await _context.Tickets.FindAsync(workOrder.TicketId.Value);
-                if (ticket != null)
+                if (ticket != null && ticket.ClosedDT == null && ticket.StatusId != 5 && ticket.StatusId != 4)
                 {
                     ticket.StatusId = 2; // Pending verification / testing
                     _context.Update(ticket);
@@ -532,11 +532,58 @@ namespace StockPortal.Controllers
             return View(workOrder);
         }
 
-        // Legacy / Quick Log
         // GET: Maintenance/Log
-        public async Task<IActionResult> Log(int? assetId)
+        public async Task<IActionResult> Log(int? assetId, int? ticketId = null)
         {
-            return RedirectToAction(nameof(SendToSupplier), new { assetId });
+            await PopulateSendDropdowns(assetId, ticketId);
+            var model = new AssetMaintenance
+            {
+                AssetId = assetId ?? 0,
+                TicketId = ticketId,
+                MaintenanceType = 2,
+                UserId = _currentUserService.GetUserId(),
+                TimStamp = DateTime.Now
+            };
+            return View(model);
+        }
+
+        // POST: Maintenance/Log
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Log(AssetMaintenance model)
+        {
+            if (model.AssetId <= 0)
+            {
+                ModelState.AddModelError("AssetId", "Please select a target hardware asset.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                await PopulateSendDropdowns(model.AssetId, model.TicketId);
+                return View(model);
+            }
+
+            model.PartsReplaced = TicketsController.NormalizePartsJson(model.PartsReplaced);
+            model.TimStamp = DateTime.Now;
+            model.WorkOrderStatus = "Completed";
+            model.ReturnDate = DateTime.Now;
+
+            _context.AssetMaintenances.Add(model);
+
+            if (model.MaintenanceType == 2)
+            {
+                var asset = await _context.Assets.FindAsync(model.AssetId);
+                if (asset != null && asset.PeriodicInterval.HasValue)
+                {
+                    asset.LastPeriodic = DateTime.Now;
+                    asset.NextPeriodic = DateTime.Now.AddDays(asset.PeriodicInterval.Value);
+                    _context.Update(asset);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            if (TempData != null) TempData["SuccessMessage"] = "Maintenance work order logged successfully.";
+            return RedirectToAction(nameof(Index));
         }
 
         // POST: Maintenance/QuickCompleteCheckup
