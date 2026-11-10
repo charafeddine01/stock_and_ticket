@@ -376,5 +376,59 @@ namespace StockPortal.Tests
             var matched = (User)httpContext.Items["CurrentUser"]!;
             Assert.Equal("trusted.user", matched.DomainUser);
         }
+
+        [Fact]
+        public async Task SubmitAccessTicket_CreatesTicketWithValidTargetTeam_NeverNull()
+        {
+            using var context = CreateInMemoryDbContext();
+            var user = new User { Id = 1, FullName = "Access Applicant", DomainUser = "access.user", IsActive = true };
+            var asset = new Asset { Id = 10, HospitalNo = "PC-LAB-01", MaintenanceTeam = MaintenanceTeams.Biomedical };
+            context.Users.Add(user);
+            context.Assets.Add(asset);
+            await context.SaveChangesAsync();
+
+            var mockUserService = CreateMockUserService();
+            var controller = new AccountController(context, mockUserService.Object);
+            controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(
+                new DefaultHttpContext(),
+                Mock.Of<Microsoft.AspNetCore.Mvc.ViewFeatures.ITempDataProvider>()
+            );
+            controller.ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+            var result = await controller.SubmitAccessTicket(pcName: "PC-LAB-01", assetId: 10, roomId: null, notes: "Cannot login to station", username: "access.user");
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+
+            var createdTicket = await context.Tickets.OrderByDescending(t => t.Id).FirstOrDefaultAsync();
+            Assert.NotNull(createdTicket);
+            Assert.False(string.IsNullOrWhiteSpace(createdTicket.TargetTeam));
+            Assert.Equal(MaintenanceTeams.Biomedical, createdTicket.TargetTeam);
+            Assert.Equal("PC-LAB-01", createdTicket.PcName);
+        }
+
+        [Fact]
+        public async Task StockDbContext_EnforcesDefaultTargetTeam_WhenTicketCreatedWithoutTargetTeam()
+        {
+            using var context = CreateInMemoryDbContext();
+            var ticket = new Ticket
+            {
+                Type = "Hardware",
+                StatusId = 1,
+                OpenedBy = 1,
+                TargetTeam = null! // Explicitly test null assignment guard
+            };
+
+            context.Tickets.Add(ticket);
+            await context.SaveChangesAsync();
+
+            var savedTicket = await context.Tickets.FindAsync(ticket.Id);
+            Assert.NotNull(savedTicket);
+            Assert.False(string.IsNullOrWhiteSpace(savedTicket.TargetTeam));
+            Assert.Equal(MaintenanceTeams.IT, savedTicket.TargetTeam);
+        }
     }
 }

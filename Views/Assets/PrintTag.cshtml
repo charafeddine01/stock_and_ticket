@@ -240,7 +240,7 @@
                         <div class="mb-2">
                             <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 1 (اسم المنشأة / القسم)" : "Top Header Line 1 (Facility / Org)")</label>
                             <input type="text" id="cfgTopLine1" class="form-control form-control-sm" oninput="updateCardLive()" 
-                                   value="@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")" />
+                                   value="@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")" />
                         </div>
                         <div class="mb-2">
                             <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 2 (عنوان بطاقة الأصل)" : "Top Header Line 2 (Card Title)")</label>
@@ -410,7 +410,7 @@
             <!-- Top Header (Customizable) -->
             <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-2 mb-2">
                 <div>
-                    <div id="lblTopLine1" class="tag-top-facility">@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")</div>
+                    <div id="lblTopLine1" class="tag-top-facility">@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")</div>
                     <div id="lblTopLine2" class="tag-top-title">@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")</div>
                 </div>
                 <div class="text-primary text-center">
@@ -550,7 +550,7 @@
             url: '@assetUrl'
         };
 
-        const STORAGE_KEY = 'StockPortal_AssetTagConfig';
+        const STORAGE_KEY = 'SOLVIS_AssetTagConfig';
         let qrcodeInstance = null;
 
         document.addEventListener('DOMContentLoaded', function () {

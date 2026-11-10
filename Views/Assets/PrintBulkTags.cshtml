@@ -223,7 +223,7 @@
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي (اسم المنشأة)" : "Top Header Line 1")</label>
                     <input type="text" id="cfgTopLine1" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
-                           value="@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")" />
+                           value="@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")" />
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 2 (عنوان البطاقة)" : "Top Header Line 2")</label>
@@ -270,7 +270,7 @@
                 
                 <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-2 mb-2">
                     <div>
-                        <div class="tag-top-facility lbl-bulk-top1">@(Loc.IsArabic ? "مستشفى الرعاية الطبية والتقنية" : "Hospital IT & Medical Assets")</div>
+                        <div class="tag-top-facility lbl-bulk-top1">@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")</div>
                         <div class="tag-top-title lbl-bulk-top2">@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")</div>
                     </div>
                     <div class="text-primary text-center">
@@ -346,7 +346,7 @@
 
     <script src="~/lib/qrcode.min.js"></script>
     <script>
-        const STORAGE_KEY = 'StockPortal_AssetTagConfig';
+        const STORAGE_KEY = 'SOLVIS_AssetTagConfig';
 
         document.addEventListener('DOMContentLoaded', function () {
             loadBulkDefaults();

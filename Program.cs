@@ -49,7 +49,7 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.Cookie.Name = "StockPortal.DomainAuth";
+        options.Cookie.Name = "SOLVIS.DomainAuth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
@@ -59,10 +59,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 // Multi-provider Database setup (SQLite by default for zero-config run, or MySQL/MariaDB)
 var dbProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
 var mySqlConn = builder.Configuration.GetConnectionString("MySqlConnection") 
-                ?? "server=localhost;port=3306;database=stock;user=root;password=;CharSet=utf8mb4;";
+                ?? "server=localhost;port=3306;database=SOLVIS_DB;user=root;password=;CharSet=utf8mb4;";
 var sqliteConn = builder.Configuration.GetConnectionString("SqliteConnection") 
                  ?? builder.Configuration.GetConnectionString("DefaultConnection") 
-                 ?? "Data Source=stockportal.db";
+                 ?? "Data Source=solvis.db";
 
 if (dbProvider.Equals("MySql", StringComparison.OrdinalIgnoreCase))
 {

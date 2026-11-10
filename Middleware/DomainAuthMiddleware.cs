@@ -189,7 +189,7 @@ namespace StockPortal.Middleware
             {
                 await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             }
-            context.Response.Cookies.Delete("StockPortal.DomainAuth");
+            context.Response.Cookies.Delete("SOLVIS.DomainAuth");
         }
     }
 

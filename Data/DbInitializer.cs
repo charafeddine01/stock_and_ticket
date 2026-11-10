@@ -684,6 +684,8 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN equipment_type_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN status_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN title_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE tickets ADD COLUMN target_team TEXT NULL DEFAULT 'IT';");
+                    TryExecuteSql(context, "UPDATE tickets SET target_team = 'IT' WHERE target_team IS NULL OR target_team = '';");
 
                     // Calibration Schema (Task 2)
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN needsCalibration INTEGER NULL DEFAULT 0;");
@@ -846,6 +848,9 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `equipment_type_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `title_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` ADD COLUMN IF NOT EXISTS `target_team` varchar(50) NOT NULL DEFAULT 'IT';");
+                    TryExecuteSql(context, "ALTER TABLE `tickets` MODIFY COLUMN `target_team` varchar(50) NOT NULL DEFAULT 'IT';");
+                    TryExecuteSql(context, "UPDATE `tickets` SET `target_team` = 'IT' WHERE `target_team` IS NULL OR `target_team` = '';");
 
                     // Calibration Schema (Task 2)
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `needsCalibration` tinyint(1) NULL DEFAULT 0;");

@@ -1,48 +1,48 @@
-# IT Stock & Helpdesk Management Portal
+<p align="center">
+  <img src="wwwroot/images/solvis-logo.png" alt="SOLVIS Logo" width="380" />
+</p>
 
-An enterprise-grade, intranet-optimized IT Asset Inventory and Service Helpdesk Portal built with **ASP.NET Core 10.0 MVC** and **Entity Framework Core**. Designed for corporate, hospital, and enterprise IT environments requiring tight asset custody auditing, scheduled preventive maintenance, and ticketing workflows with Windows Domain Single Sign-On (SSO).
+# SOLVIS - Enterprise Hospital Operations & Asset Intelligence Platform
+
+**SOLVIS** is an enterprise-grade, intranet-optimized Hospital Operations, Asset Inventory, and Service Helpdesk Platform built with **ASP.NET Core 10.0 MVC** and **Entity Framework Core**. Designed for healthcare institutions, enterprise medical centers, and corporate facilities requiring rigorous asset custody auditing, scheduled preventive maintenance, spare parts reserve tracking, and intelligent ticketing workflows integrated with Windows Domain Single Sign-On (SSO).
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Capabilities & Architecture
 
-### 1. 📦 Stock & Asset Management
-- **Hardware Tracking:** Track asset tags (Hospital No), serial numbers, manufacturers, models, equipment types, pricing, and purchase dates.
-- **Warranty Monitoring:** Real-time warranty expiration alerts (active, expiring in 30 days, expired).
-- **Physical Custody Audit Trail:** Automatic tracking in `asset_history` whenever equipment changes room, floor, or assigned employee.
-- **Hardware Lifecycle Management:** Decommission / retire assets with audit logs and deletion safety guards.
-- **Export & Label Printing:**
-  - One-click **CSV Spreadsheet Export** formatted for Microsoft Excel.
-  - Printable **Thermal Barcode / Tag Labels** formatted for physical asset tagging.
+### 1. 📦 Hospital Asset & Equipment Intelligence
+- **Comprehensive Hardware Tracking:** Track asset tags (Hospital No), serial numbers, manufacturers, models, equipment categories, purchase costs, and warranty lifecycles.
+- **Warranty & Calibration Monitoring:** Real-time calibration status tracking, certificate logging, and 30-day proactive expiry alerts.
+- **Custody Audit Trail:** Automatic historical logging in `asset_history` whenever equipment changes room, floor, or assigned employee.
+- **Decommission & Lifecycle Governance:** Controlled retirement flows with audit logs and deletion safety guards.
+- **High-Definition Thermal Label Printing:** One-click customizable asset tags with QR code payloads, compact barcodes, and department metadata.
 
-### 2. 🎫 Helpdesk & Service Ticketing
-- **Categorized Issue Tracking:** Hardware, Software, Network, and Maintenance categories.
-- **Priority Matrix:** Low, Medium, High, and Urgent (fire-priority) queues.
-- **Technician Dispatch:** Assign dedicated IT staff or field engineers to tickets.
-- **Interactive Discussion Timeline:** Threaded comments, updates, and diagnostic messages with author timestamps.
-- **Quick Resolution:** One-click ticket closure with resolution notes.
-- **Printable Work Orders:** Formatted technician field service sheets with signature sign-off boxes.
-- **Export to CSV:** Download filtered ticket audit logs for weekly reporting.
+### 2. 🎫 Helpdesk & Engineering Service Ticketing
+- **Multi-Team Routing:** Targeted queues for Clinical Engineering, IT Support, HVAC/Facilities, and General Maintenance.
+- **Priority Matrix:** Low, Medium, High, and Urgent (fire-priority) queues with pulsing visual indicators.
+- **Interactive Discussion Timeline:** Threaded comments, diagnostic updates, image attachments, and technician status changes.
+- **Printable Field Work Orders:** Formatted technician service sheets with diagnostic details and physical signature blocks.
+- **Export & Compliance:** Filtered CSV exports for audit reviews and SLA reporting.
 
 ### 3. 🛠️ Scheduled & Preventive Maintenance
-- **Periodic Servicing Cycles:** Configure custom inspection intervals (e.g. 90-day, 180-day server/imaging checks).
-- **Overdue Inspection Alerts:** Real-time detection and dashboard warning badges for overdue maintenance.
-- **Quick Checkup Completion:** Log routine maintenance checks with one click.
-- **Detailed Work Orders:** Log repair descriptions, contractor details, and replaced parts/components.
+- **Inspection Cycles:** Configure custom inspection frequencies (e.g., 90-day, 180-day, or annual biomedical checks).
+- **Overdue Inspection Detection:** Instant dashboard alerts and badge counters for overdue preventive maintenance.
+- **Vendor Dispatch & Return Workflow:** Complete custody tracking when equipment is dispatched to external contractors or OEMs for factory servicing.
 
-### 4. 🗂️ Master Directory & Administration
-- **Staff & User Management:** User directory with role definitions and active/inactive status toggling.
-- **Physical Locations:** Multi-floor room directory.
-- **Vendor / Contractor Directory:** Authorized suppliers classified by equipment, maintenance, or full service.
-- **Hospital Departments:** Department directory with designated department heads.
+### 4. ⚙️ Reserve Stock & Spare Parts Inventory
+- **Multi-Category Reserves:** Track consumables, periodic maintenance reserves, and spare parts.
+- **Dual-Nature Items:** Seamlessly commission high-value reserve components directly into registered independent hospital assets.
+- **Usage Auditing:** Link consumed spare parts directly to service tickets with automated inventory decrementing and cost tracking.
 
-### 5. 🔐 Windows Domain SSO & Developer Switching
-- **Automatic Domain Detection:** Auto-authenticates the current Windows domain user without requiring manual login passwords.
-- **Testing Profile Switcher:** Fast identity switcher in the top navigation bar allowing administrators and developers to switch between IT Managers, Field Technicians, and Department Doctors with a single click during testing.
+### 5. 🔐 Windows Domain SSO & Developer Identity Switching
+- **Zero-Password Domain Authentication:** Automatic recognition of Windows workstation credentials (`LOGON_USER` / Windows Negotiate) with fallback security controls.
+- **Role-Based Access Control (RBAC):** Strict boundaries separating Administrators, Department Staff, and Specialized Maintenance Teams.
+- **Testing Profile Switcher:** Fast testing switcher in the top navigation allowing administrators to simulate any staff persona.
 
-### 6. 💾 Multi-Database Architecture
-- **SQLite (Zero Configuration):** Default mode enables developers to clone and run immediately without setting up external database servers.
-- **MariaDB / MySQL Support:** Enterprise MySQL/MariaDB provider enabled simply by updating `DatabaseProvider` in `appsettings.json`.
+### 6. 🌐 Modern Containerized UI & Dual Language Support
+- **Elevated Container Architecture:** Clean, separated page containers with high visual contrast and distinct title hierarchy.
+- **Bilingual Interface:** Instant seamless switching between English and Arabic with tailored typography (`Inter` & `Cairo`) and full RTL layout support.
+- **Multi-Theme Support:** Light, Clinical Mint, and OLED Dark themes.
 
 ---
 
@@ -50,12 +50,13 @@ An enterprise-grade, intranet-optimized IT Asset Inventory and Service Helpdesk 
 
 ### Prerequisites
 - [.NET 10.0 SDK](https://dotnet.microsoft.com/download)
+- Modern web browser (Chrome, Edge, Firefox)
 
 ### Run the Application
-Clone or navigate to the repository folder and run:
+Clone or navigate to the repository folder and execute:
 
 ```bash
-# Build the application
+# Restore and build the project
 dotnet build
 
 # Launch the local web server
@@ -63,54 +64,57 @@ dotnet run
 ```
 
 Open your browser at:
-`http://localhost:5174` (or port specified in terminal).
+`http://localhost:5174` (or the port specified in your terminal output).
 
-The application automatically creates the database and populates sample hospital IT inventory, staff directory, and active service tickets on first launch.
+On initial startup, **SOLVIS** automatically initializes the database schema (`SOLVIS_DB` or `solvis.db`) and seeds initial department directories, equipment templates, and administrator profiles.
 
 ---
 
-## ⚙️ Configuration (`appsettings.json`)
+## ⚙️ Database Configuration (`appsettings.json`)
 
-To switch between SQLite and MySQL:
+To configure between SQLite and MariaDB/MySQL:
 
 ```json
 {
   "DatabaseProvider": "Sqlite", // Options: "Sqlite" or "MySql"
   "ConnectionStrings": {
-    "SqliteConnection": "Data Source=stockportal.db",
-    "MySqlConnection": "server=localhost;port=3306;database=stock;user=root;password=;CharSet=utf8mb4;"
+    "SqliteConnection": "Data Source=solvis.db",
+    "MySqlConnection": "server=localhost;port=3306;database=SOLVIS_DB;user=root;password=;CharSet=utf8mb4;"
   }
 }
 ```
 
 ---
 
-## 📁 Project Structure
+## 📁 Solution Structure
 
 ```
 stock_and_ticket/
 ├── Controllers/
-│   ├── AccountController.cs       # Profile, session switching
-│   ├── AssetsController.cs        # Asset CRUD, custody transfer, CSV export, print tags
-│   ├── DirectoryController.cs     # Users, rooms, suppliers, departments
-│   ├── HomeController.cs          # Executive dashboard & metrics
-│   ├── MaintenanceController.cs    # Periodic schedules, inspection logs
-│   └── TicketsController.cs       # Ticketing queue, technician assignments, printable work orders
+│   ├── AccountController.cs       # Profile, identity switching, access rejection
+│   ├── AssetsController.cs        # Asset CRUD, custody transfer, QR label printing
+│   ├── DirectoryController.cs     # Staff users, rooms, suppliers, departments
+│   ├── HomeController.cs          # Executive KPI dashboard, analytics & security compliance
+│   ├── MaintenanceController.cs    # Periodic schedules, vendor dispatches, inspection logs
+│   ├── SparePartsController.cs     # Reserve stock, spare parts usage, replenishment
+│   └── TicketsController.cs       # Service ticketing, technician assignments, work orders
 ├── Data/
-│   ├── StockDbContext.cs          # Entity Framework Core database context
+│   ├── StockDbContext.cs          # Entity Framework Core DbContext
 │   └── DbInitializer.cs           # Database migration & automatic sample data seeder
 ├── Middleware/
-│   └── DomainAuthMiddleware.cs    # Windows Domain SSO authentication
+│   └── DomainAuthMiddleware.cs    # Windows Domain SSO authentication & security guards
 ├── Models/
-│   ├── ErrorViewModel.cs
-│   └── StockModels.cs             # EF Core entities (Asset, Ticket, User, Room, etc.)
+│   └── StockModels.cs             # EF Core entities (Asset, Ticket, SparePart, User, etc.)
 ├── Services/
-│   └── CurrentUserService.cs      # Current authenticated user provider
-├── ViewModels/
-│   └── PortalViewModels.cs        # Strongly typed dashboard & details view models
-├── Views/                         # Razor views with Bootstrap 5 & FontAwesome UI
-├── wwwroot/                       # Static CSS, JS, and vendor assets
-├── appsettings.json               # Database and logging configuration
-├── Program.cs                     # ASP.NET Core host & dependency injection
+│   ├── CurrentUserService.cs      # Workstation identity & RBAC resolution
+│   ├── LocalizationService.cs     # Bilingual Arabic & English translations
+│   └── NotificationService.cs     # Real-time event notifications
+├── Views/                         # Razor views with modern containerized UI & RTL support
+├── wwwroot/
+│   ├── css/site.css               # Modern container styles, contrast palette & theme variables
+│   ├── images/                    # SOLVIS SVG vector logos and brand assets
+│   └── js/site.js                 # Autohide sidebar, notifications, and client scripts
+├── appsettings.json               # Application configuration and SOLVIS_DB connection strings
+├── Program.cs                     # ASP.NET Core pipeline and dependency injection
 └── StockPortal.csproj             # .NET 10 project definition
 ```

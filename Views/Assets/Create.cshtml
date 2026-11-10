@@ -7,104 +7,136 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-10">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-box-open text-primary me-2"></i> @Loc["Register Hospital Equipment Asset"]</h5>
+    <div class="col-xl-10 col-lg-11">
+        <!-- Page Title & Quick Intro -->
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="form-section-icon icon-blue shadow-sm" style="width: 48px; height: 48px; font-size: 1.4rem;">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-1" style="color: var(--container-title-color);">@Loc["Register Hospital Equipment Asset"]</h4>
+                    <p class="text-muted small mb-0">@(Loc.IsArabic ? "إدخال أصل جديد وتوليد المواصفات الفنية وتحديد العهدة والضمان" : "Register new asset, generate technical specifications, assign custody and warranty")</p>
+                </div>
             </div>
-            <div class="card-body p-4">
-                <form asp-action="Create" method="post" id="assetCreateForm">
-                    @Html.AntiForgeryToken()
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            <a href="@Url.Action("Index")" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left-long me-1"></i> @Loc["Back to Assets"]
+            </a>
+        </div>
 
-                    <!-- 1. Universal Device Form Selector (Forced selection) -->
-                    <div class="card bg-light border-primary border-opacity-25 mb-4">
-                        <div class="card-body p-3">
-                            <label class="form-label fw-bold fs-6 text-dark d-flex justify-content-between align-items-center">
-                                <span><i class="fa-solid fa-shapes text-primary me-2"></i> @Loc["Select Universal Device Template"] <span class="text-danger">*</span></span>
-                                @if (CurrentUser.CanManageDeviceForms())
-                                {
-                                    <a href="@Url.Action("Index", "DeviceForms")" class="btn btn-sm btn-link text-decoration-none p-0" target="_blank">
-                                        <i class="fa-solid fa-gear me-1"></i> @Loc["Manage Device Forms"]
-                                    </a>
-                                }
-                            </label>
-                            <select name="deviceFormId" id="deviceFormSelector" class="form-select form-select-lg fw-semibold border-primary" required>
-                                <option value="">@Loc["Choose Equipment Type to Generate Specifications Form"]</option>
-                                @foreach (var form in availableForms)
-                                {
-                                    <option value="@form.Id" 
-                                            data-name="@form.Name" 
-                                            data-department="@form.Department" 
-                                            data-schema="@form.Form"
-                                            data-has-software="@(form.HasSoftware ? "true" : "false")"
-                                            data-softwares="@form.InstallableSoftwares"
-                                            selected="@(selectedForm?.Id == form.Id)">
-                                        @form.Name &bull; (@Loc.TargetTeam(form.Department))
-                                    </option>
-                                }
-                            </select>
-                            <div class="form-text small mt-1">
-                                <i class="fa-solid fa-circle-info text-primary me-1"></i>
-                                @(Loc.IsArabic ? "اختيار نموذج الجهاز يبني تلقائياً حقول المواصفات الفنية ويحدد قسم الصيانة المسؤول." : "Selecting a device template dynamically builds the technical specifications form and locks maintenance routing.")
-                            </div>
+        <form asp-action="Create" method="post" id="assetCreateForm">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <input type="hidden" asp-for="Type" id="hiddenAssetType" value="@(selectedForm?.Name ?? Model?.Type)" />
+            <input type="hidden" asp-for="MaintenanceTeam" id="hiddenMaintenanceTeam" value="@(selectedForm?.Department ?? Model?.MaintenanceTeam)" />
+
+            <!-- 1. Universal Device Form Selector (Template selection) -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-purple">
+                            <i class="fa-solid fa-shapes"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@Loc["Select Universal Device Template"] <span class="text-danger">*</span></div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "اختيار نموذج الجهاز يبني تلقائياً حقول المواصفات الفنية ويحدد قسم الصيانة المسؤول." : "Selecting a device template dynamically builds the technical specifications form and locks maintenance routing.")</div>
                         </div>
                     </div>
+                    @if (CurrentUser.CanManageDeviceForms())
+                    {
+                        <a href="@Url.Action("Index", "DeviceForms")" class="btn btn-sm btn-outline-primary" target="_blank">
+                            <i class="fa-solid fa-gear me-1"></i> @Loc["Manage Device Forms"]
+                        </a>
+                    }
+                </div>
+                <div class="form-section-body">
+                    <select name="deviceFormId" id="deviceFormSelector" class="form-select form-select-lg fw-semibold" required>
+                        <option value="">@Loc["Choose Equipment Type to Generate Specifications Form"]</option>
+                        @foreach (var form in availableForms)
+                        {
+                            <option value="@form.Id" 
+                                    data-name="@form.Name" 
+                                    data-department="@form.Department" 
+                                    data-schema="@form.Form"
+                                    data-has-software="@(form.HasSoftware ? "true" : "false")"
+                                    data-softwares="@form.InstallableSoftwares"
+                                    selected="@(selectedForm?.Id == form.Id)">
+                                @form.Name &bull; (@Loc.TargetTeam(form.Department))
+                            </option>
+                        }
+                    </select>
+                </div>
+            </div>
 
-                    <input type="hidden" asp-for="Type" id="hiddenAssetType" value="@(selectedForm?.Name ?? Model?.Type)" />
-                    <input type="hidden" asp-for="MaintenanceTeam" id="hiddenMaintenanceTeam" value="@(selectedForm?.Department ?? Model?.MaintenanceTeam)" />
-
-                    <!-- 2. Dynamic Specification Form (Generated from Device Template) -->
-                    <div id="dynamicSpecsContainer" class="card shadow-sm border mb-4">
-                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                            <h6 class="fw-bold mb-0 text-dark">
-                                <i class="fa-solid fa-microchip text-primary me-2"></i> 
-                                <span id="specsHeaderTitle">@Loc["Technical Specifications Form"]</span>
-                            </h6>
-                            <span class="badge bg-primary text-white" id="specsTeamBadge">
-                                @(selectedForm != null ? $"{Loc.TargetTeam(selectedForm.Department)}" : Loc["Technical Specifications"])
-                            </span>
+            <!-- 2. Dynamic Specification Form (Generated from Device Template) -->
+            <div id="dynamicSpecsContainer" class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-blue">
+                            <i class="fa-solid fa-microchip"></i>
                         </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3" id="dynamicFieldsRow">
-                                <div class="col-12 text-center text-muted py-3" id="noTemplateAlert">
-                                    <i class="fa-solid fa-arrow-up text-primary me-1"></i> @(Loc.IsArabic ? "يرجى اختيار نموذج الجهاز أعلاه لتحميل حقول المواصفات." : "Please choose a device template above to load its specification fields.")
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2b. Installed Software Packages (Multi-check from Device Form) -->
-                    <div id="assetSoftwaresCard" class="card shadow-sm border mb-4" style="display: none;">
-                        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="fw-bold mb-0 text-dark">
-                                    <i class="fa-solid fa-cube text-primary me-2"></i>
-                                    <span id="assetSoftwaresHeader">@Loc["Installed Software Packages"]</span>
-                                </h6>
-                                <small class="text-muted">
-                                    @(Loc.IsArabic ? "حدد البرامج والأنظمة المثبتة فعلياً على هذا الأصل من قائمة البرامج المعتمدة لهذا النموذج:" : "Check the softwares and packages installed on this asset from the template's available list:")
-                                </small>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="btnSelectAllSw">
-                                    <i class="fa-solid fa-check-double me-1"></i> @(Loc.IsArabic ? "تحديد الكل" : "Select All")
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
-                                    <i class="fa-solid fa-xmark me-1"></i> @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
-                                </button>
-                            </div>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3" id="assetSoftwaresContainer">
-                                <!-- Dynamically populated checkboxes -->
-                            </div>
+                        <div>
+                            <div class="form-section-title" id="specsHeaderTitle">@Loc["Technical Specifications Form"]</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "المواصفات الفنية المعتمدة لهذا النموذج" : "Certified engineering specifications for this equipment")</div>
                         </div>
                     </div>
+                    <span class="badge bg-primary text-white" id="specsTeamBadge">
+                        @(selectedForm != null ? $"{Loc.TargetTeam(selectedForm.Department)}" : Loc["Technical Specifications"])
+                    </span>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3" id="dynamicFieldsRow">
+                        <div class="col-12 text-center text-muted py-3" id="noTemplateAlert">
+                            <i class="fa-solid fa-arrow-up text-primary me-1"></i> @(Loc.IsArabic ? "يرجى اختيار نموذج الجهاز أعلاه لتحميل حقول المواصفات." : "Please choose a device template above to load its specification fields.")
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                    <!-- 3. Hardware Asset Identification -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Identification & Serial Numbers"]</h6>
-                    <div class="row g-3 mb-4">
+            <!-- 2b. Installed Software Packages (Multi-check from Device Form) -->
+            <div id="assetSoftwaresCard" class="form-section-card" style="display: none;">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-green">
+                            <i class="fa-solid fa-cube"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title" id="assetSoftwaresHeader">@Loc["Installed Software Packages"]</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "حدد البرامج والأنظمة المثبتة فعلياً على هذا الأصل:" : "Check the softwares and packages installed on this asset:")</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnSelectAllSw">
+                            <i class="fa-solid fa-check-double me-1"></i> @(Loc.IsArabic ? "تحديد الكل" : "Select All")
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearSw">
+                            <i class="fa-solid fa-xmark me-1"></i> @(Loc.IsArabic ? "إلغاء التحديد" : "Clear All")
+                        </button>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3" id="assetSoftwaresContainer">
+                        <!-- Dynamically populated checkboxes -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Hardware Asset Identification -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-amber">
+                            <i class="fa-solid fa-barcode"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@Loc["Identification & Serial Numbers"]</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "رقم الأصل، الرقم التسلسلي، الماركة والمورد" : "Asset Tag, Serial Number, Manufacturer Brand and Vendor")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
                         <div class="col-md-4">
                             <label asp-for="HospitalNo" class="form-label fw-semibold">@Loc["Hospital Asset Tag / Tag No"] <span class="text-danger">*</span></label>
                             <input asp-for="HospitalNo" class="form-control" placeholder="e.g. HOSP-LAP-025, HOSP-BIO-010" required />
@@ -141,10 +173,24 @@
                             </select>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- 4. Location & Custody -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Initial Custody & Placement"]</h6>
-                    <div class="row g-3 mb-4">
+            <!-- 4. Location & Custody Placement -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-blue">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@Loc["Initial Custody & Placement"]</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "الغرفة السريرية، الموظف المسؤول، والحالة التشغيلية" : "Room location, custodian assignment, and operating status")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
                         <div class="col-md-4">
                             <label asp-for="UserId" class="form-label fw-semibold">@Loc["Assigned Staff / Custodian"]</label>
                             <select asp-for="UserId" class="form-select" asp-items="ViewBag.Users">
@@ -173,10 +219,24 @@
                             </select>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- 5. Commercial, Warranty & Periodic Maintenance -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">@Loc["Purchase, Warranty & Periodic Inspection"]</h6>
-                    <div class="row g-3 mb-4">
+            <!-- 5. Commercial, Warranty, Periodic Maintenance & Calibration -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-rose">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@Loc["Purchase, Warranty & Periodic Inspection"]</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "بيانات الشراء، الضمان، المعايرة الدورية وزيارات المورد" : "Commercial terms, warranty, periodic calibration, and vendor visits")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
                         <div class="col-md-4">
                             <label asp-for="Price" class="form-label fw-semibold">@Loc["Purchase Price"] ($)</label>
                             <input asp-for="Price" class="form-control" type="number" step="0.01" placeholder="0.00" />
@@ -203,7 +263,7 @@
                             <input asp-for="PeriodicInterval" class="form-control" type="number" placeholder="e.g. 90 or 180" />
                         </div>
 
-                        <!-- Calibration Data (Task 2) -->
+                        <!-- Calibration Data -->
                         <div class="col-12 mt-3 pt-3 border-top">
                             <h6 class="fw-bold text-muted text-uppercase mb-2">
                                 <i class="fa-solid fa-award text-success me-1"></i>
@@ -246,7 +306,7 @@
                             </div>
                         </div>
 
-                        <!-- Vendor Free After-Sale Maintenance (Task 5) -->
+                        <!-- Vendor Free After-Sale Maintenance -->
                         <div class="col-12 mt-3 pt-3 border-top">
                             <h6 class="fw-bold text-muted text-uppercase mb-2">
                                 <i class="fa-solid fa-handshake-angle text-info me-1"></i>
@@ -281,53 +341,64 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Compatible Spare Parts Selection (Task 2) -->
-                    <h6 class="fw-bold text-muted text-uppercase mb-3 pb-2 border-bottom">
-                        <i class="fa-solid fa-gears text-primary me-2"></i> @(Loc.IsArabic ? "قطع الغيار والمستهلكات المتوافقة" : "Compatible Spare Parts & Consumables")
-                    </h6>
-                    <div class="card bg-light border-0 mb-4">
-                        <div class="card-body p-3">
-                            <p class="small text-muted mb-2">
-                                <i class="fa-solid fa-link text-primary me-1"></i>
-                                @(Loc.IsArabic ? "حدد قطع الغيار والمستهلكات المتوافقة مع هذا الأصل ليتم ربطها تبادلياً:" : "Select spare parts and consumables compatible with this asset (bidirectional linking):")
-                            </p>
-                            @{
-                                var availableParts = ViewBag.AvailableSpareParts as List<StockPortal.Models.SparePart> ?? new();
-                            }
-                            @if (!availableParts.Any())
+            <!-- 6. Compatible Spare Parts Selection -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-green">
+                            <i class="fa-solid fa-gears"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@(Loc.IsArabic ? "قطع الغيار والمستهلكات المتوافقة" : "Compatible Spare Parts & Consumables")</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "حدد قطع الغيار والمستهلكات المتوافقة مع هذا الأصل ليتم ربطها تبادلياً:" : "Select spare parts and consumables compatible with this asset (bidirectional linking):")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    @{
+                        var availableParts = ViewBag.AvailableSpareParts as List<StockPortal.Models.SparePart> ?? new();
+                    }
+                    @if (!availableParts.Any())
+                    {
+                        <div class="text-muted small fst-italic py-2">@(Loc.IsArabic ? "لا توجد قطع غيار مسجلة لهذا القسم حالياً." : "No spare parts registered for this department yet.")</div>
+                    }
+                    else
+                    {
+                        <div class="row g-2" style="max-height: 220px; overflow-y: auto;">
+                            @foreach (var part in availableParts)
                             {
-                                <div class="text-muted small fst-italic">@(Loc.IsArabic ? "لا توجد قطع غيار مسجلة لهذا القسم حالياً." : "No spare parts registered for this department yet.")</div>
-                            }
-                            else
-                            {
-                                <div class="row g-2" style="max-height: 220px; overflow-y: auto;">
-                                    @foreach (var part in availableParts)
-                                    {
-                                        <div class="col-md-4 col-sm-6">
-                                            <div class="form-check p-2 bg-white rounded border border-light shadow-sm h-100">
-                                                <input class="form-check-input ms-1" type="checkbox" name="compatibleSparePartIds" value="@part.Id" id="sp_part_@part.Id" />
-                                                <label class="form-check-label small fw-semibold text-dark text-truncate d-block" for="sp_part_@part.Id" title="@part.DisplayName">
-                                                    @part.DisplayName
-                                                    <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">(@part.Quantity @Loc["in stock"])</span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    }
+                                <div class="col-md-4 col-sm-6">
+                                    <div class="form-check p-2 bg-light-subtle rounded border shadow-xs h-100">
+                                        <input class="form-check-input ms-1" type="checkbox" name="compatibleSparePartIds" value="@part.Id" id="sp_part_@part.Id" />
+                                        <label class="form-check-label small fw-semibold text-dark text-truncate d-block" for="sp_part_@part.Id" title="@part.DisplayName">
+                                            @part.DisplayName
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">(@part.Quantity @Loc["in stock"])</span>
+                                        </label>
+                                    </div>
                                 </div>
                             }
                         </div>
-                    </div>
-
-                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
-                        <button type="submit" class="btn btn-primary px-4 fw-bold">
-                            <i class="fa-solid fa-paper-plane me-1"></i> @Loc["Register New Asset"]
-                        </button>
-                    </div>
-                </form>
+                    }
+                </div>
             </div>
-        </div>
+
+            <!-- 7. Actions Controls Bar -->
+            <div class="form-actions-card">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary px-3">
+                        <i class="fa-solid fa-xmark me-1"></i> @Loc["Cancel"]
+                    </a>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="submit" class="btn btn-primary px-4 py-2 fw-bold shadow-sm">
+                        <i class="fa-solid fa-paper-plane me-2"></i> @Loc["Register New Asset"]
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 

@@ -9,9 +9,15 @@ namespace StockPortal.Services
         private static readonly Dictionary<string, string> ArTranslations = new(StringComparer.OrdinalIgnoreCase)
         {
             // App & Layout
-            ["Stock & Helpdesk"] = "المخزون والدعم الفني",
-            ["IT Asset & Service Portal"] = "بوابة إدارة الأصول والخدمات التقنية",
-            ["IT Stock & Helpdesk Portal"] = "بوابة إدارة العهد والدعم الفني للمستشفى",
+            ["SOLVIS"] = "سولفيس",
+            ["SOLVIS Portal"] = "بوابة سولفيس",
+            ["SOLVIS: Hospital Operations & Asset Intelligence"] = "سولفيس: بوابة إدارة العمليات والعهد الطبية",
+            ["SOLVIS - Hospital Operations & Asset Intelligence"] = "سولفيس - بوابة إدارة العمليات والعهد الطبية",
+            ["Hospital Operations & Asset Intelligence"] = "إدارة العمليات والعهد الطبية",
+            ["Hospital Asset & Operations System"] = "نظام إدارة العمليات والعهد الطبية",
+            ["Stock & Helpdesk"] = "SOLVIS",
+            ["IT Asset & Service Portal"] = "إدارة العمليات والعهد الطبية",
+            ["IT Stock & Helpdesk Portal"] = "SOLVIS - إدارة العمليات والعهد",
             ["Operations"] = "العمليات والتشغيل",
             ["Engineering Queue"] = "قائمة مهام الهندسة والصيانة",
             ["My Workspace"] = "مساحة عملي",
@@ -80,7 +86,8 @@ namespace StockPortal.Services
             ["Pin Sidebar"] = "تثبيت الشريط الجانبي",
             ["Close Sidebar"] = "إغلاق القائمة",
             ["Toggle Navigation"] = "تبديل القائمة",
-            ["Stock & Helpdesk Management System"] = "نظام إدارة العهد وتذاكر الدعم الفني",
+            ["Stock & Helpdesk Management System"] = "سولفيس - نظام إدارة العمليات والعهد وتذاكر الدعم",
+            ["Servis: Stock and Ticketing System"] = "سولفيس (SOLVIS) - نظام العمليات والعهد",
             ["Windows Domain Authentication Active"] = "المصادقة عبر نطاق ويندوز مفعلة",
             ["Host"] = "المضيف",
 

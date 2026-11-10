@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 90" width="380" height="90" fill="none">
+  <defs>
+    <!-- Top S Ribbon Gradient: Vibrant Cyan to Electric Blue -->
+    <linearGradient id="logoCyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="60%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+
+    <!-- Bottom S Ribbon Gradient: Royal Blue to Indigo -->
+    <linearGradient id="logoBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="60%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+
+    <linearGradient id="logoAccentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+
+    <!-- Icon Badge Background (Dark Slate Plate) -->
+    <linearGradient id="logoPlateGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left Icon Emblem Container (80x80 inside 90 height) -->
+  <g transform="translate(6, 5)">
+    <rect x="0" y="0" width="80" height="80" rx="20" fill="url(#logoPlateGrad)" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
+    
+    <!-- Ribbon Upper Wave -->
+    <path d="M52 20 H30 C23 20 18 25 18 32 C18 38 23 43 29 44 L47 47 C54 48 59 53 59 59 C59 66 53 71 46 71 H22" 
+          stroke="url(#logoCyanGrad)" 
+          stroke-width="9" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"/>
+
+    <!-- Ribbon Lower Shield Blade -->
+    <path d="M28 64 H50 C57 64 62 59 62 52 C62 46 57 41 51 40 L33 37 C26 36 21 31 21 25 C21 18 27 13 34 13 H58" 
+          stroke="url(#logoBlueGrad)" 
+          stroke-width="9" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          fill="none"
+          opacity="0.9"/>
+
+    <circle cx="40" cy="40" r="4.5" fill="url(#logoAccentGrad)"/>
+    <circle cx="40" cy="40" r="7.5" stroke="#38bdf8" stroke-width="1.2" stroke-opacity="0.6" fill="none"/>
+  </g>
+
+  <!-- Typography: Wordmark "SOLVIS" -->
+  <g transform="translate(104, 52)">
+    <text font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="44" 
+          font-weight="900" 
+          letter-spacing="3" 
+          fill="#0f172a">
+      SOLV<tspan fill="#2563eb">I</tspan><tspan fill="#0284c7">S</tspan>
+    </text>
+  </g>
+
+  <!-- Subtitle: Hospital Operations & Asset Intelligence -->
+  <g transform="translate(106, 73)">
+    <text font-family="'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" 
+          font-size="10" 
+          font-weight="700" 
+          letter-spacing="2" 
+          fill="#475569" 
+          text-transform="uppercase">
+      Operations &amp; Asset Intelligence
+    </text>
+  </g>
+</svg>

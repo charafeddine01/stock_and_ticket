@@ -118,59 +118,83 @@
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <h5 class="mb-0 fw-bold"><i class="fa-solid fa-ticket text-primary me-2"></i> @Loc["Open New Technical Support Ticket"]</h5>
+    <div class="col-xl-9 col-lg-10">
+        <!-- Page Title & Quick Intro -->
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div class="d-flex align-items-center gap-3">
+                <div class="form-section-icon icon-blue shadow-sm" style="width: 48px; height: 48px; font-size: 1.4rem;">
+                    <i class="fa-solid fa-ticket"></i>
+                </div>
+                <div>
+                    <h4 class="fw-bold mb-1" style="color: var(--container-title-color);">@Loc["Open New Technical Support Ticket"]</h4>
+                    <p class="text-muted small mb-0">@(Loc.IsArabic ? "نظام سولفيس للبلاغات والصيانة الفنية الذكية بالمستشفى" : "SOLVIS Intelligent Hospital Dispatch & Asset Operations")</p>
+                </div>
             </div>
-            <div class="card-body p-4">
-                <form asp-action="Create" method="post" id="createTicketForm" enctype="multipart/form-data">
-                    @Html.AntiForgeryToken()
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+            <a href="@Url.Action("Index")" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left-long me-1"></i> @Loc["Back to Tickets"]
+            </a>
+        </div>
 
-                    @if (ViewBag.ActiveTicketWarning != null)
-                    {
-                        <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="fa-solid fa-triangle-exclamation fs-4 text-danger flex-shrink-0"></i>
-                                <div>
-                                    <strong class="text-danger">@(Loc.IsArabic ? "لا يمكن فتح تذكرة جديدة لهذا الجهاز:" : "Active Ticket Conflict:")</strong>
-                                    <div class="mt-1 small">@ViewBag.ActiveTicketWarning</div>
-                                </div>
-                            </div>
-                            @if (ViewBag.ExistingActiveTicketId != null)
-                            {
-                                <a href="@Url.Action("Details", "Tickets", new { id = ViewBag.ExistingActiveTicketId })" class="btn btn-danger btn-sm text-nowrap ms-3">
-                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة النشطة" : "View Active Ticket")
-                                </a>
-                            }
-                        </div>
-                    }
+        <form asp-action="Create" method="post" id="createTicketForm" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-                    <div id="clientSideActiveTicketAlert" class="alert alert-danger d-none align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fa-solid fa-ban fs-4 text-danger flex-shrink-0"></i>
-                            <div>
-                                <strong class="text-danger">@(Loc.IsArabic ? "تنبيه: هذا الجهاز لديه تذكرة قيد المعالجة حالياً!" : "Warning: Active Ticket Already In Progress!")</strong>
-                                <div class="mt-1 small" id="clientSideActiveTicketMsg"></div>
-                            </div>
+            @if (ViewBag.ActiveTicketWarning != null)
+            {
+                <div class="alert alert-danger d-flex align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation fs-4 text-danger flex-shrink-0"></i>
+                        <div>
+                            <strong class="text-danger">@(Loc.IsArabic ? "لا يمكن فتح تذكرة جديدة لهذا الجهاز:" : "Active Ticket Conflict:")</strong>
+                            <div class="mt-1 small">@ViewBag.ActiveTicketWarning</div>
                         </div>
-                        <a href="#" id="clientSideActiveTicketLink" class="btn btn-danger btn-sm text-nowrap ms-3" target="_blank">
-                            <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة" : "View Ticket")
-                        </a>
                     </div>
+                    @if (ViewBag.ExistingActiveTicketId != null)
+                    {
+                        <a href="@Url.Action("Details", "Tickets", new { id = ViewBag.ExistingActiveTicketId })" class="btn btn-danger btn-sm text-nowrap ms-3">
+                            <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة النشطة" : "View Active Ticket")
+                        </a>
+                    }
+                </div>
+            }
 
-                    <input type="hidden" asp-for="OpenedBy" value="@currentUserId" />
-                    <!-- Hidden target team input submitted with the form -->
-                    <input type="hidden" asp-for="TargetTeam" id="hiddenTargetTeam" value="IT" />
-                    <!-- Hidden client PC Name input -->
-                    <input type="hidden" asp-for="PcName" id="ticketPcName" value="@(ViewBag.DetectedPcName ?? Environment.MachineName)" />
+            <div id="clientSideActiveTicketAlert" class="alert alert-danger d-none align-items-center justify-content-between p-3 mb-3 shadow-sm border-danger" role="alert">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-ban fs-4 text-danger flex-shrink-0"></i>
+                    <div>
+                        <strong class="text-danger">@(Loc.IsArabic ? "تنبيه: هذا الجهاز لديه تذكرة قيد المعالجة حالياً!" : "Warning: Active Ticket Already In Progress!")</strong>
+                        <div class="mt-1 small" id="clientSideActiveTicketMsg"></div>
+                    </div>
+                </div>
+                <a href="#" id="clientSideActiveTicketLink" class="btn btn-danger btn-sm text-nowrap ms-3" target="_blank">
+                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> @(Loc.IsArabic ? "عرض التذكرة" : "View Ticket")
+                </a>
+            </div>
 
-                    <div class="row g-3 mb-3">
-                        <!-- Requester & On-Behalf -->
+            <input type="hidden" asp-for="OpenedBy" value="@currentUserId" />
+            <!-- Hidden target team input submitted with the form -->
+            <input type="hidden" asp-for="TargetTeam" id="hiddenTargetTeam" value="IT" />
+            <!-- Hidden client PC Name input -->
+            <input type="hidden" asp-for="PcName" id="ticketPcName" value="@(ViewBag.DetectedPcName ?? Environment.MachineName)" />
+
+            <!-- CARD 1: Requester & Representation -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-blue">
+                            <i class="fa-solid fa-user-circle"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@(Loc.IsArabic ? "مقدم الطلب والتمثيل بالنيابة" : "Requester & Representation")</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "بيانات الحساب ومقدم البلاغ" : "Account identity and submission representation")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">@Loc["Reported By"]</label>
-                            <input type="text" class="form-control bg-light" value="@CurrentUser.GetFullName() (@CurrentUser.GetRole())" readonly />
+                            <input type="text" class="form-control" value="@CurrentUser.GetFullName() (@CurrentUser.GetRole())" readonly />
                             <div class="form-text small">@(Loc.IsArabic ? "مستخدم ويندوز الحالي مقدم التذكرة." : "Logged-in domain user submitting this ticket.")</div>
                         </div>
 
@@ -181,199 +205,226 @@
                             </select>
                             <div class="form-text small">@(Loc.IsArabic ? "اختر موظفاً آخر إذا كنت تقدم البلاغ نيابة عن زميل." : "Select another staff member if submitting for a colleague.")</div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <!-- 1. Equipment Assigned to Current User / Custody Selector -->
-                        <div class="col-md-12" id="myAssetsContainer">
-                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center mb-2">
-                                <span id="assetContainerTitle">
-                                    @if (CurrentUser.IsAdmin())
-                                    {
-                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @(Loc.IsArabic ? "معدات وأصول المستشفى (اختر الجهاز للإبلاغ)" : "Hospital Asset Inventory (Select Device)")
-                                    }
-                                    else if (CurrentUser.IsMaintenance())
-                                    {
-                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @(Loc.IsArabic ? $"معدات قسم الصيانة ({Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}) والأجهزة المسندة إليك" : $"{CurrentUser.GetMaintenanceTeam()} Department Equipment & Assigned Assets")
-                                    }
-                                    else
-                                    {
-                                        <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> @Loc["Your Assigned Hardware Asset"]
-                                    }
-                                </span>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-light text-muted border fw-normal" id="assetCountBadge">@userAssetsCount @Loc["assigned items"]</span>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-normal" id="assetFilteredBadge" style="display: none;"></span>
-                                </div>
-                            </label>
+            <!-- CARD 2: Equipment Assigned to Current User / Custody Selector -->
+            <div class="form-section-card" id="myAssetsContainer">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-purple">
+                            <i class="fa-solid fa-laptop-medical"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title" id="assetContainerTitle">
+                                @if (CurrentUser.IsAdmin())
+                                {
+                                    <span>@(Loc.IsArabic ? "معدات وأصول المستشفى (اختر الجهاز للإبلاغ)" : "Hospital Asset Inventory (Select Device)")</span>
+                                }
+                                else if (CurrentUser.IsMaintenance())
+                                {
+                                    <span>@(Loc.IsArabic ? $"معدات قسم الصيانة ({Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}) والأجهزة المسندة إليك" : $"{CurrentUser.GetMaintenanceTeam()} Department Equipment & Assigned Assets")</span>
+                                }
+                                else
+                                {
+                                    <span>@Loc["Your Assigned Hardware Asset"]</span>
+                                }
+                            </div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "اختر الجهاز من العهدة أو أدخل بيانات العتاد المشترك" : "Select equipment from personal custody or specify shared hardware")</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-muted border fw-normal" id="assetCountBadge">@userAssetsCount @Loc["assigned items"]</span>
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-normal" id="assetFilteredBadge" style="display: none;"></span>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <!-- Maintenance Department Filter Bar -->
+                    <div class="asset-dept-filter-bar mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 rounded border bg-light-subtle">
+                        <div class="d-flex align-items-center gap-1 text-muted small fw-semibold me-1">
+                            <i class="fa-solid fa-filter text-primary"></i>
+                            <span>@(Loc.IsArabic ? "قسم الصيانة:" : "Department:")</span>
+                        </div>
+                        <div class="btn-group btn-group-sm flex-wrap flex-grow-1" role="group" id="assetDeptFilterGroup" aria-label="Department Filter">
+                            <button type="button" class="btn btn-outline-primary active py-1" data-dept="ALL" id="deptFilterAll">
+                                <i class="fa-solid fa-layer-group me-1"></i>
+                                <span>@(Loc.IsArabic ? "كافة الأقسام" : "All Departments")</span>
+                                <span class="badge bg-primary text-white ms-1 rounded-pill" id="badgeDeptAll">@userAssetsCount</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary py-1" data-dept="IT" id="deptFilterIT">
+                                <i class="fa-solid fa-laptop me-1"></i>
+                                <span>@(Loc.IsArabic ? "تقنية المعلومات" : "IT")</span>
+                                <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptIT">@countIT</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-success py-1" data-dept="BIOMEDICAL" id="deptFilterBio">
+                                <i class="fa-solid fa-heart-pulse me-1"></i>
+                                <span>@(Loc.IsArabic ? "الهندسة الطبية" : "Biomedical")</span>
+                                <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptBio">@countBio</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-warning text-dark py-1" data-dept="GENERAL" id="deptFilterGen">
+                                <i class="fa-solid fa-wrench me-1"></i>
+                                <span>@(Loc.IsArabic ? "الصيانة العامة" : "General")</span>
+                                <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptGen">@countGen</span>
+                            </button>
+                        </div>
+                    </div>
 
-                            <!-- Maintenance Department Filter Bar -->
-                            <div class="asset-dept-filter-bar mb-2 d-flex flex-wrap align-items-center justify-content-between gap-2 bg-light p-2 rounded border">
-                                <div class="d-flex align-items-center gap-1 text-muted small fw-semibold me-1">
-                                    <i class="fa-solid fa-filter text-primary"></i>
-                                    <span>@(Loc.IsArabic ? "قسم الصيانة:" : "Department:")</span>
+                    <!-- Searchable Custom Dropdown Component -->
+                    <div class="dropdown w-100 position-relative mb-2" id="assetDropdownWrapper">
+                        <!-- Hidden Native Select for ASP.NET Form Binding -->
+                        <select asp-for="AssetId" id="AssetId" class="d-none">
+                            <option value="" data-team="" data-type="">@(Loc.IsArabic ? "-- طلب خدمة عام (بدون جهاز محدد) --" : "-- General Service Request (No specific hardware) --")</option>
+                            @if (ViewBag.UserAssetsList != null)
+                            {
+                                foreach (var item in ViewBag.UserAssetsList)
+                                {
+                                    <option value="@item.Id" data-team="@item.MaintenanceTeam" data-type="@item.Type" data-brand="@item.Brand" data-sn="@item.SerialNo" data-room="@item.RoomName">@item.Display</option>
+                                }
+                            }
+                        </select>
+
+                        <!-- Interactive Combobox Trigger Button -->
+                        <div class="form-control d-flex align-items-center justify-content-between p-2 cursor-pointer" 
+                             id="assetDropdownTrigger" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false" style="min-height: 48px;">
+                            <div class="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden" id="assetTriggerContent">
+                                <i class="fa-solid fa-laptop-medical text-muted fs-5 flex-shrink-0" id="assetTriggerIcon"></i>
+                                <div class="text-truncate" id="assetTriggerText">
+                                    <span class="text-muted">@(Loc.IsArabic ? "-- اختر أو ابحث عن جهاز من العهدة --" : "-- Select or search equipment from custody --")</span>
                                 </div>
-                                <div class="btn-group btn-group-sm flex-wrap flex-grow-1" role="group" id="assetDeptFilterGroup" aria-label="Department Filter">
-                                    <button type="button" class="btn btn-outline-primary active py-1" data-dept="ALL" id="deptFilterAll">
-                                        <i class="fa-solid fa-layer-group me-1"></i>
-                                        <span>@(Loc.IsArabic ? "كافة الأقسام" : "All Departments")</span>
-                                        <span class="badge bg-primary text-white ms-1 rounded-pill" id="badgeDeptAll">@userAssetsCount</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
+                                <button type="button" class="btn btn-sm btn-link text-muted p-0 me-1" id="assetTriggerClearBtn" title="@(Loc.IsArabic ? "إلغاء التحديد (طلب عام)" : "Clear selection (General request)")" style="display: none;">
+                                    <i class="fa-solid fa-xmark text-danger fs-6"></i>
+                                </button>
+                                <i class="fa-solid fa-chevron-down text-muted small" id="assetTriggerChevron"></i>
+                            </div>
+                        </div>
+
+                        <!-- Dropdown Menu Popover -->
+                        <div class="dropdown-menu shadow-lg p-2 w-100 border border-primary-subtle position-absolute start-0 end-0 mt-1" 
+                             id="assetDropdownMenu" style="display: none; z-index: 1055; max-height: 420px;">
+                            <!-- Search Box with Clear Button -->
+                            <div class="p-1 mb-2">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white border-end-0 text-primary">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                    </span>
+                                    <input type="text" class="form-control border-start-0 border-end-0" id="assetSearchInput" 
+                                           placeholder="@(Loc.IsArabic ? "ابحث برقم الأصل، الماركة، النوع، السيريال، الغرفة..." : "Search by Asset Tag, Brand, Type, Serial No, Room...")" 
+                                           autocomplete="off" />
+                                    <button type="button" class="btn btn-outline-secondary border-start-0" id="assetSearchClearBtn" style="display: none;" title="@(Loc.IsArabic ? "مسح البحث" : "Clear search")">
+                                        <i class="fa-solid fa-xmark"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-primary py-1" data-dept="IT" id="deptFilterIT">
-                                        <i class="fa-solid fa-laptop me-1"></i>
-                                        <span>@(Loc.IsArabic ? "تقنية المعلومات" : "IT")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptIT">@countIT</span>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-success py-1" data-dept="BIOMEDICAL" id="deptFilterBio">
-                                        <i class="fa-solid fa-heart-pulse me-1"></i>
-                                        <span>@(Loc.IsArabic ? "الهندسة الطبية" : "Biomedical")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptBio">@countBio</span>
-                                    </button>
-                                    <button type="button" class="btn btn-outline-warning text-dark py-1" data-dept="GENERAL" id="deptFilterGen">
-                                        <i class="fa-solid fa-wrench me-1"></i>
-                                        <span>@(Loc.IsArabic ? "الصيانة العامة" : "General")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptGen">@countGen</span>
-                                    </button>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center px-1 pt-1 text-muted" style="font-size: 0.72rem;">
+                                    <span id="assetFilterStatusText">@(Loc.IsArabic ? "اكتب للتصفية الفورية" : "Type to filter immediately")</span>
+                                    <span id="assetMatchCountText"></span>
                                 </div>
                             </div>
 
-                            <!-- Searchable Custom Dropdown Component -->
-                            <div class="dropdown w-100 position-relative" id="assetDropdownWrapper">
-                                <!-- Hidden Native Select for ASP.NET Form Binding -->
-                                <select asp-for="AssetId" id="AssetId" class="d-none">
-                                    <option value="" data-team="" data-type="">@(Loc.IsArabic ? "-- طلب خدمة عام (بدون جهاز محدد) --" : "-- General Service Request (No specific hardware) --")</option>
-                                    @if (ViewBag.UserAssetsList != null)
-                                    {
-                                        foreach (var item in ViewBag.UserAssetsList)
-                                        {
-                                            <option value="@item.Id" data-team="@item.MaintenanceTeam" data-type="@item.Type" data-brand="@item.Brand" data-sn="@item.SerialNo" data-room="@item.RoomName">@item.Display</option>
-                                        }
-                                    }
-                                </select>
-
-                                <!-- Interactive Combobox Trigger Button -->
-                                <div class="form-control d-flex align-items-center justify-content-between p-2 cursor-pointer bg-white" 
-                                     id="assetDropdownTrigger" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false" style="min-height: 48px;">
-                                    <div class="d-flex align-items-center gap-2 flex-grow-1 overflow-hidden" id="assetTriggerContent">
-                                        <i class="fa-solid fa-laptop-medical text-muted fs-5 flex-shrink-0" id="assetTriggerIcon"></i>
-                                        <div class="text-truncate" id="assetTriggerText">
-                                            <span class="text-muted">@(Loc.IsArabic ? "-- اختر أو ابحث عن جهاز من العهدة --" : "-- Select or search equipment from custody --")</span>
-                                        </div>
+                            <!-- Quick Option: General Service Request (Always at top) -->
+                            <div class="asset-option-item p-2 rounded mb-1 cursor-pointer border-bottom bg-light bg-opacity-75" 
+                                 id="assetOptGeneral" data-id="" data-team="" data-type="">
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="fa-solid fa-wrench text-secondary"></i>
+                                        <span class="fw-semibold small text-dark">@(Loc.IsArabic ? "-- طلب خدمة عام (بدون جهاز محدد) --" : "-- General Service Request (No specific hardware) --")</span>
                                     </div>
-                                    <div class="d-flex align-items-center gap-1 flex-shrink-0 ms-2">
-                                        <button type="button" class="btn btn-sm btn-link text-muted p-0 me-1" id="assetTriggerClearBtn" title="@(Loc.IsArabic ? "إلغاء التحديد (طلب عام)" : "Clear selection (General request)")" style="display: none;">
-                                            <i class="fa-solid fa-xmark text-danger fs-6"></i>
-                                        </button>
-                                        <i class="fa-solid fa-chevron-down text-muted small" id="assetTriggerChevron"></i>
-                                    </div>
-                                </div>
-
-                                <!-- Dropdown Menu Popover -->
-                                <div class="dropdown-menu shadow-lg p-2 w-100 border border-primary-subtle position-absolute start-0 end-0 mt-1" 
-                                     id="assetDropdownMenu" style="display: none; z-index: 1055; max-height: 420px;">
-                                    <!-- Search Box with Clear Button -->
-                                    <div class="p-1 mb-2">
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-white border-end-0 text-primary">
-                                                <i class="fa-solid fa-magnifying-glass"></i>
-                                            </span>
-                                            <input type="text" class="form-control border-start-0 border-end-0" id="assetSearchInput" 
-                                                   placeholder="@(Loc.IsArabic ? "ابحث برقم الأصل، الماركة، النوع، السيريال، الغرفة..." : "Search by Asset Tag, Brand, Type, Serial No, Room...")" 
-                                                   autocomplete="off" />
-                                            <button type="button" class="btn btn-outline-secondary border-start-0" id="assetSearchClearBtn" style="display: none;" title="@(Loc.IsArabic ? "مسح البحث" : "Clear search")">
-                                                <i class="fa-solid fa-xmark"></i>
-                                            </button>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-center px-1 pt-1 text-muted" style="font-size: 0.72rem;">
-                                            <span id="assetFilterStatusText">@(Loc.IsArabic ? "اكتب للتصفية الفورية" : "Type to filter immediately")</span>
-                                            <span id="assetMatchCountText"></span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Quick Option: General Service Request (Always at top) -->
-                                    <div class="asset-option-item p-2 rounded mb-1 cursor-pointer border-bottom bg-light bg-opacity-75" 
-                                         id="assetOptGeneral" data-id="" data-team="" data-type="">
-                                        <div class="d-flex align-items-center justify-content-between">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="fa-solid fa-wrench text-secondary"></i>
-                                                <span class="fw-semibold small text-dark">@(Loc.IsArabic ? "-- طلب خدمة عام (بدون جهاز محدد) --" : "-- General Service Request (No specific hardware) --")</span>
-                                            </div>
-                                            <span class="badge bg-secondary-subtle text-secondary border small">@Loc["General"]</span>
-                                        </div>
-                                    </div>
-
-                                    <!-- Scrollable Asset Options List -->
-                                    <div id="assetOptionsScroll" class="overflow-y-auto pe-1" style="max-height: 250px;">
-                                        <!-- Dynamically generated asset items -->
-                                    </div>
-
-                                    <!-- Empty Result Message -->
-                                    <div id="assetEmptyState" class="text-center py-4 text-muted small" style="display: none;">
-                                        <i class="fa-solid fa-magnifying-glass fs-3 d-block mb-2 text-muted opacity-50"></i>
-                                        <div>@(Loc.IsArabic ? "لا توجد أجهزة مطابقة للبحث في هذا القسم." : "No equipment matching your search in this department.")</div>
-                                        <button type="button" class="btn btn-sm btn-link mt-1 text-decoration-none" id="assetResetFiltersBtn">
-                                            <i class="fa-solid fa-rotate-left me-1"></i>@(Loc.IsArabic ? "إعادة تعيين البحث والأقسام" : "Reset search & department filter")
-                                        </button>
-                                    </div>
+                                    <span class="badge bg-secondary-subtle text-secondary border small">@Loc["General"]</span>
                                 </div>
                             </div>
 
-                            <!-- Zero Assets Warning / Custody Notice -->
-                            <div id="assetZeroAlert" class="alert alert-light border small text-muted mt-2 py-2" style="@(userAssetsCount == 0 ? "" : "display: none;")">
-                                <i class="fa-solid fa-circle-info text-primary me-1"></i> 
-                                <span id="assetZeroAlertText">
-                                    @(Loc.IsArabic ? "لا توجد أجهزة مسندة لعهدتك الشخصية حالياً. إذا كان البلاغ لجهاز مشترك، اختر طلباً عاماً أو حدد التفاصيل أدناه." : "No equipment is currently registered to your personal custody. If reporting an issue with a shared workstation, select general request or describe it below.")
-                                </span>
+                            <!-- Scrollable Asset Options List -->
+                            <div id="assetOptionsScroll" class="overflow-y-auto pe-1" style="max-height: 250px;">
+                                <!-- Dynamically generated asset items -->
                             </div>
 
-                            <div class="d-flex justify-content-between align-items-center mt-2">
-                                <div class="form-text small" id="assetHelpText">
-                                    @(Loc.IsArabic ? "اختر الجهاز من عهدتك الذي يواجه المشكلة الفنية، أو استخدم البحث لتحديد الجهاز بسرعة." : "Choose the specific equipment from custody experiencing technical issues, or use search to locate it quickly.")
-                                </div>
-                                <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted" id="toggleManualAssetBtn" style="font-size: 0.78rem;">
-                                    <i class="fa-solid fa-pen me-1"></i>@(Loc.IsArabic ? "إدخال جهاز يدوي غير مدرج" : "Enter unlisted asset manually")
+                            <!-- Empty Result Message -->
+                            <div id="assetEmptyState" class="text-center py-4 text-muted small" style="display: none;">
+                                <i class="fa-solid fa-magnifying-glass fs-3 d-block mb-2 text-muted opacity-50"></i>
+                                <div>@(Loc.IsArabic ? "لا توجد أجهزة مطابقة للبحث في هذا القسم." : "No equipment matching your search in this department.")</div>
+                                <button type="button" class="btn btn-sm btn-link mt-1 text-decoration-none" id="assetResetFiltersBtn">
+                                    <i class="fa-solid fa-rotate-left me-1"></i>@(Loc.IsArabic ? "إعادة تعيين البحث والأقسام" : "Reset search & department filter")
                                 </button>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- 2. Manual Asset Specification (Visible when toggled or fallback) -->
-                        <div class="col-md-12" id="onBehalfAssetContainer" style="display: none;">
-                            <div class="alert alert-warning py-2 small mb-2 d-flex align-items-center gap-2">
-                                <i class="fa-solid fa-user-pen fs-6"></i>
-                                <div>
-                                    <strong>@(Loc.IsArabic ? "تحديد جهاز يدوي:" : "Manual Equipment Entry:")</strong> @(Loc.IsArabic ? "إذا كان الجهاز غير مسجل بالعهدة أو مشتركاً، حدد كود الأصل أو اسمه أدناه." : "If the equipment is unassigned or shared, please specify the device tag or room below. It will be recorded directly into the dispatch ticket.")
-                                </div>
-                            </div>
-                            <label class="form-label fw-semibold text-dark">
-                                @Loc["Target Asset / Workstation Tag (Manual Entry)"]
-                            </label>
-                            <input type="text" name="manualAsset" id="manualAssetInput" class="form-control" 
-                                   placeholder="@(Loc.IsArabic ? "أدخل اسم الكمبيوتر، رقم الأصل، الغرفة، أو الرقم التسلسلي..." : "Enter PC Name, Asset Tag, Room, or Serial (e.g. HOSP-LAP-012, Room 301 Workstation, Dell OptiPlex 7080)...")" />
-                            <div class="form-text small">@(Loc.IsArabic ? "سيتم تسجيل تفاصيل الجهاز مباشرة في رسالة البلاغ للفنيين." : "Equipment details entered here will be logged directly into the technician's dispatch message.")</div>
+                    <!-- Zero Assets Warning / Custody Notice -->
+                    <div id="assetZeroAlert" class="alert alert-light border small text-muted mt-2 py-2" style="@(userAssetsCount == 0 ? "" : "display: none;")">
+                        <i class="fa-solid fa-circle-info text-primary me-1"></i> 
+                        <span id="assetZeroAlertText">
+                            @(Loc.IsArabic ? "لا توجد أجهزة مسندة لعهدتك الشخصية حالياً. إذا كان البلاغ لجهاز مشترك، اختر طلباً عاماً أو حدد التفاصيل أدناه." : "No equipment is currently registered to your personal custody. If reporting an issue with a shared workstation, select general request or describe it below.")
+                        </span>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <div class="form-text small" id="assetHelpText">
+                            @(Loc.IsArabic ? "اختر الجهاز من عهدتك الذي يواجه المشكلة الفنية، أو استخدم البحث لتحديد الجهاز بسرعة." : "Choose the specific equipment from custody experiencing technical issues, or use search to locate it quickly.")
                         </div>
+                        <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted" id="toggleManualAssetBtn" style="font-size: 0.78rem;">
+                            <i class="fa-solid fa-pen me-1"></i>@(Loc.IsArabic ? "إدخال جهاز يدوي غير مدرج" : "Enter unlisted asset manually")
+                        </button>
+                    </div>
 
-                        <!-- 3. Workstation Installed Software Selector (Pre-configured by Maintenance) -->
-                        <div class="col-md-12" id="installedSoftwareContainer" style="display: none;">
-                            <div class="p-3 bg-light rounded border">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <label class="form-label fw-semibold mb-0 text-dark">
-                                        <i class="fa-solid fa-cube text-primary me-1"></i> @(Loc.IsArabic ? "البرنامج / التطبيق المتعطل على هذا الجهاز" : "Affected Software on this Workstation")
-                                    </label>
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle small fw-normal" id="installedSoftwareCountBadge">0 @(Loc.IsArabic ? "برامج مثبتة" : "installed softwares")</span>
-                                </div>
-                                <select asp-for="AffectedSoftware" id="affectedSoftwareSelect" class="form-select">
-                                    <option value="">@(Loc.IsArabic ? "-- لا يوجد / المشكلة عامة أو عتادية بالمحطة --" : "-- None / General or Hardware Issue --")</option>
-                                </select>
-                                <div class="input-group mt-2" id="customSoftwareInputContainer" style="display: none;">
-                                    <span class="input-group-text bg-white text-muted small"><i class="fa-solid fa-pen"></i></span>
-                                    <input type="text" id="customSoftwareInput" class="form-control" placeholder="@(Loc.IsArabic ? "اكتب اسم البرنامج غير المدرج..." : "Enter unlisted software name...")" />
-                                </div>
-                                <div class="form-text small text-muted mt-1">
-                                    <i class="fa-solid fa-circle-info text-primary me-1"></i>
-                                    @(Loc.IsArabic ? "قائمة البرامج المثبتة على محطة العمل معدة مسبقاً من قبل قسم الصيانة الفنية." : "List of software packages installed on this workstation as pre-configured by maintenance.")
-                                </div>
+                    <!-- Manual Asset Specification (Visible when toggled or fallback) -->
+                    <div id="onBehalfAssetContainer" class="mt-3 pt-3 border-top" style="display: none;">
+                        <div class="alert alert-warning py-2 small mb-2 d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-user-pen fs-6"></i>
+                            <div>
+                                <strong>@(Loc.IsArabic ? "تحديد جهاز يدوي:" : "Manual Equipment Entry:")</strong> @(Loc.IsArabic ? "إذا كان الجهاز غير مسجل بالعهدة أو مشتركاً، حدد كود الأصل أو اسمه أدناه." : "If the equipment is unassigned or shared, please specify the device tag or room below. It will be recorded directly into the dispatch ticket.")
                             </div>
                         </div>
+                        <label class="form-label fw-semibold text-dark">
+                            @Loc["Target Asset / Workstation Tag (Manual Entry)"]
+                        </label>
+                        <input type="text" name="manualAsset" id="manualAssetInput" class="form-control" 
+                               placeholder="@(Loc.IsArabic ? "أدخل اسم الكمبيوتر، رقم الأصل، الغرفة، أو الرقم التسلسلي..." : "Enter PC Name, Asset Tag, Room, or Serial (e.g. HOSP-LAP-012, Room 301 Workstation, Dell OptiPlex 7080)...")" />
+                        <div class="form-text small">@(Loc.IsArabic ? "سيتم تسجيل تفاصيل الجهاز مباشرة في رسالة البلاغ للفنيين." : "Equipment details entered here will be logged directly into the technician's dispatch message.")</div>
+                    </div>
 
-                        <!-- Target Maintenance Team (Relocked to Equipment Department Scope) -->
+                    <!-- Workstation Installed Software Selector (Pre-configured by Maintenance) -->
+                    <div id="installedSoftwareContainer" class="mt-3 pt-3 border-top" style="display: none;">
+                        <div class="p-3 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-semibold mb-0 text-dark">
+                                    <i class="fa-solid fa-cube text-primary me-1"></i> @(Loc.IsArabic ? "البرنامج / التطبيق المتعطل على هذا الجهاز" : "Affected Software on this Workstation")
+                                </label>
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle small fw-normal" id="installedSoftwareCountBadge">0 @(Loc.IsArabic ? "برامج مثبتة" : "installed softwares")</span>
+                            </div>
+                            <select asp-for="AffectedSoftware" id="affectedSoftwareSelect" class="form-select">
+                                <option value="">@(Loc.IsArabic ? "-- لا يوجد / المشكلة عامة أو عتادية بالمحطة --" : "-- None / General or Hardware Issue --")</option>
+                            </select>
+                            <div class="input-group mt-2" id="customSoftwareInputContainer" style="display: none;">
+                                <span class="input-group-text bg-white text-muted small"><i class="fa-solid fa-pen"></i></span>
+                                <input type="text" id="customSoftwareInput" class="form-control" placeholder="@(Loc.IsArabic ? "اكتب اسم البرنامج غير المدرج..." : "Enter unlisted software name...")" />
+                            </div>
+                            <div class="form-text small text-muted mt-1">
+                                <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                                @(Loc.IsArabic ? "قائمة البرامج المثبتة على محطة العمل معدة مسبقاً من قبل قسم الصيانة الفنية." : "List of software packages installed on this workstation as pre-configured by maintenance.")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CARD 3: Issue Classification & Responsible Maintenance Team -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-green">
+                            <i class="fa-solid fa-sitemap"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@(Loc.IsArabic ? "تصنيف البلاغ وتوجيه الصيانة" : "Classification & Team Routing")</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "تحديد القسم المسؤول وتصنيف العطل ومستوى الأولوية" : "Responsible maintenance department, category, and urgency")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
+                        <!-- Responsible Department -->
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">@Loc["Responsible Department"]</label>
                             
@@ -424,7 +475,7 @@
                             <div class="form-text small text-muted">@(Loc.IsArabic ? "درجة استعجال المعالجة الفنية." : "Urgency of service response.")</div>
                         </div>
 
-                        <!-- Specialist / Technician in Responsible Department: Assignable by End User & Staff -->
+                        <!-- Specialist / Technician Assignment -->
                         <div class="col-md-12">
                             <label class="form-label fw-semibold">
                                 <i class="fa-solid fa-user-gear text-primary me-1"></i> @Loc["Assign to Specialist in Responsible Department (Optional)"]
@@ -443,16 +494,33 @@
                                 <i class="fa-solid fa-circle-info me-1"></i> @(Loc.IsArabic ? "عرض المختصين في القسم المسؤول." : "Showing specialists for the responsible department.")
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <!-- Issue Description & Message -->
+            <!-- CARD 4: Problem Details & Diagnostics -->
+            <div class="form-section-card">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-amber">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@(Loc.IsArabic ? "وصف المشكلة والأعراض الفنية" : "Problem Description & Symptoms")</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "شرح رسائل الخطأ، الأعطال الظاهرة، وتشخيص النظام" : "Detail error messages, symptoms, or retrieve Windows event logs")</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-section-body">
+                    <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label fw-semibold">@Loc["Issue Description & Symptoms"]</label>
+                            <label class="form-label fw-semibold">@Loc["Issue Description & Symptoms"] <span class="text-danger">*</span></label>
                             <textarea name="initialMessage" class="form-control" rows="4" placeholder="@(Loc.IsArabic ? "اشرح بالتفصيل رسائل الخطأ، الأعطال الظاهرة، الأعراض، أو خطوات تكرار المشكلة..." : "Detail error messages, physical damage, symptoms, or steps to reproduce...")" required></textarea>
                         </div>
 
                         <!-- Workstation Diagnostics & Windows Error Log Card -->
                         <div class="col-12" id="pcDiagnosticsCard" style="display: none;">
-                            <div class="card border border-danger-subtle shadow-xs">
+                            <div class="card border border-danger-subtle shadow-xs mb-0">
                                 <div class="card-header bg-danger-subtle bg-opacity-25 py-2 d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="fa-solid fa-terminal text-danger"></i>
@@ -494,51 +562,65 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
 
-                        <!-- Screenshot Drop & Paste Zone (Ctrl+V) -->
-                        <div class="col-12" id="screenshotSection">
-                            <label class="form-label fw-semibold d-flex justify-content-between align-items-center mb-1">
-                                <span>
-                                    <i class="fa-solid fa-camera text-primary me-1"></i> @(Loc.IsArabic ? "لقطات الشاشة وإثبات العطل (الصق مباشرة عبر Ctrl+V)" : "Screenshots & Error Evidence (Paste via Ctrl+V)")
-                                </span>
-                                <span class="badge bg-light text-muted border fw-normal" id="screenshotCountBadge">0 @(Loc.IsArabic ? "لقطات ملحقة" : "screenshots attached")</span>
-                            </label>
-
-                            <!-- Interactive Paste & Drop Zone -->
-                            <div class="screenshot-paste-zone p-4 text-center rounded border border-2 border-dashed bg-light bg-opacity-50 position-relative mb-2 cursor-pointer" 
-                                 id="screenshotPasteZone" tabindex="0" role="button" aria-label="Paste screenshot zone">
-                                <div class="py-2">
-                                    <i class="fa-solid fa-paste fs-2 text-primary mb-2 d-block"></i>
-                                    <div class="fw-bold text-dark mb-1">
-                                        @(Loc.IsArabic ? "انقر هنا واضغط Ctrl+V للصق لقطة الشاشة، أو اسحب الملفات" : "Click here and press Ctrl+V to paste screenshot, or drag & drop files")
-                                    </div>
-                                    <div class="text-muted small mb-2">
-                                        @(Loc.IsArabic ? "يمكنك استخدام أداة القصاصة (Win+Shift+S) أو زر PrtScn ولصق الصورة فوراً بدون حفظها" : "Capture screen via Snipping Tool (Win+Shift+S) or PrintScreen and paste instantly!")
-                                    </div>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="browseScreenshotBtn">
-                                        <i class="fa-solid fa-folder-open me-1"></i> @(Loc.IsArabic ? "استعراض ملفات الصور..." : "Browse image files...")
-                                    </button>
-                                </div>
-                                <input type="file" id="screenshotFileInput" name="screenshotFiles" accept="image/*" multiple style="display:none;" />
-                                <input type="hidden" name="pastedScreenshotsJson" id="pastedScreenshotsJson" value="[]" />
-                            </div>
-
-                            <!-- Live Screenshot Thumbnail Gallery -->
-                            <div class="row g-2" id="screenshotGallery">
-                                <!-- Thumbnails populated dynamically by JavaScript -->
-                            </div>
+            <!-- CARD 5: Evidence & Screenshots -->
+            <div class="form-section-card" id="screenshotSection">
+                <div class="form-section-header">
+                    <div class="form-section-header-content">
+                        <div class="form-section-icon icon-rose">
+                            <i class="fa-solid fa-camera"></i>
+                        </div>
+                        <div>
+                            <div class="form-section-title">@(Loc.IsArabic ? "لقطات الشاشة وإثبات العطل" : "Screenshots & Error Evidence")</div>
+                            <div class="form-section-subtitle">@(Loc.IsArabic ? "الصق لقطات الشاشة مباشرة عبر Ctrl+V أو اسحب ملفات الصور" : "Paste screenshots directly via Ctrl+V or upload image files")</div>
                         </div>
                     </div>
-
-                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a href="@Url.Action("Index")" class="btn btn-outline-secondary">@Loc["Cancel"]</a>
-                        <button type="submit" id="submitTicketBtn" class="btn btn-primary px-4 fw-bold">
-                            <i class="fa-solid fa-paper-plane me-1"></i> @Loc["Submit Ticket"]
-                        </button>
+                    <span class="badge bg-light text-muted border fw-normal" id="screenshotCountBadge">0 @(Loc.IsArabic ? "لقطات ملحقة" : "screenshots attached")</span>
+                </div>
+                <div class="form-section-body">
+                    <!-- Interactive Paste & Drop Zone -->
+                    <div class="screenshot-paste-zone p-4 text-center rounded border border-2 border-dashed position-relative mb-3 cursor-pointer" 
+                         id="screenshotPasteZone" tabindex="0" role="button" aria-label="Paste screenshot zone">
+                        <div class="py-2">
+                            <i class="fa-solid fa-paste fs-2 text-primary mb-2 d-block"></i>
+                            <div class="fw-bold mb-1" style="color: var(--text-heading);">
+                                @(Loc.IsArabic ? "انقر هنا واضغط Ctrl+V للصق لقطة الشاشة، أو اسحب الملفات" : "Click here and press Ctrl+V to paste screenshot, or drag & drop files")
+                            </div>
+                            <div class="text-muted small mb-2">
+                                @(Loc.IsArabic ? "يمكنك استخدام أداة القصاصة (Win+Shift+S) أو زر PrtScn ولصق الصورة فوراً بدون حفظها" : "Capture screen via Snipping Tool (Win+Shift+S) or PrintScreen and paste instantly!")
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="browseScreenshotBtn">
+                                <i class="fa-solid fa-folder-open me-1"></i> @(Loc.IsArabic ? "استعراض ملفات الصور..." : "Browse image files...")
+                            </button>
+                        </div>
+                        <input type="file" id="screenshotFileInput" name="screenshotFiles" accept="image/*" multiple style="display:none;" />
+                        <input type="hidden" name="pastedScreenshotsJson" id="pastedScreenshotsJson" value="[]" />
                     </div>
-                </form>
+
+                    <!-- Live Screenshot Thumbnail Gallery -->
+                    <div class="row g-2" id="screenshotGallery">
+                        <!-- Thumbnails populated dynamically by JavaScript -->
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- CARD 6: Actions Controls Bar -->
+            <div class="form-actions-card">
+                <div class="d-flex align-items-center gap-2">
+                    <a href="@Url.Action("Index")" class="btn btn-outline-secondary px-3">
+                        <i class="fa-solid fa-xmark me-1"></i> @Loc["Cancel"]
+                    </a>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="submit" id="submitTicketBtn" class="btn btn-primary px-4 py-2 fw-bold shadow-sm">
+                        <i class="fa-solid fa-paper-plane me-2"></i> @Loc["Submit Ticket"]
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 

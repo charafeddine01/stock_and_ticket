@@ -94,6 +94,9 @@ namespace StockPortal.Data
             // Ticket relationships
             modelBuilder.Entity<Ticket>(entity =>
             {
+                entity.Property(t => t.TargetTeam)
+                    .HasDefaultValue(MaintenanceTeams.IT);
+
                 entity.HasOne(t => t.Asset)
                     .WithMany(a => a.Tickets)
                     .HasForeignKey(t => t.AssetId)
@@ -285,6 +288,32 @@ namespace StockPortal.Data
                     .HasForeignKey(f => f.CategoryId)
                     .OnDelete(DeleteBehavior.SetNull);
             });
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            EnforceTicketDefaults();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        public override int SaveChanges()
+        {
+            EnforceTicketDefaults();
+            return base.SaveChanges();
+        }
+
+        private void EnforceTicketDefaults()
+        {
+            foreach (var entry in ChangeTracker.Entries<Ticket>())
+            {
+                if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
+                {
+                    if (string.IsNullOrWhiteSpace(entry.Entity.TargetTeam))
+                    {
+                        entry.Entity.TargetTeam = entry.Entity.Asset?.MaintenanceTeam ?? MaintenanceTeams.IT;
+                    }
+                }
+            }
         }
     }
 }

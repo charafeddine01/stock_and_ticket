@@ -212,6 +212,10 @@ namespace StockPortal.Controllers
 
             int ticketUserId = pcUser?.Id ?? (asset?.UserId ?? 1);
 
+            var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+            var clientMac = NetworkInfoHelper.GetClientMacAddress(HttpContext, clientIp);
+            string routingTeam = !string.IsNullOrWhiteSpace(asset?.MaintenanceTeam) ? asset.MaintenanceTeam : MaintenanceTeams.IT;
+
             // Create technical access ticket
             var ticket = new Ticket
             {
@@ -221,7 +225,11 @@ namespace StockPortal.Controllers
                 Type = "Access",
                 Priority = 3, // High
                 StatusId = 1, // Opened
-                OpenedDT = DateTime.Now
+                OpenedDT = DateTime.Now,
+                TargetTeam = routingTeam,
+                PcName = hostName,
+                IpAddress = clientIp,
+                MacAddress = clientMac
             };
 
             _context.Tickets.Add(ticket);

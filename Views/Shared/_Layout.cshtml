@@ -15,7 +15,9 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@localizedTitle - @Loc["IT Stock & Helpdesk Portal"]</title>
+    <title>@localizedTitle - SOLVIS</title>
+    <link rel="icon" type="image/png" href="~/images/solvis-icon-transparent.png" />
+    <link rel="shortcut icon" href="~/favicon.ico" />
     
     <!-- Google Fonts: Inter & Cairo (for Arabic) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -70,12 +72,8 @@
             }
         }
         <div class="sidebar-brand">
-            <a href="@userDashboardUrl" class="d-flex align-items-center gap-2 text-decoration-none text-white flex-grow-1 overflow-hidden">
-                <i class="fa-solid fa-server"></i>
-                <div class="text-truncate">
-                    <div>@Loc["Stock & Helpdesk"]</div>
-                    <div style="font-size: 0.68rem; color: #94a3b8; font-weight: normal;">@Loc["IT Asset & Service Portal"]</div>
-                </div>
+            <a href="@userDashboardUrl" class="d-flex align-items-center text-decoration-none flex-grow-1 overflow-hidden py-1">
+                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 38px; width: auto; max-width: 175px; object-fit: contain;" />
             </a>
             <span class="autohide-indicator">@Loc["Auto-hide"]</span>
             <button id="sidebarPinBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-none d-lg-inline-flex" title="@Loc["Pin Sidebar"]">
@@ -624,7 +622,7 @@
         <!-- Footer -->
         <footer class="portal-footer d-flex justify-content-between align-items-center">
             <div>
-                &copy; 2026 <strong>@Loc["Servis: Stock and Ticketing System"]</strong>
+                &copy; 2026 <strong>SOLVIS</strong> &bull; @Loc["Hospital Asset & Operations System"]
                 <span class="mx-2">&bull;</span>
                 <a href="@Url.Action("Privacy", "Home")" class="text-decoration-none text-muted">
                     <i class="fa-solid fa-shield-halved me-1 text-primary"></i>@Loc["System Information & Security Compliance"]

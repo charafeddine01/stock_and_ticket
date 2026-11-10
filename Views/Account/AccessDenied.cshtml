@@ -16,7 +16,9 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@(Loc.IsArabic ? "تم تقييد الوصول - بوابة العهد والتذاكر" : "Access Denied - Stock & Ticket Portal")</title>
+    <title>@(Loc.IsArabic ? "تم تقييد الوصول - بوابة سولفيس (SOLVIS)" : "Access Restricted - SOLVIS Portal")</title>
+    <link rel="icon" type="image/png" href="~/images/solvis-icon-transparent.png" />
+    <link rel="shortcut icon" href="~/favicon.ico" />
     
     <!-- Google Fonts: Cairo (Arabic) & Inter (English) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -108,6 +110,10 @@
 </head>
 <body>
     <div class="auth-card">
+        <!-- SOLVIS Brand Header -->
+        <div class="text-center pt-4 pb-3 border-bottom" style="background: #080d1a;">
+            <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 48px; max-width: 85%; object-fit: contain;" />
+        </div>
         @if (reason.Equals("ForbiddenResource", StringComparison.OrdinalIgnoreCase))
         {
             var currentUser = ViewBag.CurrentUser as StockPortal.Models.User;
