@@ -87,16 +87,16 @@
 @section Scripts {
 <script>
     const isAr = @(isAr ? "true" : "false");
+    const hiddenFormJson = document.getElementById('hiddenFormJson');
     let fields = [];
     try {
-        fields = JSON.parse('@Html.Raw(Model.Form.Replace("\\", "\\\\").Replace("'", "\\'"))') || [];
+        fields = JSON.parse(hiddenFormJson.value || "[]");
     } catch (e) {
         fields = [];
     }
 
     const fieldsContainer = document.getElementById('fieldsContainer');
     const noFieldsAlert = document.getElementById('noFieldsAlert');
-    const hiddenFormJson = document.getElementById('hiddenFormJson');
     const formEditor = document.getElementById('sparePartFormEditor');
 
     function renderFields() {

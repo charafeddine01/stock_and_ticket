@@ -403,11 +403,16 @@
     // Send AJAX to mark notification as read
     function markNotificationReadOnServer(id) {
         if (!id || id <= 0) return;
+        const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+        const headers = {
+            "X-Requested-With": "XMLHttpRequest"
+        };
+        if (tokenInput && tokenInput.value) {
+            headers["RequestVerificationToken"] = tokenInput.value;
+        }
         fetch("/Notifications/Dismiss/" + id, {
             method: "POST",
-            headers: {
-                "X-Requested-With": "XMLHttpRequest"
-            }
+            headers: headers
         }).catch(function () {});
     }
 

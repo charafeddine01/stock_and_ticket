@@ -234,6 +234,7 @@ namespace StockPortal.Controllers
 
         // AJAX POST: AssetCategories/QuickCreate
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> QuickCreate(string name, string? nameAr, string department, string? description)
         {
             if (_currentUserService.IsEndUser()) return Json(new { success = false, message = "Access denied." });

@@ -192,7 +192,7 @@ namespace StockPortal.Tests
             var updatedTicket = await context.Tickets.Include(t => t.Messages).FirstOrDefaultAsync(t => t.Id == 101);
             Assert.NotNull(updatedTicket);
             Assert.Equal(6, updatedTicket.StatusId); // TicketStatusConstants.Maintenance
-            Assert.Contains(updatedTicket.Messages, m => m.Msg.Contains("WORK ORDER"));
+            Assert.Contains(updatedTicket.Messages, m => m.Msg != null && m.Msg.Contains("WORK ORDER"));
         }
 
         [Fact]

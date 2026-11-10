@@ -72,6 +72,7 @@ namespace StockPortal.Controllers
 
         // POST: /Notifications/Dismiss/5 (AJAX endpoint for top notification dismissal)
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Dismiss(int id)
         {
             int currentUserId = _currentUserService.GetUserId();

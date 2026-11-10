@@ -494,7 +494,7 @@
                             {
                                 @foreach (var notif in recentTopNotifications)
                                 {
-                                    string notifUrl = !string.IsNullOrWhiteSpace(notif.LinkUrl) ? notif.LinkUrl : (notif.TicketId.HasValue ? Url.Action("Details", "Tickets", new { id = notif.TicketId }) : Url.Action("Index", "Notifications"));
+                                    string notifUrl = (!string.IsNullOrWhiteSpace(notif.LinkUrl) ? notif.LinkUrl : (notif.TicketId.HasValue ? Url.Action("Details", "Tickets", new { id = notif.TicketId }) : Url.Action("Index", "Notifications"))) ?? "#";
                                     <a href="@notifUrl" class="list-group-item list-group-item-action p-2 @(!notif.IsRead ? "bg-light" : "") d-flex align-items-start gap-2">
                                         <div class="mt-1">
                                             @if (!notif.IsRead)
@@ -624,10 +624,14 @@
         <!-- Footer -->
         <footer class="portal-footer d-flex justify-content-between align-items-center">
             <div>
-                &copy; 2026 by CES <strong>@Loc["Servis: Stock and Ticketing System"]</strong> &bull; MariaDB Database: <code>stock</code>
+                &copy; 2026 <strong>@Loc["Servis: Stock and Ticketing System"]</strong>
+                <span class="mx-2">&bull;</span>
+                <a href="@Url.Action("Privacy", "Home")" class="text-decoration-none text-muted">
+                    <i class="fa-solid fa-shield-halved me-1 text-primary"></i>@Loc["System Information & Security Compliance"]
+                </a>
             </div>
             <div class="text-muted small">
-                @Loc["Windows Domain Authentication Active"] &bull; @Loc["Host"]: <code>@Environment.MachineName</code>
+                <i class="fa-solid fa-lock text-success me-1"></i>@Loc["Windows Domain Authentication Active"]
             </div>
         </footer>
     </div>

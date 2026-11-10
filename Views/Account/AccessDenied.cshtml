@@ -232,6 +232,7 @@
                     <form asp-action="SubmitAccessTicket" method="post" id="accessTicketForm">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="pcName" value="@pcName" />
+                        <input type="hidden" name="username" value="@username" />
                         <input type="hidden" name="assetId" value="@(asset?.Id)" />
 
                         <!-- Workstation Specs Readout -->

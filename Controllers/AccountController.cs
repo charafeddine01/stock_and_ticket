@@ -171,10 +171,10 @@ namespace StockPortal.Controllers
         // POST: Account/SubmitAccessTicket
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SubmitAccessTicket(string? pcName, int? assetId, int? roomId, string? notes)
+        public async Task<IActionResult> SubmitAccessTicket(string? pcName, int? assetId, int? roomId, string? notes, string? username = null)
         {
             string hostName = string.IsNullOrWhiteSpace(pcName) ? Environment.MachineName : pcName.Trim();
-            string cleanUsername = Environment.UserName;
+            string cleanUsername = !string.IsNullOrWhiteSpace(username) ? username.Trim() : Environment.UserName;
 
             // Resolve target asset
             Asset? asset = null;

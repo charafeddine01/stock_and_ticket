@@ -13,8 +13,6 @@ namespace StockPortal.Services
         string GetDomainUser();
         string GetRole();
         string? GetMaintenanceTeam();
-        string GetDepartmentName();
-        bool IsAuthenticated();
         User? GetPhysicalUser();
         bool CanSwitchProfile();
 
@@ -137,17 +135,6 @@ namespace StockPortal.Services
 
             var claim = _httpContextAccessor.HttpContext?.User.FindFirst("MaintenanceTeam");
             return claim?.Value?.Trim().ToUpperInvariant();
-        }
-
-        public string GetDepartmentName()
-        {
-            var user = GetCurrentUser();
-            return user?.Department?.Name ?? "General";
-        }
-
-        public bool IsAuthenticated()
-        {
-            return GetCurrentUser() != null || (_httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated ?? false);
         }
 
         public User? GetPhysicalUser()

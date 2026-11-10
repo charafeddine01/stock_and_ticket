@@ -760,7 +760,7 @@ namespace StockPortal.Controllers
                 {
                     var usedPartsList = await _context.SparePartTransactions
                         .Where(t => t.TicketId == ticket.Id && t.SparePart != null)
-                        .Select(t => t.SparePart.Name)
+                        .Select(t => t.SparePart!.Name)
                         .ToListAsync();
                     string? partsReplacedStr = usedPartsList.Any() ? string.Join(", ", usedPartsList.Distinct()) : null;
 
@@ -1362,6 +1362,11 @@ namespace StockPortal.Controllers
         [HttpGet]
         public IActionResult GetPcErrorLog(string? pcName)
         {
+            if (!_currentUserService.IsAdmin() && !_currentUserService.IsMaintenance() && !_currentUserService.IsEndUser() && _currentUserService.GetUserId() <= 0)
+            {
+                return Forbid();
+            }
+
             var targetPc = !string.IsNullOrWhiteSpace(pcName) ? pcName.Trim() : Environment.MachineName;
             var logEntries = new List<object>();
             var sbFormatted = new StringBuilder();
@@ -1373,7 +1378,8 @@ namespace StockPortal.Controllers
                     using var eventLog = new System.Diagnostics.EventLog("Application");
                     int totalEntries = eventLog.Entries.Count;
                     int collected = 0;
-                    for (int i = totalEntries - 1; i >= 0 && collected < 15; i--)
+                    int maxScan = Math.Max(0, totalEntries - 50);
+                    for (int i = totalEntries - 1; i >= maxScan && collected < 15; i--)
                     {
                         try
                         {
@@ -1505,16 +1511,35 @@ namespace StockPortal.Controllers
                 catch { }
             }
 
-            // 2. Process uploaded image files
+            // 2. Process uploaded image files with strict extension whitelisting and size limits
+            var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".png", ".jpg", ".jpeg", ".gif", ".webp"
+            };
+            const long maxFileSize = 10 * 1024 * 1024; // 10 MB limit per file
+
             if (screenshotFiles != null && screenshotFiles.Any())
             {
                 foreach (var file in screenshotFiles)
                 {
-                    if (file.Length > 0 && file.ContentType.StartsWith("image/"))
+                    if (file.Length > 0 && file.Length <= maxFileSize)
                     {
-                        var ext = Path.GetExtension(file.FileName);
-                        if (string.IsNullOrWhiteSpace(ext)) ext = ".png";
-                        var uniqueFileName = $"upload_{ticketId}_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{ext}";
+                        var rawExt = Path.GetExtension(file.FileName)?.ToLowerInvariant() ?? "";
+                        if (string.IsNullOrWhiteSpace(rawExt) && file.ContentType.StartsWith("image/"))
+                        {
+                            rawExt = ".png";
+                        }
+
+                        // Strictly reject non-whitelisted extensions (including .svg, .html, .exe, .cshtml, etc.)
+                        if (!allowedExtensions.Contains(rawExt))
+                        {
+                            continue;
+                        }
+
+                        var sanitizedOriginalName = Path.GetFileName(file.FileName);
+                        if (string.IsNullOrWhiteSpace(sanitizedOriginalName)) sanitizedOriginalName = $"attachment_{DateTime.Now:yyyyMMddHHmmss}{rawExt}";
+
+                        var uniqueFileName = $"upload_{ticketId}_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid().ToString("N").Substring(0, 8)}{rawExt}";
                         var filePath = Path.Combine(uploadsFolder, uniqueFileName);
                         using (var stream = new FileStream(filePath, FileMode.Create))
                         {
@@ -1525,7 +1550,7 @@ namespace StockPortal.Controllers
                         {
                             TicketId = ticketId,
                             MessageId = messageId,
-                            FileName = file.FileName,
+                            FileName = sanitizedOriginalName,
                             FilePath = $"/uploads/tickets/{uniqueFileName}",
                             FileType = file.ContentType,
                             FileSize = file.Length,

@@ -680,6 +680,12 @@ namespace StockPortal.Controllers
             return View(reportVm);
         }
 
+        // GET: Home/Privacy
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {

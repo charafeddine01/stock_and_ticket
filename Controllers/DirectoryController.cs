@@ -16,13 +16,11 @@ namespace StockPortal.Controllers
     {
         private readonly StockDbContext _context;
         private readonly ICurrentUserService _currentUserService;
-        private readonly IConfiguration? _configuration;
 
-        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService, IConfiguration? configuration = null)
+        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService)
         {
             _context = context;
             _currentUserService = currentUserService;
-            _configuration = configuration;
         }
 
         /// <summary>
@@ -294,7 +292,7 @@ namespace StockPortal.Controllers
                 await _context.SaveChangesAsync();
                 TempData["SuccessMessage"] = $"Supplier {supplier.Name} updated successfully with departments: {(supplier.DepartmentList.Any() ? string.Join(", ", supplier.DepartmentList) : "Common to All")}.";
             }
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { tab = "suppliers" });
         }
 
         // POST: Directory/ToggleSupplierStatus

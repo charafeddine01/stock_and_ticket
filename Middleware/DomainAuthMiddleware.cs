@@ -1,12 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using StockPortal.Data;
 using StockPortal.Models;
 
@@ -21,7 +25,7 @@ namespace StockPortal.Middleware
             _next = next;
         }
 
-        public async Task InvokeAsync(HttpContext context, StockDbContext dbContext)
+        public async Task InvokeAsync(HttpContext context, StockDbContext dbContext, IConfiguration configuration, IHostEnvironment env)
         {
             var path = context.Request.Path.Value?.ToLower() ?? "";
 
@@ -39,12 +43,27 @@ namespace StockPortal.Middleware
             }
 
             // 2. Resolve Physical Workstation / PC Username
-            // Check in strict order from network/reverse proxy/environment (NEVER cached cookie identity):
-            string? rawUser = context.Request.Headers["LOGON_USER"].FirstOrDefault()
-                ?? context.Request.Headers["REMOTE_USER"].FirstOrDefault()
-                ?? context.Request.Headers["X-Remote-User"].FirstOrDefault();
+            // In production, prioritize server-verified Windows identity (IIS / Kestrel Negotiate).
+            string? rawUser = null;
+            if (context.User?.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(context.User.Identity.Name))
+            {
+                rawUser = context.User.Identity.Name;
+            }
 
-            if (string.IsNullOrWhiteSpace(rawUser))
+            // Reverse-proxy identity headers are honored ONLY if explicitly trusted in config and from loopback/trusted proxy
+            bool trustProxyHeaders = configuration.GetValue<bool>("Authentication:TrustProxyHeaders");
+            var remoteIp = context.Connection.RemoteIpAddress;
+            bool isLoopbackOrLocal = remoteIp != null && (IPAddress.IsLoopback(remoteIp) || remoteIp.ToString() == "127.0.0.1" || remoteIp.ToString() == "::1");
+
+            if (string.IsNullOrWhiteSpace(rawUser) && trustProxyHeaders && isLoopbackOrLocal)
+            {
+                rawUser = context.Request.Headers["LOGON_USER"].FirstOrDefault()
+                    ?? context.Request.Headers["REMOTE_USER"].FirstOrDefault()
+                    ?? context.Request.Headers["X-Remote-User"].FirstOrDefault();
+            }
+
+            // In local development environment ONLY, allow fallback to host process username for frictionless dev
+            if (string.IsNullOrWhiteSpace(rawUser) && env.IsDevelopment())
             {
                 rawUser = Environment.UserName;
             }
@@ -64,9 +83,7 @@ namespace StockPortal.Middleware
             // If no username can be resolved at all, reject
             if (string.IsNullOrWhiteSpace(cleanUsername))
             {
-                context.Session.Clear();
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                context.Response.Cookies.Delete("StockPortal.DomainAuth");
+                await SafeSignOutAsync(context);
                 context.Response.Redirect("/Account/AccessDenied?reason=NotFound&username=Unknown");
                 return;
             }
@@ -84,9 +101,7 @@ namespace StockPortal.Middleware
             // 4. REJECTION CHECK 1: Physical PC user not registered in database
             if (pcUser == null)
             {
-                context.Session.Clear();
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                context.Response.Cookies.Delete("StockPortal.DomainAuth");
+                await SafeSignOutAsync(context);
                 context.Response.Redirect($"/Account/AccessDenied?reason=NotFound&username={Uri.EscapeDataString(cleanUsername)}");
                 return;
             }
@@ -94,9 +109,7 @@ namespace StockPortal.Middleware
             // 5. REJECTION CHECK 2: Physical PC user is INACTIVE (isActive == 0 / false)
             if (pcUser.IsActive != true)
             {
-                context.Session.Clear();
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                context.Response.Cookies.Delete("StockPortal.DomainAuth");
+                await SafeSignOutAsync(context);
                 context.Response.Redirect($"/Account/AccessDenied?reason=Inactive&username={Uri.EscapeDataString(cleanUsername)}");
                 return;
             }
@@ -106,7 +119,7 @@ namespace StockPortal.Middleware
                                    (pcUser.Role != null && (pcUser.Role.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) || pcUser.Role.Contains("SYSADMIN", StringComparison.OrdinalIgnoreCase)));
 
             User matchedUser = pcUser;
-            var sessionUserId = context.Session.GetInt32("ActiveUserId");
+            var sessionUserId = HasSession(context) ? context.Session.GetInt32("ActiveUserId") : null;
 
             if (sessionUserId.HasValue)
             {
@@ -122,12 +135,12 @@ namespace StockPortal.Middleware
                     {
                         matchedUser = switchedUser;
                     }
-                    else
+                    else if (HasSession(context))
                     {
                         context.Session.Remove("ActiveUserId");
                     }
                 }
-                else
+                else if (HasSession(context))
                 {
                     // Non-admin physical user attempting to use ActiveUserId: clear session immediately
                     context.Session.Remove("ActiveUserId");
@@ -159,6 +172,24 @@ namespace StockPortal.Middleware
             context.User = new ClaimsPrincipal(identity);
 
             await _next(context);
+        }
+
+        private static bool HasSession(HttpContext context)
+        {
+            return context.Features.Get<Microsoft.AspNetCore.Http.Features.ISessionFeature>()?.Session != null;
+        }
+
+        private static async Task SafeSignOutAsync(HttpContext context)
+        {
+            if (HasSession(context))
+            {
+                context.Session.Clear();
+            }
+            if (context.RequestServices?.GetService<IAuthenticationService>() != null)
+            {
+                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+            context.Response.Cookies.Delete("StockPortal.DomainAuth");
         }
     }
 
