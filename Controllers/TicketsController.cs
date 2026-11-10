@@ -1284,7 +1284,7 @@ namespace StockPortal.Controllers
                 displayType = a.DisplayType,
                 serialNo = a.SerialNo ?? "",
                 roomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
-                maintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(),
+                maintenanceTeam = string.IsNullOrWhiteSpace(a.MaintenanceTeam) ? MaintenanceTeams.IT : (a.MaintenanceTeam.ToUpper().Contains("BIO") ? MaintenanceTeams.Biomedical : (a.MaintenanceTeam.ToUpper().Contains("GEN") || a.MaintenanceTeam.ToUpper().Contains("FACIL") ? MaintenanceTeams.General : MaintenanceTeams.IT)),
                 installedSoftwares = a.InstalledSoftwares ?? "[]",
                 installedSoftwaresList = a.InstalledSoftwaresList,
                 display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})",
@@ -1525,7 +1525,7 @@ namespace StockPortal.Controllers
                 DisplayType = a.DisplayType,
                 SerialNo = a.SerialNo ?? "",
                 RoomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
-                MaintenanceTeam = (a.MaintenanceTeam ?? MaintenanceTeams.IT).ToUpper(), 
+                MaintenanceTeam = string.IsNullOrWhiteSpace(a.MaintenanceTeam) ? MaintenanceTeams.IT : (a.MaintenanceTeam.ToUpper().Contains("BIO") ? MaintenanceTeams.Biomedical : (a.MaintenanceTeam.ToUpper().Contains("GEN") || a.MaintenanceTeam.ToUpper().Contains("FACIL") ? MaintenanceTeams.General : MaintenanceTeams.IT)), 
                 InstalledSoftwares = a.InstalledSoftwares ?? "[]",
                 InstalledSoftwaresList = a.InstalledSoftwaresList,
                 Display = $"{a.HospitalNo} - {a.Brand} ({a.Type ?? "Workstation"})",
@@ -1536,6 +1536,9 @@ namespace StockPortal.Controllers
             ViewBag.Assets = new SelectList(userAssets, "Id", "Display", selectedAssetId);
             ViewBag.UserAssetsList = userAssets;
             ViewBag.UserAssetsCount = userAssets.Count;
+            ViewBag.UserAssetsCountIT = userAssets.Count(a => a.MaintenanceTeam == MaintenanceTeams.IT);
+            ViewBag.UserAssetsCountBio = userAssets.Count(a => a.MaintenanceTeam == MaintenanceTeams.Biomedical);
+            ViewBag.UserAssetsCountGen = userAssets.Count(a => a.MaintenanceTeam == MaintenanceTeams.General);
             ViewBag.UserAssetsJson = JsonSerializer.Serialize(userAssets);
             ViewBag.ActiveTicketAssetsMap = activeTicketsDict;
             ViewBag.CurrentUserId = currentUserId ?? 0;

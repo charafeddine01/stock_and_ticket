@@ -4,6 +4,29 @@
     ViewData["Title"] = Loc["Open New Ticket"];
     int currentUserId = ViewBag.CurrentUserId ?? CurrentUser.GetUserId();
     int userAssetsCount = ViewBag.UserAssetsCount ?? 0;
+    int countIT = ViewBag.UserAssetsCountIT ?? 0;
+    int countBio = ViewBag.UserAssetsCountBio ?? 0;
+    int countGen = ViewBag.UserAssetsCountGen ?? 0;
+    if (countIT == 0 && countBio == 0 && countGen == 0 && userAssetsCount > 0)
+    {
+        try
+        {
+        var jsonStr = ViewBag.UserAssetsJson as string;
+        if (!string.IsNullOrWhiteSpace(jsonStr))
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
+            foreach (var elem in doc.RootElement.EnumerateArray())
+            {
+                var teamProp = elem.TryGetProperty("MaintenanceTeam", out var mt) ? mt.GetString() : (elem.TryGetProperty("maintenanceTeam", out var mt2) ? mt2.GetString() : "");
+                var team = (teamProp ?? "").ToUpperInvariant();
+                if (team.Contains("BIO")) countBio++;
+                else if (team.Contains("GEN") || team.Contains("FACIL")) countGen++;
+                else countIT++;
+            }
+        }
+        }
+        catch { }
+    }
 }
 
 @section Styles {
@@ -21,10 +44,17 @@
         background-color: rgba(13, 110, 253, 0.12) !important;
         border-color: var(--bs-primary, #0d6efd) !important;
     }
+    #assetDropdownTrigger {
+        cursor: pointer;
+        user-select: none;
+    }
     #assetDropdownTrigger:focus, #assetDropdownTrigger.is-focused {
         border-color: #86b7fe;
         outline: 0;
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    .cursor-pointer {
+        cursor: pointer !important;
     }
     #assetOptionsScroll::-webkit-scrollbar {
         width: 6px;
@@ -190,17 +220,17 @@
                                     <button type="button" class="btn btn-outline-primary py-1" data-dept="IT" id="deptFilterIT">
                                         <i class="fa-solid fa-laptop me-1"></i>
                                         <span>@(Loc.IsArabic ? "تقنية المعلومات" : "IT")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptIT">0</span>
+                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptIT">@countIT</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-success py-1" data-dept="BIOMEDICAL" id="deptFilterBio">
                                         <i class="fa-solid fa-heart-pulse me-1"></i>
                                         <span>@(Loc.IsArabic ? "الهندسة الطبية" : "Biomedical")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptBio">0</span>
+                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptBio">@countBio</span>
                                     </button>
                                     <button type="button" class="btn btn-outline-warning text-dark py-1" data-dept="GENERAL" id="deptFilterGen">
                                         <i class="fa-solid fa-wrench me-1"></i>
                                         <span>@(Loc.IsArabic ? "الصيانة العامة" : "General")</span>
-                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptGen">0</span>
+                                        <span class="badge bg-secondary text-white ms-1 rounded-pill" id="badgeDeptGen">@countGen</span>
                                     </button>
                                 </div>
                             </div>
@@ -734,11 +764,21 @@
             }
         }
 
+        function normalizeDept(dept) {
+            if (!dept) return "IT";
+            const d = String(dept).trim().toUpperCase();
+            if (d.includes("BIO")) return "BIOMEDICAL";
+            if (d.includes("GEN") || d.includes("FACIL")) return "GENERAL";
+            if (d.includes("IT")) return "IT";
+            return "IT";
+        }
+
         function updateDepartmentPillCounts(assets) {
-            const total = assets.length;
-            const itCount = assets.filter(a => a.maintenanceTeam === "IT").length;
-            const bioCount = assets.filter(a => a.maintenanceTeam === "BIOMEDICAL").length;
-            const genCount = assets.filter(a => a.maintenanceTeam === "GENERAL").length;
+            const list = assets || [];
+            const total = list.length;
+            const itCount = list.filter(a => normalizeDept(a.maintenanceTeam) === "IT").length;
+            const bioCount = list.filter(a => normalizeDept(a.maintenanceTeam) === "BIOMEDICAL").length;
+            const genCount = list.filter(a => normalizeDept(a.maintenanceTeam) === "GENERAL").length;
 
             if (badgeDeptAll) badgeDeptAll.textContent = total;
             if (badgeDeptIT) badgeDeptIT.textContent = itCount;
@@ -763,8 +803,9 @@
             const q = (query || "").trim().toLowerCase();
             const normalizedDept = (dept || "ALL").toUpperCase();
 
-            const filtered = assets.filter(a => {
-                const matchesDept = (normalizedDept === "ALL") || (a.maintenanceTeam === normalizedDept);
+            const filtered = (assets || []).filter(a => {
+                const itemDept = normalizeDept(a.maintenanceTeam);
+                const matchesDept = (normalizedDept === "ALL") || (itemDept === normalizedDept);
                 if (!matchesDept) return false;
 
                 if (!q) return true;
@@ -790,8 +831,8 @@
 
             if (assetMatchCountText) {
                 assetMatchCountText.textContent = isAr 
-                    ? `عرض ${filtered.length} من ${assets.length}` 
-                    : `Showing ${filtered.length} of ${assets.length}`;
+                    ? `عرض ${filtered.length} من ${(assets || []).length}` 
+                    : `Showing ${filtered.length} of ${(assets || []).length}`;
             }
 
             if (filtered.length === 0) {
@@ -812,7 +853,8 @@
                 itemDiv.setAttribute("role", "option");
                 itemDiv.setAttribute("aria-selected", isSelected ? "true" : "false");
 
-                const deptBadgeHtml = `<span class="badge ${getDeptBadgeClass(item.maintenanceTeam)} small">${getDeptShortLabel(item.maintenanceTeam)}</span>`;
+                const itemDept = normalizeDept(item.maintenanceTeam);
+                const deptBadgeHtml = `<span class="badge ${getDeptBadgeClass(itemDept)} small">${getDeptShortLabel(itemDept)}</span>`;
                 const activeBadgeHtml = hasActive
                     ? `<span class="badge bg-danger text-white small ms-1 flex-shrink-0"><i class="fa-solid fa-clock-rotate-left me-1"></i>${isAr ? `تذكرة #${item.activeTicketId}` : `Active #${item.activeTicketId}`}</span>`
                     : ``;
@@ -849,6 +891,32 @@
             });
         }
 
+        function resetToPlaceholder() {
+            currentlySelectedAssetId = "";
+            if (assetSelect) assetSelect.value = "";
+            if (assetTriggerIcon) assetTriggerIcon.className = "fa-solid fa-laptop-medical text-muted fs-5 flex-shrink-0";
+            if (assetTriggerText) {
+                assetTriggerText.innerHTML = `<span class="text-muted">${isAr ? "-- اختر أو ابحث عن جهاز من العهدة --" : "-- Select or search equipment from custody --"}</span>`;
+            }
+            if (assetTriggerClearBtn) assetTriggerClearBtn.style.display = "none";
+            if (assetOptGeneral) assetOptGeneral.classList.remove("bg-secondary", "bg-opacity-25");
+
+            const clientAlert = document.getElementById("clientSideActiveTicketAlert");
+            if (clientAlert) {
+                clientAlert.classList.add("d-none");
+                clientAlert.classList.remove("d-flex");
+            }
+            const submitBtn = document.getElementById("submitTicketBtn") || document.querySelector("button[type='submit']");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove("opacity-50");
+                submitBtn.title = "";
+            }
+
+            syncTeamAndCategories();
+            updateInstalledSoftwareOptions(null);
+        }
+
         function selectAssetItem(item) {
             if (!item) {
                 // General Service Request
@@ -858,10 +926,11 @@
                 if (assetTriggerText) {
                     assetTriggerText.innerHTML = `<span class="text-secondary small fw-semibold">${isAr ? "-- طلب خدمة عام (بدون جهاز محدد) --" : "-- General Service Request (No specific hardware) --"}</span>`;
                 }
-                if (assetTriggerClearBtn) assetTriggerClearBtn.style.display = "none";
+                if (assetTriggerClearBtn) assetTriggerClearBtn.style.display = "inline-block";
                 if (assetOptGeneral) assetOptGeneral.classList.add("bg-secondary", "bg-opacity-25");
             } else {
                 currentlySelectedAssetId = String(item.id);
+                const itemDept = normalizeDept(item.maintenanceTeam);
                 // Ensure assetSelect has this option and select it
                 if (assetSelect) {
                     let opt = Array.from(assetSelect.options).find(o => o.value === String(item.id));
@@ -870,14 +939,14 @@
                         opt.value = item.id;
                         assetSelect.appendChild(opt);
                     }
-                    opt.setAttribute("data-team", item.maintenanceTeam);
+                    opt.setAttribute("data-team", itemDept);
                     opt.setAttribute("data-type", item.type);
                     opt.textContent = item.display || `${item.hospitalNo} - ${item.brand}`;
                     assetSelect.value = item.id;
                 }
 
                 if (assetTriggerIcon) {
-                    assetTriggerIcon.className = `${getDeptIconClass(item.maintenanceTeam)} fs-5 flex-shrink-0`;
+                    assetTriggerIcon.className = `${getDeptIconClass(itemDept)} fs-5 flex-shrink-0`;
                 }
                 if (assetTriggerText) {
                     const activeBadgeInTrigger = (item.hasActiveTicket && item.activeTicketId)
@@ -890,7 +959,7 @@
                             <strong class="text-dark text-truncate small">${escapeHtml(item.brand)}</strong>
                             <span class="text-muted small text-truncate d-none d-sm-inline">(${escapeHtml(item.displayType || item.type)})</span>
                             ${activeBadgeInTrigger}
-                            <span class="badge ${getDeptBadgeClass(item.maintenanceTeam)} small ms-auto flex-shrink-0">${getDeptShortLabel(item.maintenanceTeam)}</span>
+                            <span class="badge ${getDeptBadgeClass(itemDept)} small ms-auto flex-shrink-0">${getDeptShortLabel(itemDept)}</span>
                         </div>
                     `;
                 }
@@ -1010,6 +1079,7 @@
         function openDropdown() {
             if (!assetDropdownMenu) return;
             assetDropdownMenu.style.display = "block";
+            assetDropdownMenu.classList.add("show");
             if (assetDropdownTrigger) {
                 assetDropdownTrigger.setAttribute("aria-expanded", "true");
                 assetDropdownTrigger.classList.add("is-focused");
@@ -1026,6 +1096,7 @@
         function closeDropdown() {
             if (!assetDropdownMenu) return;
             assetDropdownMenu.style.display = "none";
+            assetDropdownMenu.classList.remove("show");
             if (assetDropdownTrigger) {
                 assetDropdownTrigger.setAttribute("aria-expanded", "false");
                 assetDropdownTrigger.classList.remove("is-focused");
@@ -1041,7 +1112,8 @@
                 if (e.target.closest("#assetTriggerClearBtn")) {
                     return; // Clear button handled separately
                 }
-                if (assetDropdownMenu && assetDropdownMenu.style.display === "block") {
+                const isCurrentlyOpen = assetDropdownMenu && (assetDropdownMenu.style.display === "block" || assetDropdownMenu.classList.contains("show"));
+                if (isCurrentlyOpen) {
                     closeDropdown();
                 } else {
                     openDropdown();
@@ -1059,7 +1131,8 @@
         if (assetTriggerClearBtn) {
             assetTriggerClearBtn.addEventListener("click", function (e) {
                 e.stopPropagation();
-                selectAssetItem(null);
+                resetToPlaceholder();
+                renderAssetList(currentAssets, activeSearchQuery, activeDeptFilter);
             });
         }
 
@@ -1071,7 +1144,7 @@
 
         // Close dropdown when clicking outside
         document.addEventListener("click", function (e) {
-            if (assetDropdownWrapper && !assetDropdownWrapper.contains(e.target)) {
+            if (assetDropdownWrapper && !assetDropdownWrapper.contains(e.target) && !e.target.closest("#assetDeptFilterGroup")) {
                 closeDropdown();
             }
         });
@@ -1122,11 +1195,13 @@
         // Department Filter Buttons listeners
         const deptFilterButtons = document.querySelectorAll("#assetDeptFilterGroup button");
         deptFilterButtons.forEach(btn => {
-            btn.addEventListener("click", function () {
+            btn.addEventListener("click", function (e) {
+                e.stopPropagation();
                 deptFilterButtons.forEach(b => b.classList.remove("active"));
                 this.classList.add("active");
                 activeDeptFilter = this.getAttribute("data-dept") || "ALL";
                 renderAssetList(currentAssets, activeSearchQuery, activeDeptFilter);
+                openDropdown();
             });
         });
 
@@ -1191,6 +1266,8 @@
             });
         }
 
+        const initialAssetContainerTitleHtml = assetContainerTitle ? assetContainerTitle.innerHTML : "";
+
         function syncTeamAndCategories() {
             let activeTeam = "IT";
             let hasAsset = false;
@@ -1198,14 +1275,14 @@
             if (currentlySelectedAssetId) {
                 const item = currentAssets.find(a => String(a.id) === String(currentlySelectedAssetId));
                 if (item && item.maintenanceTeam) {
-                    activeTeam = item.maintenanceTeam.toUpperCase();
+                    activeTeam = normalizeDept(item.maintenanceTeam);
                     hasAsset = true;
                 }
             } else if (assetSelect && assetSelect.value) {
                 const selectedOpt = assetSelect.options[assetSelect.selectedIndex];
                 const teamData = selectedOpt ? selectedOpt.getAttribute("data-team") : null;
                 if (teamData) {
-                    activeTeam = teamData.toUpperCase();
+                    activeTeam = normalizeDept(teamData);
                     hasAsset = true;
                 }
             }
@@ -1234,16 +1311,16 @@
                 // Ticket is for Myself
                 currentAssets = [...myPersonalAssets];
                 if (assetContainerTitle) {
-                    assetContainerTitle.innerHTML = `<i class="fa-solid fa-boxes-stacked text-primary me-1"></i> ${isAr ? "الأجهزة المسندة لعهدتك الشخصية" : "Your Assigned Hardware Asset"}`;
+                    assetContainerTitle.innerHTML = initialAssetContainerTitleHtml || `<i class="fa-solid fa-boxes-stacked text-primary me-1"></i> ${isAr ? "الأجهزة المسندة لعهدتك الشخصية" : "Your Assigned Hardware Asset"}`;
                 }
                 if (onBehalfAssetContainer) onBehalfAssetContainer.style.display = "none";
                 if (myAssetsContainer) myAssetsContainer.style.display = "block";
                 updateDepartmentPillCounts(currentAssets);
                 renderAssetList(currentAssets, activeSearchQuery, activeDeptFilter);
 
-                // If currently selected asset is not in personal assets, clear it
+                // If currently selected asset is not in personal assets, reset
                 if (currentlySelectedAssetId && !currentAssets.some(a => String(a.id) === String(currentlySelectedAssetId))) {
-                    selectAssetItem(null);
+                    resetToPlaceholder();
                 }
             } else {
                 // Filing on behalf of another user
@@ -1268,7 +1345,7 @@
                             displayType: a.displayType || a.type || "Equipment",
                             serialNo: a.serialNo || "",
                             roomName: a.roomName || "",
-                            maintenanceTeam: (a.maintenanceTeam || "IT").toUpperCase(),
+                            maintenanceTeam: normalizeDept(a.maintenanceTeam),
                             installedSoftwares: a.installedSoftwares || "[]",
                             installedSoftwaresList: a.installedSoftwaresList || [],
                             display: a.display || "",
@@ -1288,7 +1365,7 @@
 
                 // Clear any previous asset selection that does not belong to colleague
                 if (currentlySelectedAssetId && !currentAssets.some(a => String(a.id) === String(currentlySelectedAssetId))) {
-                    selectAssetItem(null);
+                    resetToPlaceholder();
                 }
 
                 if (currentAssets.length === 0) {
@@ -1544,10 +1621,23 @@
             });
         }
 
-        // Form submission sync for custom software
+        // Form submission sync for custom software & active ticket guard
         const createTicketForm = document.getElementById("createTicketForm");
         if (createTicketForm) {
-            createTicketForm.addEventListener("submit", function () {
+            createTicketForm.addEventListener("submit", function (e) {
+                // Block submission if chosen asset has an active ticket
+                if (currentlySelectedAssetId) {
+                    const sel = currentAssets.find(a => String(a.id) === String(currentlySelectedAssetId));
+                    if (sel && sel.hasActiveTicket && sel.activeTicketId) {
+                        e.preventDefault();
+                        alert(isAr 
+                            ? `تنبيه: لا يمكن إرسال تذكرة جديدة لهذا الجهاز لوجود تذكرة نشطة حالياً برقم #${sel.activeTicketId}.` 
+                            : `Warning: Cannot submit ticket. An active ticket (#${sel.activeTicketId}) is already in progress for this asset.`);
+                        return false;
+                    }
+                }
+
+                // Custom software sync
                 if (affectedSoftwareSelect && affectedSoftwareSelect.value === "OTHER" && customSoftwareInput && customSoftwareInput.value.trim() !== "") {
                     const customVal = customSoftwareInput.value.trim();
                     const opt = document.createElement("option");
@@ -1586,27 +1676,10 @@
             if (preselectedItem) {
                 selectAssetItem(preselectedItem);
             } else {
-                selectAssetItem(null);
+                resetToPlaceholder();
             }
         } else {
-            selectAssetItem(null);
-        }
-
-        // Task 11: Block submission if chosen asset has an active ticket
-        const createTicketForm = document.getElementById("createTicketForm");
-        if (createTicketForm) {
-            createTicketForm.addEventListener("submit", function(e) {
-                if (currentlySelectedAssetId) {
-                    const sel = currentAssets.find(a => String(a.id) === String(currentlySelectedAssetId));
-                    if (sel && sel.hasActiveTicket && sel.activeTicketId) {
-                        e.preventDefault();
-                        alert(isAr 
-                            ? `تنبيه: لا يمكن إرسال تذكرة جديدة لهذا الجهاز لوجود تذكرة نشطة حالياً برقم #${sel.activeTicketId}.` 
-                            : `Warning: Cannot submit ticket. An active ticket (#${sel.activeTicketId}) is already in progress for this asset.`);
-                        return false;
-                    }
-                }
-            });
+            resetToPlaceholder();
         }
 
         // Initialize state

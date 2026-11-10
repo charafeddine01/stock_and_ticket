@@ -1443,5 +1443,77 @@ namespace StockPortal.Tests
             Assert.DoesNotContain(20, closedTicket.ClosedByUserIds);
             Assert.DoesNotContain(30, closedTicket.ClosedByUserIds);
         }
+
+        [Fact]
+        public async Task TicketsController_Create_PopulatesDepartmentAssetCountsAccurately()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            // Seed user
+            var user = new User { Id = 101, FullName = "Dr. Alice", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(user);
+
+            // Seed assets for this user across departments: 2 IT, 1 Biomedical, 1 General, 1 with mixed-case "biomedical"
+            context.Assets.AddRange(
+                new Asset { Id = 1, HospitalNo = "ASSET-01", Brand = "Dell", Type = "Laptop", UserId = 101, MaintenanceTeam = "IT" },
+                new Asset { Id = 2, HospitalNo = "ASSET-02", Brand = "HP", Type = "Workstation", UserId = 101, MaintenanceTeam = "IT" },
+                new Asset { Id = 3, HospitalNo = "ASSET-03", Brand = "Philips", Type = "Monitor", UserId = 101, MaintenanceTeam = "BIOMEDICAL" },
+                new Asset { Id = 4, HospitalNo = "ASSET-04", Brand = "GE", Type = "Ultrasound", UserId = 101, MaintenanceTeam = "Biomedical" },
+                new Asset { Id = 5, HospitalNo = "ASSET-05", Brand = "Carrier", Type = "HVAC Unit", UserId = 101, MaintenanceTeam = "General" }
+            );
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(101);
+            mockUserService.Setup(s => s.IsAdmin()).Returns(false);
+            mockUserService.Setup(s => s.IsMaintenance()).Returns(false);
+
+            var controller = new TicketsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+
+            var result = await controller.Create(assetId: null);
+            var viewResult = Assert.IsType<ViewResult>(result);
+
+            Assert.Equal(5, controller.ViewBag.UserAssetsCount);
+            Assert.Equal(2, controller.ViewBag.UserAssetsCountIT);
+            Assert.Equal(2, controller.ViewBag.UserAssetsCountBio);
+            Assert.Equal(1, controller.ViewBag.UserAssetsCountGen);
+        }
+
+        [Fact]
+        public async Task TicketsController_GetUserAssets_NormalizesMaintenanceTeamsAcrossDisciplines()
+        {
+            using var context = CreateInMemoryDbContext();
+
+            var user = new User { Id = 202, FullName = "Nurse Bob", Role = SystemRoles.EndUser, IsActive = true };
+            context.Users.Add(user);
+
+            context.Assets.AddRange(
+                new Asset { Id = 10, HospitalNo = "IT-01", Brand = "Lenovo", UserId = 202, MaintenanceTeam = "it" },
+                new Asset { Id = 20, HospitalNo = "BIO-01", Brand = "Mindray", UserId = 202, MaintenanceTeam = "Biomedical Engineering" },
+                new Asset { Id = 30, HospitalNo = "GEN-01", Brand = "Trane", UserId = 202, MaintenanceTeam = "Facility General" }
+            );
+            await context.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.GetUserId()).Returns(202);
+
+            var controller = new TicketsController(context, mockUserService.Object, Mock.Of<INotificationService>());
+
+            var result = await controller.GetUserAssets(202);
+            var jsonResult = Assert.IsType<JsonResult>(result);
+
+            var jsonStr = System.Text.Json.JsonSerializer.Serialize(jsonResult.Value);
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
+            Assert.True(doc.RootElement.GetProperty("success").GetBoolean());
+            Assert.Equal(3, doc.RootElement.GetProperty("count").GetInt32());
+
+            var assets = doc.RootElement.GetProperty("assets").EnumerateArray().ToList();
+            var itAsset = assets.First(a => a.GetProperty("id").GetInt32() == 10);
+            var bioAsset = assets.First(a => a.GetProperty("id").GetInt32() == 20);
+            var genAsset = assets.First(a => a.GetProperty("id").GetInt32() == 30);
+            Assert.Equal("IT", itAsset.GetProperty("maintenanceTeam").GetString());
+            Assert.Equal("BIOMEDICAL", bioAsset.GetProperty("maintenanceTeam").GetString());
+            Assert.Equal("GENERAL", genAsset.GetProperty("maintenanceTeam").GetString());
+        }
     }
 }
