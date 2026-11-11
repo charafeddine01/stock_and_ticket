@@ -62,27 +62,44 @@ namespace StockPortal.Controllers
                 normalizedTeam = "ALL";
             }
 
-            var assets = await _context.Assets
+            // Query scoped datasets based on RBAC & department filter:
+            // Admin can see ALL departments (or filter by one).
+            // Maintenance users are strictly isolated to their own department's assets, tickets, and maintenance logs!
+            var assetsQuery = _context.Assets
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
-                .ToListAsync();
+                .AsQueryable();
 
-            var tickets = await _context.Tickets
+            var ticketsQuery = _context.Tickets
                 .Include(t => t.Asset)
                 .Include(t => t.OpenedByUser)
                 .Include(t => t.Status)
                 .Include(t => t.Handler).ThenInclude(h => h!.TechUser)
-                .OrderByDescending(t => t.OpenedDT)
-                .ToListAsync();
+                .AsQueryable();
 
-            var recentMaintenance = await _context.AssetMaintenances
+            var recentMaintQuery = _context.AssetMaintenances
                 .Include(m => m.Asset)
                 .Include(m => m.Technician)
                 .Include(m => m.Supplier)
-                .OrderByDescending(m => m.TimStamp)
-                .Take(5)
-                .ToListAsync();
+                .AsQueryable();
+
+            if (normalizedTeam != "ALL")
+            {
+                assetsQuery = assetsQuery.Where(a => a.MaintenanceTeam == normalizedTeam);
+                ticketsQuery = ticketsQuery.Where(t =>
+                    t.TargetTeam == normalizedTeam ||
+                    (t.Asset != null && t.Asset.MaintenanceTeam == normalizedTeam)
+                );
+                recentMaintQuery = recentMaintQuery.Where(m =>
+                    (m.Asset != null && m.Asset.MaintenanceTeam == normalizedTeam) ||
+                    (m.Technician != null && m.Technician.MaintenanceTeam == normalizedTeam)
+                );
+            }
+
+            var assets = await assetsQuery.ToListAsync();
+            var tickets = await ticketsQuery.OrderByDescending(t => t.OpenedDT).ToListAsync();
+            var recentMaintenance = await recentMaintQuery.OrderByDescending(m => m.TimStamp).Take(5).ToListAsync();
 
             // ----------------------------------------------------
             // Date Filter Computation for Maintenance Analytics Tab

@@ -28,6 +28,7 @@ namespace StockPortal.Data
         public DbSet<SparePart> SpareParts { get; set; } = null!;
         public DbSet<SparePartTransaction> SparePartTransactions { get; set; } = null!;
         public DbSet<AssetCategory> AssetCategories { get; set; } = null!;
+        public DbSet<IssueCategory> IssueCategories { get; set; } = null!;
         public DbSet<SparePartForm> SparePartForms { get; set; } = null!;
         public DbSet<AssetCompatibleSparePart> AssetCompatibleSpareParts { get; set; } = null!;
         public DbSet<CalibrationForm> CalibrationForms { get; set; } = null!;
@@ -36,6 +37,12 @@ namespace StockPortal.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Many-to-many between AssetCategory and IssueCategory
+            modelBuilder.Entity<AssetCategory>()
+                .HasMany(a => a.IssueCategories)
+                .WithMany(i => i.AssetCategories)
+                .UsingEntity(j => j.ToTable("asset_category_issue_categories"));
 
             // TicketHandler 1-to-1 with Ticket
             modelBuilder.Entity<TicketHandler>(entity =>

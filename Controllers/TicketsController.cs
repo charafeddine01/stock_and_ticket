@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -126,12 +127,25 @@ namespace StockPortal.Controllers
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
-            var maintCountQuery = _context.Tickets.Where(t => t.StatusId == 6 || (t.Status != null && t.Status.Status != null && t.Status.Status.ToLower() == "maintenance"));
-            if (_currentUserService.IsMaintenance())
+            // Base active query for counting quick filters within the user's RBAC scope
+            var baseRbacQuery = _context.Tickets.AsQueryable();
+            if (_currentUserService.IsEndUser())
+            {
+                baseRbacQuery = baseRbacQuery.Where(t => t.OpenedBy == currentUserId || t.OnBehalfOf == currentUserId);
+            }
+            else if (_currentUserService.IsMaintenance())
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
-                maintCountQuery = maintCountQuery.Where(t => t.TargetTeam == myTeam);
+                baseRbacQuery = baseRbacQuery.Where(t => t.TargetTeam == myTeam);
             }
+
+            var unclosedQuery = baseRbacQuery.Where(t => t.StatusId != 5 && t.StatusId != 4 && t.ClosedDT == null);
+            ViewBag.AllCount = await unclosedQuery.CountAsync();
+            ViewBag.MyAssignedCount = await unclosedQuery.Where(t => t.Handler != null && t.Handler.TechUserId == currentUserId).CountAsync();
+            ViewBag.MyOpenedCount = await unclosedQuery.Where(t => t.OpenedBy == currentUserId || t.OnBehalfOf == currentUserId).CountAsync();
+            ViewBag.UnassignedCount = await unclosedQuery.Where(t => t.Handler == null || t.Handler.TechUserId == null).CountAsync();
+
+            var maintCountQuery = baseRbacQuery.Where(t => t.StatusId == 6 || (t.Status != null && t.Status.Status != null && t.Status.Status.ToLower() == "maintenance"));
             ViewBag.MaintenanceCount = await maintCountQuery.CountAsync();
 
             var tickets = await query.OrderByDescending(t => t.OpenedDT).ToListAsync();
@@ -1332,12 +1346,41 @@ namespace StockPortal.Controllers
                 .GroupBy(x => x.AssetId)
                 .ToDictionary(g => g.Key, g => g.First().TicketId);
 
+            var targetUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == targetUserId);
             var rawAssets = await _context.Assets
                 .Include(a => a.Room)
+                .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
                 .Where(a => a.UserId == targetUserId)
                 .OrderBy(a => a.HospitalNo)
                 .ToListAsync();
 
+            // If target user has no directly assigned custody, fall back to assets in their department
+            if (!rawAssets.Any() && targetUser != null && targetUser.DepartmentId.HasValue)
+            {
+                var deptUserIds = await _context.Users
+                    .Where(u => u.DepartmentId == targetUser.DepartmentId.Value)
+                    .Select(u => u.Id)
+                    .ToListAsync();
+
+                rawAssets = await _context.Assets
+                    .Include(a => a.Room)
+                    .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                    .Where(a => a.UserId.HasValue && deptUserIds.Contains(a.UserId.Value))
+                    .OrderBy(a => a.HospitalNo)
+                    .ToListAsync();
+            }
+
+            // Fallback for Admin / Maintenance or when no department custody is defined
+            if (!rawAssets.Any() && (_currentUserService.IsAdmin() || _currentUserService.IsMaintenance()))
+            {
+                rawAssets = await _context.Assets
+                    .Include(a => a.Room)
+                    .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                    .OrderBy(a => a.HospitalNo)
+                    .ToListAsync();
+            }
+
+            var isArabic = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
             var assets = rawAssets.Select(a => new
             {
                 id = a.Id,
@@ -1346,6 +1389,14 @@ namespace StockPortal.Controllers
                 type = a.Type ?? "Equipment",
                 displayType = a.DisplayType,
                 serialNo = a.SerialNo ?? "",
+                categoryId = a.CategoryId,
+                issues = (a.Category != null && a.Category.IssueCategories != null)
+                    ? a.Category.IssueCategories.Where(i => i.IsActive).Select(i => (object)new {
+                        id = i.Id,
+                        value = i.Name,
+                        label = (isArabic && !string.IsNullOrWhiteSpace(i.NameAr)) ? i.NameAr : i.Name
+                    }).ToList()
+                    : new List<object>(),
                 roomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
                 maintenanceTeam = string.IsNullOrWhiteSpace(a.MaintenanceTeam) ? MaintenanceTeams.IT : (a.MaintenanceTeam.ToUpper().Contains("BIO") ? MaintenanceTeams.Biomedical : (a.MaintenanceTeam.ToUpper().Contains("GEN") || a.MaintenanceTeam.ToUpper().Contains("FACIL") ? MaintenanceTeams.General : MaintenanceTeams.IT)),
                 installedSoftwares = a.InstalledSoftwares ?? "[]",
@@ -1582,29 +1633,46 @@ namespace StockPortal.Controllers
                 .ToDictionary(g => g.Key, g => g.First().TicketId);
 
             // Assets associated with the current user / authorized scope
-            var userAssetsQuery = _context.Assets.Include(a => a.Room).AsQueryable();
+            var userAssetsQuery = _context.Assets
+                .Include(a => a.Room)
+                .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                .AsQueryable();
 
-            if (_currentUserService.IsAdmin())
+            if (_currentUserService.IsAdmin() || _currentUserService.IsMaintenance())
             {
-                // Admin can open tickets for any asset across all departments in the hospital
-            }
-            else if (_currentUserService.IsMaintenance())
-            {
-                var myTeam = _currentUserService.GetMaintenanceTeam();
-                if (!string.IsNullOrWhiteSpace(myTeam))
-                {
-                    userAssetsQuery = userAssetsQuery.Where(a => a.MaintenanceTeam == myTeam || (currentUserId.HasValue && a.UserId == currentUserId.Value));
-                }
+                // Admin and Maintenance staff can open tickets for any equipment across all hospital departments
             }
             else if (currentUserId.HasValue && currentUserId.Value > 0)
             {
-                userAssetsQuery = userAssetsQuery.Where(a => a.UserId == currentUserId.Value);
+                var userObj = await _context.Users.FirstOrDefaultAsync(u => u.Id == currentUserId.Value);
+                bool hasCustody = await _context.Assets.AnyAsync(a => a.UserId == currentUserId.Value);
+                if (hasCustody)
+                {
+                    userAssetsQuery = userAssetsQuery.Where(a => a.UserId == currentUserId.Value);
+                }
+                else if (userObj != null && userObj.DepartmentId.HasValue)
+                {
+                    var deptUserIds = await _context.Users
+                        .Where(u => u.DepartmentId == userObj.DepartmentId.Value)
+                        .Select(u => u.Id)
+                        .ToListAsync();
+
+                    var hasDeptAssets = await _context.Assets.AnyAsync(a => a.UserId.HasValue && deptUserIds.Contains(a.UserId.Value));
+                    if (hasDeptAssets)
+                    {
+                        userAssetsQuery = _context.Assets
+                            .Include(a => a.Room)
+                            .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                            .Where(a => a.UserId.HasValue && deptUserIds.Contains(a.UserId.Value));
+                    }
+                }
             }
 
             var rawUserAssets = await userAssetsQuery
                 .OrderBy(a => a.HospitalNo)
                 .ToListAsync();
 
+            var isAr = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
             var userAssets = rawUserAssets.Select(a => new { 
                 a.Id, 
                 HospitalNo = a.HospitalNo ?? "", 
@@ -1612,6 +1680,14 @@ namespace StockPortal.Controllers
                 Type = a.Type ?? "Equipment", 
                 DisplayType = a.DisplayType,
                 SerialNo = a.SerialNo ?? "",
+                CategoryId = a.CategoryId,
+                Issues = (a.Category != null && a.Category.IssueCategories != null)
+                    ? a.Category.IssueCategories.Where(i => i.IsActive).Select(i => (object)new {
+                        id = i.Id,
+                        value = i.Name,
+                        label = (isAr && !string.IsNullOrWhiteSpace(i.NameAr)) ? i.NameAr : i.Name
+                    }).ToList()
+                    : new List<object>(),
                 RoomName = a.Room != null ? (a.Room.RoomNo.HasValue ? $"Room {a.Room.RoomNo}" : (a.Room.RoomNameAr ?? "")) : "",
                 MaintenanceTeam = string.IsNullOrWhiteSpace(a.MaintenanceTeam) ? MaintenanceTeams.IT : (a.MaintenanceTeam.ToUpper().Contains("BIO") ? MaintenanceTeams.Biomedical : (a.MaintenanceTeam.ToUpper().Contains("GEN") || a.MaintenanceTeam.ToUpper().Contains("FACIL") ? MaintenanceTeams.General : MaintenanceTeams.IT)), 
                 InstalledSoftwares = a.InstalledSoftwares ?? "[]",
@@ -1631,6 +1707,17 @@ namespace StockPortal.Controllers
             ViewBag.ActiveTicketAssetsMap = activeTicketsDict;
             ViewBag.CurrentUserId = currentUserId ?? 0;
             ViewBag.DetectedPcName = Environment.MachineName;
+
+            // Fetch and organize all issue categories by department for general tickets or category fallback
+            var allActiveIssues = await _context.IssueCategories.Where(i => i.IsActive).OrderBy(i => i.Name).ToListAsync();
+            var issuesByDept = new Dictionary<string, object>
+            {
+                ["IT"] = allActiveIssues.Where(i => i.Department == MaintenanceTeams.IT).Select(i => new { id = i.Id, value = i.Name, label = (isAr && !string.IsNullOrWhiteSpace(i.NameAr)) ? i.NameAr : i.Name }).ToList(),
+                ["BIOMEDICAL"] = allActiveIssues.Where(i => i.Department == MaintenanceTeams.Biomedical).Select(i => new { id = i.Id, value = i.Name, label = (isAr && !string.IsNullOrWhiteSpace(i.NameAr)) ? i.NameAr : i.Name }).ToList(),
+                ["GENERAL"] = allActiveIssues.Where(i => i.Department == MaintenanceTeams.General).Select(i => new { id = i.Id, value = i.Name, label = (isAr && !string.IsNullOrWhiteSpace(i.NameAr)) ? i.NameAr : i.Name }).ToList()
+            };
+            ViewBag.IssuesByDeptJson = JsonSerializer.Serialize(issuesByDept);
+            ViewBag.AllIssuesList = allActiveIssues;
             ViewBag.Users = new SelectList(await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(), "Id", "FullName", defaultUserId);
             var techUsers = await _context.Users
                 .Where(u => u.IsActive == true && (u.Role == SystemRoles.Maintenance || u.Role == SystemRoles.Admin))

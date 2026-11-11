@@ -27,6 +27,55 @@
     <!-- TAB 1: EXECUTIVE OVERVIEW -->
     <!-- ========================================== -->
     <div class="tab-pane fade @(Model.ActiveTab != "analytics" ? "show active" : "")" id="tab-overview" role="tabpanel" aria-labelledby="overview-tab">
+        <!-- Department Filter / Scope Indicator for Executive Overview -->
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 pb-2 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+                @if (Model.CanFilterTeam)
+                {
+                    <span class="small fw-bold text-muted"><i class="fa-solid fa-filter me-1 text-primary"></i> @(isAr ? "تصفية حسب القسم:" : "Department Filter:")</span>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a href="@Url.Action("Index", "Home", new { tab = "overview", teamFilter = "ALL" })" 
+                           class="btn @(Model.SelectedTeam == "ALL" ? "btn-primary fw-bold" : "btn-outline-secondary bg-white")">
+                            <i class="fa-solid fa-hospital me-1"></i> @(isAr ? "كافة الأقسام" : "All Departments")
+                        </a>
+                        <a href="@Url.Action("Index", "Home", new { tab = "overview", teamFilter = "IT" })" 
+                           class="btn @(Model.SelectedTeam == "IT" ? "btn-primary fw-bold" : "btn-outline-secondary bg-white")">
+                            <i class="fa-solid fa-laptop me-1"></i> @(isAr ? "تقنية المعلومات (IT)" : "IT")
+                        </a>
+                        <a href="@Url.Action("Index", "Home", new { tab = "overview", teamFilter = "BIOMEDICAL" })" 
+                           class="btn @(Model.SelectedTeam == "BIOMEDICAL" ? "btn-success fw-bold text-white" : "btn-outline-secondary bg-white")">
+                            <i class="fa-solid fa-heart-pulse me-1"></i> @(isAr ? "الهندسة الطبية" : "Biomedical")
+                        </a>
+                        <a href="@Url.Action("Index", "Home", new { tab = "overview", teamFilter = "GENERAL" })" 
+                           class="btn @(Model.SelectedTeam == "GENERAL" ? "btn-warning fw-bold text-dark" : "btn-outline-secondary bg-white")">
+                            <i class="fa-solid fa-wrench me-1"></i> @(isAr ? "الصيانة العامة" : "General")
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge @(Model.SelectedTeam == "BIOMEDICAL" ? "bg-success" : Model.SelectedTeam == "GENERAL" ? "bg-warning text-dark" : "bg-primary") px-3 py-2 fs-6 rounded-pill shadow-sm">
+                            <i class="fa-solid @(Model.SelectedTeam == "BIOMEDICAL" ? "fa-heart-pulse" : Model.SelectedTeam == "GENERAL" ? "fa-wrench" : "fa-laptop") me-1"></i>
+                            @(isAr ? $"بيانات قسم: {Loc.TargetTeam(Model.SelectedTeam)}" : $"{Loc.TargetTeam(Model.SelectedTeam)} Department Overview")
+                        </span>
+                        <span class="small text-muted"><i class="fa-solid fa-shield-halved text-success me-1"></i> @(isAr ? "معاينة معزولة خاصة بقسم الصيانة الخاص بك" : "Private department-isolated view")</span>
+                    </div>
+                }
+            </div>
+            @if (Model.CanFilterTeam && Model.SelectedTeam != "ALL")
+            {
+                <div>
+                    <span class="badge bg-info-subtle text-dark border">
+                        @(isAr ? $"المعاينة الحالية: {Loc.TargetTeam(Model.SelectedTeam)}" : $"Filtered by: {Loc.TargetTeam(Model.SelectedTeam)}")
+                    </span>
+                    <a href="@Url.Action("Index", "Home", new { tab = "overview", teamFilter = "ALL" })" class="btn btn-sm btn-link text-decoration-none py-0 text-muted">
+                        <i class="fa-solid fa-xmark me-1"></i> @(isAr ? "إلغاء التصفية" : "Reset to All")
+                    </a>
+                </div>
+            }
+        </div>
+
         <!-- Key Metric Stat Cards -->
         <div class="row g-3 mb-4">
             <!-- Assets Card -->
@@ -316,12 +365,13 @@
                                             <td>
                                                 @switch (ticket.StatusId)
                                                 {
-                                                    case 1: <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">@Loc["opened"]</span>; break;
-                                                    case 2: <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">@Loc["pending"]</span>; break;
-                                                    case 3: <span class="badge bg-secondary">@Loc["delayed"]</span>; break;
-                                                    case 4: <span class="badge bg-dark">@Loc["canceled"]</span>; break;
-                                                    case 5: <span class="badge bg-success bg-opacity-10 text-success border border-success">@Loc["closed"]</span>; break;
-                                                    default: <span class="badge bg-light text-dark">@Loc.Status(ticket.Status?.Status)</span>; break;
+                                                    case 1: <span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="fa-solid fa-circle-dot me-1"></i> @Loc["opened"]</span>; break;
+                                                    case 2: <span class="badge bg-warning bg-opacity-10 text-warning border border-warning"><i class="fa-solid fa-spinner me-1"></i> @Loc["pending"]</span>; break;
+                                                    case 3: <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary"><i class="fa-solid fa-clock me-1"></i> @Loc["delayed"]</span>; break;
+                                                    case 4: <span class="badge bg-dark bg-opacity-10 text-dark border border-dark"><i class="fa-solid fa-ban me-1"></i> @Loc["canceled"]</span>; break;
+                                                    case 5: <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fa-solid fa-circle-check me-1"></i> @Loc["closed"]</span>; break;
+                                                    case 6: <span class="badge bg-info bg-opacity-10 text-info border border-info"><i class="fa-solid fa-screwdriver-wrench me-1"></i> @Loc["maintenance"]</span>; break;
+                                                    default: <span class="badge bg-light text-dark border">@Loc.Status(ticket.Status?.Status)</span>; break;
                                                 }
                                             </td>
                                             <td>

@@ -3,11 +3,13 @@
 @{
     ViewData["Title"] = Loc["Create Asset Category"];
     var availableDepts = ViewBag.AvailableDepartments as string[] ?? MaintenanceTeams.All;
+    var allIssues = ViewBag.AllIssues as List<StockPortal.Models.IssueCategory> ?? new();
+    var departmentIssues = ViewBag.DepartmentIssues as List<StockPortal.Models.IssueCategory> ?? new();
     var isAr = Loc.IsArabic;
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-7">
+    <div class="col-lg-8">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3 border-bottom">
                 <div class="d-flex align-items-center justify-content-between">
@@ -21,7 +23,7 @@
             </div>
 
             <div class="card-body p-4">
-                <form asp-action="Create" method="post">
+                <form asp-action="Create" method="post" id="createCategoryForm">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -38,15 +40,15 @@
                     </div>
 
                     <div class="mb-3">
-                        <label asp-for="Department" class="form-label fw-bold">@Loc["Department"] <span class="text-danger">*</span></label>
+                        <label asp-for="Department" class="form-label fw-bold"><i class="fa-solid fa-building text-primary me-1"></i> @Loc["Department"] <span class="text-danger">*</span></label>
                         @if (CurrentUser.IsMaintenance())
                         {
-                            <input type="text" class="form-control" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" readonly />
-                            <input type="hidden" asp-for="Department" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" />
+                            <input type="text" class="form-control" id="categoryDeptDisplay" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" readonly />
+                            <input type="hidden" asp-for="Department" id="categoryDept" value="@(CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT)" />
                         }
                         else
                         {
-                            <select asp-for="Department" class="form-select">
+                            <select asp-for="Department" id="categoryDept" class="form-select">
                                 @foreach (var dept in availableDepts)
                                 {
                                     <option value="@dept">@dept</option>
@@ -56,9 +58,42 @@
                         <span asp-validation-for="Department" class="text-danger small"></span>
                     </div>
 
+                    <!-- Searchable Multi-Select Issue Categories -->
+                    <div class="mb-4 p-3 rounded border bg-light-subtle">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <div>
+                                <label class="form-label fw-bold mb-0 text-dark">
+                                    <i class="fa-solid fa-list-check text-primary me-1"></i>
+                                    @(isAr ? "الأعطال والبلاغات المتاحة لهذه الفئة (Multi-Select)" : "Linked Issue Categories (Multi-Select)")
+                                </label>
+                                <div class="text-muted small">
+                                    @(isAr ? "حدد المشاكل الفنية التي ستظهر للمستخدم عند الإبلاغ عن أجهزة هذه الفئة:" : "Select which fault categories will be offered to users filing tickets for this asset:")
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0" id="selectAllIssuesBtn">@(isAr ? "تحديد الكل" : "Select All")</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="deselectAllIssuesBtn">@(isAr ? "إلغاء الكل" : "Clear All")</button>
+                                <span class="badge bg-primary rounded-pill" id="selectedIssuesCountBadge">0 @(isAr ? "محدد" : "selected")</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Search Input for Issues -->
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="issueSearchInput" class="form-control border-start-0" placeholder="@(isAr ? "ابحث في قائمة الأعطال..." : "Search issues in this department...")" autocomplete="off" />
+                        </div>
+
+                        <!-- Scrollable Checklist Container -->
+                        <div class="border rounded p-2 bg-white" id="issuesListContainer" style="max-height: 240px; overflow-y: auto;">
+                            <!-- Populated dynamically by department -->
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label asp-for="Description" class="form-label fw-semibold">@Loc["Description"]</label>
-                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="@(isAr ? "وصف موجز لنوع الأجهزة التابعة لهذه الفئة..." : "Brief description of equipment falling under this category...")"></textarea>
+                        <textarea asp-for="Description" class="form-control" rows="2" placeholder="@(isAr ? "وصف موجز لنوع الأجهزة التابعة لهذه الفئة..." : "Brief description of equipment falling under this category...")"></textarea>
                         <span asp-validation-for="Description" class="text-danger small"></span>
                     </div>
 
@@ -73,3 +108,111 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const isAr = @(isAr ? "true" : "false");
+        const allIssues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(allIssues.Select(i => new { id = i.Id, name = i.Name, nameAr = i.NameAr, dept = i.Department, display = i.DisplayName })));
+
+        const deptSelect = document.getElementById("categoryDept");
+        const issuesContainer = document.getElementById("issuesListContainer");
+        const issueSearch = document.getElementById("issueSearchInput");
+        const selectAllBtn = document.getElementById("selectAllIssuesBtn");
+        const deselectAllBtn = document.getElementById("deselectAllIssuesBtn");
+        const countBadge = document.getElementById("selectedIssuesCountBadge");
+
+        let selectedIds = new Set();
+
+        function renderIssues() {
+            if (!issuesContainer) return;
+            const currentDept = (deptSelect ? deptSelect.value : "IT").trim().toUpperCase();
+            const filterText = (issueSearch ? issueSearch.value : "").trim().toLowerCase();
+
+            const deptIssues = allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept);
+            const visibleIssues = deptIssues.filter(i => !filterText || (i.name && i.name.toLowerCase().includes(filterText)) || (i.nameAr && i.nameAr.toLowerCase().includes(filterText)));
+
+            issuesContainer.innerHTML = "";
+            if (deptIssues.length === 0) {
+                issuesContainer.innerHTML = `<div class="p-3 text-center text-muted small"><i class="fa-solid fa-circle-info me-1"></i> ${isAr ? "لا توجد أعطال مسجلة لهذا القسم حالياً." : "No issue categories defined for this department."}</div>`;
+                updateBadge();
+                return;
+            }
+
+            if (visibleIssues.length === 0) {
+                issuesContainer.innerHTML = `<div class="p-3 text-center text-muted small">${isAr ? "لا توجد أعطال مطابقة للبحث." : "No matching issues."}</div>`;
+                updateBadge();
+                return;
+            }
+
+            visibleIssues.forEach(issue => {
+                const isChecked = selectedIds.has(issue.id);
+                const itemDiv = document.createElement("div");
+                itemDiv.className = "form-check py-1 px-3 border-bottom border-light issue-checkbox-item";
+                itemDiv.innerHTML = `
+                    <input class="form-check-input issue-checkbox" type="checkbox" name="selectedIssueIds" value="${issue.id}" id="issue_${issue.id}" ${isChecked ? "checked" : ""} />
+                    <label class="form-check-label small d-flex justify-content-between align-items-center w-100 cursor-pointer" for="issue_${issue.id}">
+                        <span><strong class="text-dark">${escapeHtml(issue.display || issue.name)}</strong> ${issue.nameAr && issue.name !== issue.nameAr ? `<span class="text-muted ms-1">(${escapeHtml(issue.name)})</span>` : ""}</span>
+                        <span class="badge bg-secondary-subtle text-secondary small ms-2">${escapeHtml(issue.dept)}</span>
+                    </label>
+                `;
+
+                itemDiv.querySelector(".issue-checkbox").addEventListener("change", function () {
+                    if (this.checked) {
+                        selectedIds.add(issue.id);
+                    } else {
+                        selectedIds.delete(issue.id);
+                    }
+                    updateBadge();
+                });
+
+                issuesContainer.appendChild(itemDiv);
+            });
+
+            updateBadge();
+        }
+
+        function updateBadge() {
+            if (countBadge) {
+                countBadge.textContent = isAr 
+                    ? `${selectedIds.size} محدد` 
+                    : `${selectedIds.size} selected`;
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        if (deptSelect) {
+            deptSelect.addEventListener("change", function () {
+                selectedIds.clear();
+                renderIssues();
+            });
+        }
+
+        if (issueSearch) {
+            issueSearch.addEventListener("input", renderIssues);
+        }
+
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener("click", function () {
+                const currentDept = (deptSelect ? deptSelect.value : "IT").trim().toUpperCase();
+                allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept).forEach(i => selectedIds.add(i.id));
+                renderIssues();
+            });
+        }
+
+        if (deselectAllBtn) {
+            deselectAllBtn.addEventListener("click", function () {
+                selectedIds.clear();
+                renderIssues();
+            });
+        }
+
+        // Initial render
+        renderIssues();
+    });
+</script>
+}

@@ -21,50 +21,89 @@ namespace StockPortal.Controllers
         }
 
         // GET: AssetCategories
-        public async Task<IActionResult> Index(string? department, string? search = null, string? filter = null)
+        public async Task<IActionResult> Index(string? department, string? search = null, string? filter = null, string? tab = "categories")
         {
             if (_currentUserService.IsEndUser())
             {
                 return Forbid();
             }
 
-            var query = _context.AssetCategories.Where(c => c.IsActive).AsQueryable();
+            var activeTab = string.Equals(tab, "issues", StringComparison.OrdinalIgnoreCase) ? "issues" : "categories";
+
+            // 1. Asset Categories Query
+            var catQuery = _context.AssetCategories.Where(c => c.IsActive).AsQueryable();
 
             if (_currentUserService.IsMaintenance())
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
-                query = query.Where(c => c.Department == myTeam);
+                catQuery = catQuery.Where(c => c.Department == myTeam);
             }
             else if (_currentUserService.IsAdmin())
             {
                 if (!string.IsNullOrWhiteSpace(department) && !string.Equals(department, "ALL", StringComparison.OrdinalIgnoreCase))
                 {
-                    query = query.Where(c => c.Department == department);
+                    catQuery = catQuery.Where(c => c.Department == department);
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim().ToLower();
-                query = query.Where(c => c.Name.ToLower().Contains(term) ||
+                catQuery = catQuery.Where(c => c.Name.ToLower().Contains(term) ||
                                          (c.NameAr != null && c.NameAr.ToLower().Contains(term)) ||
                                          (c.Description != null && c.Description.ToLower().Contains(term)));
             }
 
             if (string.Equals(filter, "with_assets", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(c => c.Assets.Any());
+                catQuery = catQuery.Where(c => c.Assets.Any());
             }
             else if (string.Equals(filter, "empty", StringComparison.OrdinalIgnoreCase))
             {
-                query = query.Where(c => !c.Assets.Any());
+                catQuery = catQuery.Where(c => !c.Assets.Any());
             }
 
-            var categories = await query
+            var categories = await catQuery
                 .Include(c => c.Assets)
+                .Include(c => c.IssueCategories)
                 .OrderBy(c => c.Department)
                 .ThenBy(c => c.Name)
                 .ToListAsync();
+
+            // 2. Issue Categories Query
+            var issuesQuery = _context.IssueCategories.Where(i => i.IsActive).AsQueryable();
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+                issuesQuery = issuesQuery.Where(i => i.Department == myTeam);
+            }
+            else if (_currentUserService.IsAdmin())
+            {
+                if (!string.IsNullOrWhiteSpace(department) && !string.Equals(department, "ALL", StringComparison.OrdinalIgnoreCase))
+                {
+                    issuesQuery = issuesQuery.Where(i => i.Department == department);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLower();
+                issuesQuery = issuesQuery.Where(i => i.Name.ToLower().Contains(term) ||
+                                                     (i.NameAr != null && i.NameAr.ToLower().Contains(term)) ||
+                                                     (i.Description != null && i.Description.ToLower().Contains(term)));
+            }
+
+            var issues = await issuesQuery
+                .Include(i => i.AssetCategories)
+                .OrderBy(i => i.Department)
+                .ThenBy(i => i.Name)
+                .ToListAsync();
+
+            ViewBag.ActiveTab = activeTab;
+            ViewBag.IssueCategories = issues;
+            ViewBag.AssetCategoriesCount = categories.Count;
+            ViewBag.IssueCategoriesCount = issues.Count;
+            ViewBag.AllAssetCategories = await _context.AssetCategories.Where(c => c.IsActive).OrderBy(c => c.Department).ThenBy(c => c.Name).ToListAsync();
 
             ViewBag.SelectedDepartment = department;
             ViewBag.SearchTerm = search;
@@ -77,7 +116,7 @@ namespace StockPortal.Controllers
         }
 
         // GET: AssetCategories/Create
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
@@ -91,13 +130,23 @@ namespace StockPortal.Controllers
             };
 
             ViewBag.AvailableDepartments = MaintenanceTeams.All;
+            ViewBag.DepartmentIssues = await _context.IssueCategories
+                .Where(i => i.IsActive && i.Department == defaultDept)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.AllIssues = await _context.IssueCategories
+                .Where(i => i.IsActive)
+                .OrderBy(i => i.Department)
+                .ThenBy(i => i.Name)
+                .ToListAsync();
+
             return View(model);
         }
 
         // POST: AssetCategories/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(AssetCategory model)
+        public async Task<IActionResult> Create(AssetCategory model, int[]? selectedIssueIds = null)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
@@ -124,14 +173,37 @@ namespace StockPortal.Controllers
                 model.CreatedAt = DateTime.Now;
                 model.IsActive = true;
 
+                if (selectedIssueIds != null && selectedIssueIds.Any())
+                {
+                    var idList = selectedIssueIds.ToList();
+                    var selectedIssues = await _context.IssueCategories
+                        .Where(i => idList.Contains(i.Id))
+                        .ToListAsync();
+                    foreach (var issue in selectedIssues)
+                    {
+                        model.IssueCategories.Add(issue);
+                    }
+                }
+
                 _context.AssetCategories.Add(model);
                 await _context.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"Category '{model.Name}' created successfully for {model.Department}.";
+                TempData["SuccessMessage"] = $"Category '{model.Name}' created successfully for {model.Department} with {model.IssueCategories.Count} linked issues.";
                 return RedirectToAction(nameof(Index), new { department = model.Department });
             }
 
             ViewBag.AvailableDepartments = MaintenanceTeams.All;
+            ViewBag.DepartmentIssues = await _context.IssueCategories
+                .Where(i => i.IsActive && i.Department == model.Department)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.AllIssues = await _context.IssueCategories
+                .Where(i => i.IsActive)
+                .OrderBy(i => i.Department)
+                .ThenBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.SelectedIssueIds = selectedIssueIds?.ToList() ?? new List<int>();
+
             return View(model);
         }
 
@@ -140,7 +212,9 @@ namespace StockPortal.Controllers
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
-            var category = await _context.AssetCategories.FindAsync(id);
+            var category = await _context.AssetCategories
+                .Include(c => c.IssueCategories)
+                .FirstOrDefaultAsync(c => c.Id == id);
             if (category == null || !category.IsActive) return NotFound();
 
             if (_currentUserService.IsMaintenance())
@@ -153,17 +227,30 @@ namespace StockPortal.Controllers
             }
 
             ViewBag.AvailableDepartments = MaintenanceTeams.All;
+            ViewBag.DepartmentIssues = await _context.IssueCategories
+                .Where(i => i.IsActive && i.Department == category.Department)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.AllIssues = await _context.IssueCategories
+                .Where(i => i.IsActive)
+                .OrderBy(i => i.Department)
+                .ThenBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.SelectedIssueIds = category.IssueCategories.Select(i => i.Id).ToList();
+
             return View(category);
         }
 
         // POST: AssetCategories/Edit/5
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, AssetCategory model)
+        public async Task<IActionResult> Edit(int id, AssetCategory model, int[]? selectedIssueIds = null)
         {
             if (_currentUserService.IsEndUser()) return Forbid();
 
-            var category = await _context.AssetCategories.FindAsync(id);
+            var category = await _context.AssetCategories
+                .Include(c => c.IssueCategories)
+                .FirstOrDefaultAsync(c => c.Id == id);
             if (category == null || !category.IsActive) return NotFound();
 
             if (_currentUserService.IsMaintenance())
@@ -195,14 +282,192 @@ namespace StockPortal.Controllers
                     category.Department = model.Department;
                 }
 
+                // Synchronize many-to-many IssueCategories
+                category.IssueCategories.Clear();
+                if (selectedIssueIds != null && selectedIssueIds.Any())
+                {
+                    var idList = selectedIssueIds.ToList();
+                    var selectedIssues = await _context.IssueCategories
+                        .Where(i => idList.Contains(i.Id))
+                        .ToListAsync();
+                    foreach (var issue in selectedIssues)
+                    {
+                        category.IssueCategories.Add(issue);
+                    }
+                }
+
                 await _context.SaveChangesAsync();
 
-                TempData["SuccessMessage"] = $"Category '{category.Name}' updated successfully.";
+                TempData["SuccessMessage"] = $"Category '{category.Name}' updated successfully with {category.IssueCategories.Count} linked issues.";
                 return RedirectToAction(nameof(Index), new { department = category.Department });
             }
 
             ViewBag.AvailableDepartments = MaintenanceTeams.All;
+            ViewBag.DepartmentIssues = await _context.IssueCategories
+                .Where(i => i.IsActive && i.Department == category.Department)
+                .OrderBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.AllIssues = await _context.IssueCategories
+                .Where(i => i.IsActive)
+                .OrderBy(i => i.Department)
+                .ThenBy(i => i.Name)
+                .ToListAsync();
+            ViewBag.SelectedIssueIds = selectedIssueIds?.ToList() ?? new List<int>();
+
             return View(model);
+        }
+
+        // ==========================================
+        // Issue Categories CRUD Actions (Task 3)
+        // ==========================================
+
+        // POST: AssetCategories/CreateIssue
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateIssue(IssueCategory model, int[]? linkedAssetCategoryIds = null, string? returnTab = "issues")
+        {
+            if (_currentUserService.IsEndUser()) return Forbid();
+
+            if (_currentUserService.IsMaintenance())
+            {
+                model.Department = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Name))
+            {
+                TempData["ErrorMessage"] = "Issue Category Name is required.";
+                return RedirectToAction(nameof(Index), new { tab = returnTab, department = model.Department });
+            }
+
+            if (await _context.IssueCategories.AnyAsync(i => i.IsActive && i.Department == model.Department && i.Name.ToLower() == model.Name.Trim().ToLower()))
+            {
+                TempData["ErrorMessage"] = $"An issue named '{model.Name}' already exists in {model.Department}.";
+                return RedirectToAction(nameof(Index), new { tab = returnTab, department = model.Department });
+            }
+
+            model.Name = model.Name.Trim();
+            model.NameAr = model.NameAr?.Trim();
+            model.Description = model.Description?.Trim();
+            model.CreatedAt = DateTime.Now;
+            model.IsActive = true;
+
+            if (linkedAssetCategoryIds != null && linkedAssetCategoryIds.Any())
+            {
+                var idList = linkedAssetCategoryIds.ToList();
+                var linkedCats = await _context.AssetCategories
+                    .Where(c => idList.Contains(c.Id))
+                    .ToListAsync();
+                foreach (var c in linkedCats)
+                {
+                    model.AssetCategories.Add(c);
+                }
+            }
+
+            _context.IssueCategories.Add(model);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Issue Category '{model.Name}' created successfully for {model.Department}.";
+            return RedirectToAction(nameof(Index), new { tab = returnTab, department = model.Department });
+        }
+
+        // POST: AssetCategories/EditIssue
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditIssue(int id, IssueCategory model, int[]? linkedAssetCategoryIds = null, string? returnTab = "issues")
+        {
+            if (_currentUserService.IsEndUser()) return Forbid();
+
+            var issue = await _context.IssueCategories
+                .Include(i => i.AssetCategories)
+                .FirstOrDefaultAsync(i => i.Id == id);
+            if (issue == null || !issue.IsActive) return NotFound();
+
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+                if (!string.Equals(issue.Department, myTeam, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Forbid();
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Name))
+            {
+                TempData["ErrorMessage"] = "Issue Category Name is required.";
+                return RedirectToAction(nameof(Index), new { tab = returnTab, department = issue.Department });
+            }
+
+            issue.Name = model.Name.Trim();
+            issue.NameAr = model.NameAr?.Trim();
+            issue.Description = model.Description?.Trim();
+            if (_currentUserService.IsAdmin() && !string.IsNullOrWhiteSpace(model.Department))
+            {
+                issue.Department = model.Department;
+            }
+
+            // Update linked asset categories
+            issue.AssetCategories.Clear();
+            if (linkedAssetCategoryIds != null && linkedAssetCategoryIds.Any())
+            {
+                var idList = linkedAssetCategoryIds.ToList();
+                var linkedCats = await _context.AssetCategories
+                    .Where(c => idList.Contains(c.Id))
+                    .ToListAsync();
+                foreach (var c in linkedCats)
+                {
+                    issue.AssetCategories.Add(c);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["SuccessMessage"] = $"Issue Category '{issue.Name}' updated successfully.";
+            return RedirectToAction(nameof(Index), new { tab = returnTab, department = issue.Department });
+        }
+
+        // POST: AssetCategories/DeleteIssue/5
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteIssue(int id, string? returnTab = "issues")
+        {
+            if (_currentUserService.IsEndUser()) return Forbid();
+
+            var issue = await _context.IssueCategories.FindAsync(id);
+            if (issue == null) return NotFound();
+
+            if (_currentUserService.IsMaintenance())
+            {
+                var myTeam = _currentUserService.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
+                if (!string.Equals(issue.Department, myTeam, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Forbid();
+                }
+            }
+
+            issue.IsActive = false;
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Issue Category '{issue.Name}' removed successfully.";
+            return RedirectToAction(nameof(Index), new { tab = returnTab, department = issue.Department });
+        }
+
+        // AJAX GET: AssetCategories/GetDepartmentIssues?department=IT
+        [HttpGet]
+        public async Task<IActionResult> GetDepartmentIssues(string? department)
+        {
+            var dept = string.IsNullOrWhiteSpace(department) ? MaintenanceTeams.IT : department.Trim().ToUpper();
+            var issues = await _context.IssueCategories
+                .Where(i => i.IsActive && i.Department.ToUpper() == dept)
+                .OrderBy(i => i.Name)
+                .Select(i => new {
+                    i.Id,
+                    i.Name,
+                    i.NameAr,
+                    i.Department,
+                    DisplayName = i.DisplayName
+                })
+                .ToListAsync();
+
+            return Json(issues);
         }
 
         // POST: AssetCategories/Delete/5

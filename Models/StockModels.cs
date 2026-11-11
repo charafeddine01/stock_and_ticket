@@ -1456,6 +1456,49 @@ namespace StockPortal.Models
         public virtual ICollection<Asset> Assets { get; set; } = new List<Asset>();
         public virtual ICollection<ChecklistForm> Checklists { get; set; } = new List<ChecklistForm>();
         public virtual ICollection<CalibrationForm> CalibrationForms { get; set; } = new List<CalibrationForm>();
+        public virtual ICollection<IssueCategory> IssueCategories { get; set; } = new List<IssueCategory>();
+    }
+
+    [Table("issue_categories")]
+    public class IssueCategory
+    {
+        [Key]
+        [Column("id")]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int Id { get; set; }
+
+        [Column("name")]
+        [Required]
+        [StringLength(255)]
+        [Display(Name = "Issue Name")]
+        public string Name { get; set; } = string.Empty;
+
+        [Column("name_ar")]
+        [StringLength(255)]
+        [Display(Name = "Issue Name (Arabic)")]
+        public string? NameAr { get; set; }
+
+        [Column("department")]
+        [Required]
+        [StringLength(50)]
+        [Display(Name = "Department")]
+        public string Department { get; set; } = MaintenanceTeams.IT;
+
+        [Column("description")]
+        [StringLength(1024)]
+        [Display(Name = "Description")]
+        public string? Description { get; set; }
+
+        [Column("is_active")]
+        public bool IsActive { get; set; } = true;
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [NotMapped]
+        public string DisplayName => (CultureInfo.CurrentUICulture.Name.StartsWith("ar") && !string.IsNullOrWhiteSpace(NameAr)) ? NameAr : Name;
+
+        public virtual ICollection<AssetCategory> AssetCategories { get; set; } = new List<AssetCategory>();
     }
 
     [Table("spare_part_forms")]

@@ -5,7 +5,7 @@
 @inject StockPortal.Services.ICurrentUserService CurrentUser
 
 @{
-    ViewData["Title"] = Loc["Reserve Stock & Spare Parts"];
+    ViewData["Title"] = Loc["Spare Parts"];
     var isArabic = Loc.IsArabic;
     var isAdmin = CurrentUser.IsAdmin();
     var userTeam = CurrentUser.GetMaintenanceTeam();
@@ -17,7 +17,7 @@
         <div>
             <h3 class="fw-bold text-dark mb-1 d-flex align-items-center gap-2">
                 <i class="fa-solid fa-layer-group text-warning"></i>
-                @Loc["Reserve Stock & Spare Parts"]
+                @Loc["Spare Parts"]
             </h3>
             <p class="text-muted small mb-0">
                 @(isArabic 
@@ -306,7 +306,7 @@
                                                     if (ca.Asset != null)
                                                     {
                                                         <a href="@Url.Action("Details", "Assets", new { id = ca.AssetId })" class="badge bg-info-subtle text-dark border text-decoration-none" title="@ca.Asset.Brand @ca.Asset.Type">
-                                                            <i class="fa-solid fa-laptop-medical me-1"></i>@(ca.Asset.HospitalNo ?? ("#" + ca.Asset.Id))
+                                                            <i class="fa-solid fa-laptop me-1"></i>@(ca.Asset.HospitalNo ?? ("#" + ca.Asset.Id))
                                                         </a>
                                                     }
                                                 }
@@ -466,7 +466,7 @@
                         <!-- Task 2: Many-to-Many Compatible Devices Selection -->
                         <div class="col-md-12">
                             <label class="form-label fw-semibold">
-                                <i class="fa-solid fa-laptop-medical text-primary me-1"></i>
+                                <i class="fa-solid fa-laptop text-primary me-1"></i>
                                 @(isArabic ? "الأجهزة المتوافقة مع هذه القطعة (تحديد متعدد)" : "Compatible Hospital Devices (Many-to-Many)")
                             </label>
                             <select name="compatibleAssetIds" class="form-select" multiple size="4">
@@ -764,7 +764,7 @@
                         <!-- Task 2: Edit Compatible Devices Multi-Select -->
                         <div class="col-md-12">
                             <label class="form-label fw-semibold">
-                                <i class="fa-solid fa-laptop-medical text-primary me-1"></i>
+                                <i class="fa-solid fa-laptop text-primary me-1"></i>
                                 @(isArabic ? "الأجهزة المتوافقة مع هذه القطعة (علاقة متعدد لمتعدد)" : "Compatible Hospital Devices (Many-to-Many)")
                             </label>
                             <select name="compatibleAssetIds" id="editCompatibleAssetsSelect" class="form-select" multiple size="4">

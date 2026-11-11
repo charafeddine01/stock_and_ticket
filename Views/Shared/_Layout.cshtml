@@ -71,20 +71,29 @@
                 userDashboardUrl = Url.Action("Index", "Tickets")!;
             }
         }
-        <div class="sidebar-brand">
-            <a href="@userDashboardUrl" class="d-flex align-items-center text-decoration-none flex-grow-1 overflow-hidden py-1">
-                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 38px; width: auto; max-width: 175px; object-fit: contain;" />
+        <div class="sidebar-brand position-relative p-0 overflow-hidden">
+            <!-- Floating Sidebar Controls (Zero vertical height impact on logo) -->
+            <div class="position-absolute top-0 end-0 p-2 d-flex align-items-center gap-1" style="z-index: 10;">
+                <span class="autohide-indicator" style="font-size: 0.6rem; padding: 2px 6px;">@Loc["Auto-hide"]</span>
+                <button id="sidebarPinBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 d-none d-lg-inline-flex" title="@Loc["Pin Sidebar"]" style="line-height: 1; opacity: 0.75;">
+                    <i class="fa-solid @(isArabic ? "fa-angles-right" : "fa-angles-left")"></i>
+                </button>
+                <button id="sidebarCloseBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 d-lg-none" title="@Loc["Close Sidebar"]" style="line-height: 1;">
+                    <i class="fa-solid fa-xmark fs-5"></i>
+                </button>
+            </div>
+            <a href="@userDashboardUrl" class="d-flex align-items-center justify-content-center text-decoration-none w-100 pt-1 pb-1" title="SOLVIS">
+                <video id="solvisBrandVideo" autoplay loop muted playsinline poster="~/images/solvis-logo-transparent.png" 
+                       style="display: none;" crossorigin="anonymous">
+                    <source src="~/images/solvis-logo.webm" type="video/webm" />
+                    <source src="~/images/solvis-logo.mp4" type="video/mp4" />
+                </video>
+                <canvas id="solvisBrandCanvas" class="solvis-brand-video" width="300" height="169" style="height: 96px; width: 100%; max-width: 240px; object-fit: contain; background: transparent; margin-top: -4px;"></canvas>
             </a>
-            <span class="autohide-indicator">@Loc["Auto-hide"]</span>
-            <button id="sidebarPinBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-none d-lg-inline-flex" title="@Loc["Pin Sidebar"]">
-                <i class="fa-solid @(isArabic ? "fa-angles-right" : "fa-angles-left")"></i>
-            </button>
-            <button id="sidebarCloseBtn" type="button" class="btn btn-sm btn-link text-white-50 p-1 ms-auto d-lg-none" title="@Loc["Close Sidebar"]">
-                <i class="fa-solid fa-xmark fs-5"></i>
-            </button>
         </div>
 
         @{
+            int currentUid = CurrentUser.GetUserId();
             int openTicketsCount = 0;
             int assetsAtMaintenanceCount = 0;
             int unreadNotifsCount = 0;
@@ -93,19 +102,30 @@
             try
             {
                 var today = DateTime.Now.Date;
-                var ticketsQuery = DbContext.Tickets.Where(t => t.StatusId == 1 && t.ClosedDT == null);
+                var ticketsQuery = DbContext.Tickets.Where(t => t.StatusId != 5 && t.StatusId != 4 && t.ClosedDT == null);
 
                 if (CurrentUser.IsMaintenance())
                 {
                     var myTeam = CurrentUser.GetMaintenanceTeam();
                     if (!string.IsNullOrWhiteSpace(myTeam))
                     {
-                        ticketsQuery = ticketsQuery.Where(t => t.TargetTeam == myTeam);
+                        // Maintenance queue badge: (number of unassigned in team + assigned to the user)
+                        ticketsQuery = ticketsQuery.Where(t => 
+                            (t.TargetTeam == myTeam && (t.Handler == null || t.Handler.TechUserId == null)) ||
+                            (t.Handler != null && t.Handler.TechUserId == currentUid)
+                        );
+                    }
+                    else
+                    {
+                        ticketsQuery = ticketsQuery.Where(t => 
+                            (t.Handler == null || t.Handler.TechUserId == null) ||
+                            (t.Handler != null && t.Handler.TechUserId == currentUid)
+                        );
                     }
                 }
                 else if (CurrentUser.IsEndUser())
                 {
-                    var uid = CurrentUser.GetUserId();
+                    var uid = currentUid;
                     var uObj = CurrentUser.GetCurrentUser();
                     if (uObj?.DepartmentId != null)
                     {
@@ -116,7 +136,7 @@
                         ticketsQuery = ticketsQuery.Where(t => t.OpenedBy == uid || t.OnBehalfOf == uid);
                     }
                 }
-                // Admin sees all open tickets across all teams
+                // Admin sees all active tickets across all teams
 
                 openTicketsCount = ticketsQuery.Count();
 
@@ -142,7 +162,6 @@
                     lowStockCount = DbContext.SpareParts.Count(p => p.IsActive && p.Department == myTeam && p.Quantity <= p.MinReserveQuantity);
                 }
 
-                int currentUid = CurrentUser.GetUserId();
                 if (currentUid > 0)
                 {
                     unreadNotifsCount = DbContext.Notifications.Count(n => n.UserId == currentUid && !n.IsRead);
@@ -156,18 +175,23 @@
             catch {}
         }
 
+        @{
+            var currentCtrl = ViewContext.RouteData.Values["Controller"]?.ToString();
+            var isFormsActive = currentCtrl is "AssetCategories" or "DeviceForms" or "SparePartForms" or "Checklists";
+        }
+
         <ul class="sidebar-nav">
             @if (CurrentUser.IsAdmin())
             {
                 <li class="nav-category">@Loc["Operations"]</li>
                 <li>
-                    <a href="@Url.Action("Index", "Home")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Home" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Home")" class="nav-link @(currentCtrl == "Home" ? "active" : "")">
                         <i class="fa-solid fa-chart-pie"></i>
                         <span>@Loc["Dashboard"]</span>
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(currentCtrl == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell"></i>
                         <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
@@ -177,15 +201,15 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(currentCtrl == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
                         <span>@Loc["Stock & Assets"]</span>
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SpareParts" ? "active" : "")">
+                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(currentCtrl == "SpareParts" ? "active" : "")">
                         <i class="fa-solid fa-layer-group text-warning"></i>
-                        <span class="flex-grow-1">@Loc["Reserve Stock & Spare Parts"]</span>
+                        <span class="flex-grow-1">@Loc["Spare Parts"]</span>
                         @if (lowStockCount > 0)
                         {
                             <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;" title="@Loc["Low Reserve Alerts"]">@lowStockCount</span>
@@ -193,7 +217,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(currentCtrl == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-ticket"></i>
                         <span class="flex-grow-1">@Loc["Tickets & Helpdesk"]</span>
                         @if (openTicketsCount > 0)
@@ -203,7 +227,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Maintenance" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(currentCtrl == "Maintenance" ? "active" : "")">
                         <i class="fa-solid fa-screwdriver-wrench"></i>
                         <span class="flex-grow-1">@Loc["Maintenance"]</span>
                         @if (assetsAtMaintenanceCount > 0)
@@ -215,39 +239,46 @@
 
                 <li class="nav-category mt-3">@Loc["Administration"]</li>
                 <li>
-                    <a href="@Url.Action("Index", "AssetCategories")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "AssetCategories" ? "active" : "")">
-                        <i class="fa-solid fa-tags"></i>
-                        <span>@(Loc.IsArabic ? "فئات الأصول" : "Asset Categories")</span>
+                    <a href="#adminFormsSubmenu" data-bs-toggle="collapse" class="nav-link @(isFormsActive ? "active" : "") d-flex align-items-center justify-content-between" aria-expanded="@(isFormsActive ? "true" : "false")">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-shapes text-info"></i>
+                            <span>@Loc["Forms & Specifications"]</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down submenu-chevron"></i>
                     </a>
+                    <div class="collapse @(isFormsActive ? "show" : "")" id="adminFormsSubmenu">
+                        <ul class="sidebar-submenu">
+                            <li>
+                                <a href="@Url.Action("Index", "AssetCategories")" class="nav-link @(currentCtrl == "AssetCategories" ? "active" : "")">
+                                    <i class="fa-solid fa-tags me-1"></i>
+                                    <span>@Loc["Asset Categories"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(currentCtrl == "DeviceForms" ? "active" : "")">
+                                    <i class="fa-solid fa-shapes me-1"></i>
+                                    <span>@Loc["Device Forms & Templates"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "SparePartForms")" class="nav-link @(currentCtrl == "SparePartForms" ? "active" : "")">
+                                    <i class="fa-solid fa-layer-group me-1"></i>
+                                    <span>@Loc["Spare Part Forms"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "Checklists")" class="nav-link @(currentCtrl == "Checklists" ? "active" : "")">
+                                    <i class="fa-solid fa-list-check me-1"></i>
+                                    <span>@Loc["Maintenance Checklists"]</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "DeviceForms" ? "active" : "")">
-                        <i class="fa-solid fa-shapes"></i>
-                        <span>@Loc["Device Forms & Templates"]</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "SparePartForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SparePartForms" ? "active" : "")">
-                        <i class="fa-solid fa-layer-group"></i>
-                        <span>@(Loc.IsArabic ? "نماذج قطع الغيار" : "Spare Part Forms")</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "Checklists")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Checklists" ? "active" : "")">
-                        <i class="fa-solid fa-list-check"></i>
-                        <span>@(Loc.IsArabic ? "قوائم الفحص (Checklists)" : "Maintenance Checklists")</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "Directory")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Directory" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Directory")" class="nav-link @(currentCtrl == "Directory" ? "active" : "")">
                         <i class="fa-solid fa-sitemap"></i>
                         <span>@Loc["Master Directory & RBAC"]</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
-                        <i class="fa-solid fa-user-circle"></i>
-                        <span>@Loc["My Domain Profile"]</span>
                     </a>
                 </li>
             }
@@ -255,13 +286,13 @@
             {
                 <li class="nav-category">@Loc["Engineering Queue"]</li>
                 <li>
-                    <a href="@Url.Action("Index", "Home")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Home" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Home")" class="nav-link @(currentCtrl == "Home" ? "active" : "")">
                         <i class="fa-solid fa-chart-pie text-primary"></i>
                         <span>@Loc["Dashboard & Analytics"]</span>
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(currentCtrl == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell text-warning"></i>
                         <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
@@ -271,7 +302,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(currentCtrl == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-users-gear text-info"></i>
                         <span class="flex-grow-1">@(isArabic ? $"قائمة {Loc.TargetTeam(CurrentUser.GetMaintenanceTeam())}" : $"{CurrentUser.GetMaintenanceTeam()} Queue")</span>
                         @if (openTicketsCount > 0)
@@ -281,15 +312,15 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(currentCtrl == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-boxes-stacked"></i>
                         <span>@Loc["Hospital Assets"]</span>
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SpareParts" ? "active" : "")">
+                    <a href="@Url.Action("Index", "SpareParts")" class="nav-link @(currentCtrl == "SpareParts" ? "active" : "")">
                         <i class="fa-solid fa-layer-group text-warning"></i>
-                        <span class="flex-grow-1">@Loc["Reserve Stock & Spare Parts"]</span>
+                        <span class="flex-grow-1">@Loc["Spare Parts"]</span>
                         @if (lowStockCount > 0)
                         {
                             <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.7rem;" title="@Loc["Low Reserve Alerts"]">@lowStockCount</span>
@@ -297,7 +328,7 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Maintenance" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Maintenance")" class="nav-link @(currentCtrl == "Maintenance" ? "active" : "")">
                         <i class="fa-solid fa-screwdriver-wrench"></i>
                         <span class="flex-grow-1">@Loc["Maintenance Logs"]</span>
                         @if (assetsAtMaintenanceCount > 0)
@@ -307,43 +338,48 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "AssetCategories")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "AssetCategories" ? "active" : "")">
-                        <i class="fa-solid fa-tags text-warning"></i>
-                        <span>@(Loc.IsArabic ? "فئات الأصول" : "Asset Categories")</span>
+                    <a href="#maintFormsSubmenu" data-bs-toggle="collapse" class="nav-link @(isFormsActive ? "active" : "") d-flex align-items-center justify-content-between" aria-expanded="@(isFormsActive ? "true" : "false")">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-shapes text-info"></i>
+                            <span>@Loc["Forms & Specifications"]</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-down submenu-chevron"></i>
                     </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "DeviceForms" ? "active" : "")">
-                        <i class="fa-solid fa-shapes text-warning"></i>
-                        <span>@Loc["Device Forms & Specs"]</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "SparePartForms")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "SparePartForms" ? "active" : "")">
-                        <i class="fa-solid fa-layer-group text-warning"></i>
-                        <span>@(Loc.IsArabic ? "نماذج قطع الغيار" : "Spare Part Forms")</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="@Url.Action("Index", "Checklists")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Checklists" ? "active" : "")">
-                        <i class="fa-solid fa-list-check text-warning"></i>
-                        <span>@(Loc.IsArabic ? "قوائم الفحص (Checklists)" : "Maintenance Checklists")</span>
-                    </a>
-                </li>
-
-                <li class="nav-category mt-3">@Loc["Account"]</li>
-                <li>
-                    <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
-                        <i class="fa-solid fa-user-circle"></i>
-                        <span>@Loc["My Domain Profile"]</span>
-                    </a>
+                    <div class="collapse @(isFormsActive ? "show" : "")" id="maintFormsSubmenu">
+                        <ul class="sidebar-submenu">
+                            <li>
+                                <a href="@Url.Action("Index", "AssetCategories")" class="nav-link @(currentCtrl == "AssetCategories" ? "active" : "")">
+                                    <i class="fa-solid fa-tags me-1"></i>
+                                    <span>@Loc["Asset Categories"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "DeviceForms")" class="nav-link @(currentCtrl == "DeviceForms" ? "active" : "")">
+                                    <i class="fa-solid fa-shapes me-1"></i>
+                                    <span>@Loc["Device Forms & Specs"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "SparePartForms")" class="nav-link @(currentCtrl == "SparePartForms" ? "active" : "")">
+                                    <i class="fa-solid fa-layer-group me-1"></i>
+                                    <span>@Loc["Spare Part Forms"]</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="@Url.Action("Index", "Checklists")" class="nav-link @(currentCtrl == "Checklists" ? "active" : "")">
+                                    <i class="fa-solid fa-list-check me-1"></i>
+                                    <span>@Loc["Maintenance Checklists"]</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </li>
             }
             else
             {
                 <li class="nav-category">@Loc["My Workspace"]</li>
                 <li>
-                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Notifications" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Notifications")" class="nav-link @(currentCtrl == "Notifications" ? "active" : "")">
                         <i class="fa-solid fa-bell text-warning"></i>
                         <span class="flex-grow-1">@Loc["Notifications"]</span>
                         @if (unreadNotifsCount > 0)
@@ -353,13 +389,13 @@
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Assets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Assets")" class="nav-link @(currentCtrl == "Assets" ? "active" : "")">
                         <i class="fa-solid fa-laptop text-primary"></i>
                         <span>@Loc["My Equipment"]</span>
                     </a>
                 </li>
                 <li>
-                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Tickets" ? "active" : "")">
+                    <a href="@Url.Action("Index", "Tickets")" class="nav-link @(currentCtrl == "Tickets" ? "active" : "")">
                         <i class="fa-solid fa-ticket text-info"></i>
                         <span>@Loc["My Service Tickets"]</span>
                     </a>
@@ -368,14 +404,6 @@
                     <a href="@Url.Action("Create", "Tickets")" class="nav-link">
                         <i class="fa-solid fa-plus-circle text-success"></i>
                         <span>@Loc["Open New Ticket"]</span>
-                    </a>
-                </li>
-
-                <li class="nav-category mt-3">@Loc["Account"]</li>
-                <li>
-                    <a href="@Url.Action("Profile", "Account")" class="nav-link @(ViewContext.RouteData.Values["Controller"]?.ToString() == "Account" ? "active" : "")">
-                        <i class="fa-solid fa-user-circle"></i>
-                        <span>@Loc["My Domain Profile"]</span>
                     </a>
                 </li>
             }

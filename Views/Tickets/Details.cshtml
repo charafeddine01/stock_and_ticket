@@ -296,7 +296,25 @@
                                         <td>@m.TimStamp?.ToString("MMM dd, yyyy")</td>
                                         <td><span class="badge @(m.MaintenanceType == 2 ? "bg-info text-dark" : "bg-danger")">@Loc.MaintenanceType(m.MaintenanceType)</span></td>
                                         <td>@m.Description</td>
-                                        <td><code class="text-dark bg-light px-2 py-1 rounded small">@(m.PartsReplaced ?? Loc["None assigned"])</code></td>
+                                        <td>
+                                            @if (m.ParsedParts.Any())
+                                            {
+                                                @foreach (var part in m.ParsedParts)
+                                                {
+                                                    <span class="badge bg-light text-dark border me-1 mb-1">
+                                                        <i class="fa-solid fa-microchip text-primary me-1"></i> @part.PartName (x@(part.Quantity))
+                                                    </span>
+                                                }
+                                            }
+                                            else if (!string.IsNullOrWhiteSpace(m.PartsReplaced))
+                                            {
+                                                <code class="text-dark bg-light px-2 py-1 rounded small">@m.PartsReplaced</code>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">@Loc["None assigned"]</span>
+                                            }
+                                        </td>
                                         <td>@(m.Technician?.DisplayFullName ?? (Loc.IsArabic ? "شركة صيانة خارجية" : "Contractor"))</td>
                                     </tr>
                                 }
@@ -480,10 +498,10 @@
             </div>
         }
 
-        <!-- Reserve Stock & Spare Parts Card -->
+        <!-- Spare Parts Card -->
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-layer-group text-warning me-2"></i> @Loc["Reserve Stock & Spare Parts"]</h6>
+                <h6 class="mb-0 fw-bold"><i class="fa-solid fa-layer-group text-warning me-2"></i> @Loc["Spare Parts"]</h6>
                 @if (!isClosed && canManage && Model.AvailableSpareParts.Any())
                 {
                     <button type="button" class="btn btn-sm btn-outline-success py-0" data-bs-toggle="modal" data-bs-target="#useSparePartModal">

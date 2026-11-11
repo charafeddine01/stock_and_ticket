@@ -9,19 +9,38 @@
     bool isAdmin = CurrentUser.IsAdmin();
     var userDept = ViewBag.UserDepartment as string ?? CurrentUser.GetMaintenanceTeam() ?? MaintenanceTeams.IT;
     var isAr = Loc.IsArabic;
+    var activeTab = ViewBag.ActiveTab as string ?? "categories";
+    var issueCategories = ViewBag.IssueCategories as List<StockPortal.Models.IssueCategory> ?? new();
+    var allAssetCategories = ViewBag.AllAssetCategories as List<StockPortal.Models.AssetCategory> ?? new();
+    int assetCatCount = ViewBag.AssetCategoriesCount ?? Model.Count();
+    int issueCatCount = ViewBag.IssueCategoriesCount ?? issueCategories.Count;
 }
 
-<div class="d-flex align-items-center justify-content-between mb-4">
+<!-- Top Header with Actions -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
         <h3 class="mb-1 fw-bold text-dark">
-            <i class="fa-solid fa-tags text-primary me-2"></i> @Loc["Asset Categories"]
+            <i class="fa-solid fa-tags text-primary me-2"></i> @(isAr ? "فئات الأصول والأعطال" : "Asset & Issue Categories")
         </h3>
-        <p class="text-muted mb-0">@(isAr ? "تعريف وتصنيف فئات الأصول والمعدات (حاسوب، طابعة، ملحقات، أجهزة طبية، تكييف، إلخ) قبل إضافتها للمخزون" : "Define and manage equipment categories (e.g. PC, Printer, Peripheral, Medical, General) prior to asset registration.")</p>
+        <p class="text-muted mb-0">
+            @(isAr 
+                ? "إدارة تصنيفات المعدات والأجهزة وربطها بقوائم المشاكل الفنية والأعطال الخاصة بكل فئة لتقديم البلاغات بدقة" 
+                : "Manage equipment classifications and map them to department-specific issue categories for guided ticket logging.")
+        </p>
     </div>
-    <div>
-        <a asp-action="Create" class="btn btn-primary fw-bold shadow-sm">
-            <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة فئة جديدة" : "New Category")
-        </a>
+    <div class="d-flex align-items-center gap-2">
+        @if (activeTab == "issues")
+        {
+            <button type="button" class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#createIssueModal">
+                <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة فئة عطل جديدة" : "New Issue Category")
+            </button>
+        }
+        else
+        {
+            <a asp-action="Create" class="btn btn-primary fw-bold shadow-sm">
+                <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة فئة أصل جديدة" : "New Asset Category")
+            </a>
+        }
     </div>
 </div>
 
@@ -33,170 +52,528 @@
     </div>
 }
 
-@if (isAdmin)
+@if (TempData["ErrorMessage"] != null)
 {
-    <!-- Department Filter Pills (Strictly for Administrators) -->
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <i class="fa-solid fa-circle-exclamation me-2"></i> @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Top Navigation Tabs (Asset Categories vs Issue Categories) -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <div class="btn-group shadow-sm" role="group">
+        <a href="@Url.Action("Index", new { tab = "categories", department = selectedDept, search = searchTerm })" 
+           class="btn @(activeTab == "categories" ? "btn-primary active fw-bold" : "btn-light border") px-3">
+            <i class="fa-solid fa-boxes-stacked me-1"></i>
+            @(isAr ? "فئات الأصول والمعدات" : "Asset Categories")
+            <span class="badge @(activeTab == "categories" ? "bg-white text-primary" : "bg-secondary text-white") rounded-pill ms-1">@assetCatCount</span>
+        </a>
+        <a href="@Url.Action("Index", new { tab = "issues", department = selectedDept, search = searchTerm })" 
+           class="btn @(activeTab == "issues" ? "btn-primary active fw-bold" : "btn-light border") px-3">
+            <i class="fa-solid fa-triangle-exclamation me-1"></i>
+            @(isAr ? "فئات الأعطال والبلاغات (حسب القسم)" : "Issue Categories (By Department)")
+            <span class="badge @(activeTab == "issues" ? "bg-white text-primary" : "bg-secondary text-white") rounded-pill ms-1">@issueCatCount</span>
+        </a>
+    </div>
+
+    @if (isAdmin)
+    {
+        <!-- Department Filter Pills (Strictly for Administrators) -->
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+            <span class="text-muted small fw-semibold me-1"><i class="fa-solid fa-building me-1"></i>@Loc["Department"]:</span>
+            <a href="@Url.Action("Index", new { tab = activeTab, department = "ALL", search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(string.IsNullOrEmpty(selectedDept) || selectedDept == "ALL" ? "btn-secondary text-white fw-bold" : "btn-outline-secondary")">
+                @Loc["All Departments"]
+            </a>
+            @foreach (var dept in availableDepts)
+            {
+                <a href="@Url.Action("Index", new { tab = activeTab, department = dept, search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(selectedDept == dept ? "btn-secondary text-white fw-bold" : "btn-outline-secondary")">
+                    @Loc.TargetTeam(dept)
+                </a>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- Department Indicator for Maintenance Users -->
+        <span class="badge bg-primary fs-6 px-3 py-2 shadow-sm">
+            <i class="fa-solid fa-shield-halved me-1"></i> @(isAr ? $"قسم: {Loc.TargetTeam(userDept)}" : $"{userDept} Department")
+        </span>
+    }
+</div>
+
+@if (activeTab == "categories")
+{
+    <!-- ========================================== -->
+    <!-- TAB 1: ASSET CATEGORIES TABLE -->
+    <!-- ========================================== -->
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-body py-2">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-                <span class="text-muted small fw-semibold me-2"><i class="fa-solid fa-building me-1"></i>@Loc["Department"]:</span>
-                <a href="@Url.Action("Index", new { department = "ALL", search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(string.IsNullOrEmpty(selectedDept) || selectedDept == "ALL" ? "btn-primary" : "btn-outline-secondary")">
-                    @Loc["All Departments"]
-                </a>
-                @foreach (var dept in availableDepts)
-                {
-                    <a href="@Url.Action("Index", new { department = dept, search = searchTerm, filter = selectedFilter })" class="btn btn-sm @(selectedDept == dept ? "btn-primary" : "btn-outline-secondary")">
-                        @Loc.TargetTeam(dept)
-                    </a>
-                }
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="categoryLiveSearch" class="form-control border-start-0" placeholder="@(isAr ? "بحث فوري بالاسم، الاسم العربي، الوصف..." : "Quick filter by name, Arabic name, or description...")" value="@searchTerm" autocomplete="off" />
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" title="@Loc["Reset"]">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-5">
+                    <div class="btn-group btn-group-sm w-100" role="group" id="categoryFilterGroup">
+                        <button type="button" class="btn btn-outline-secondary active" data-filter="all" id="btnFilterAll">
+                            <i class="fa-solid fa-layer-group me-1"></i> @(isAr ? "كافة الفئات" : "All Categories")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="with_assets" id="btnFilterWithAssets">
+                            <i class="fa-solid fa-boxes-stacked me-1"></i> @(isAr ? "بها أجهزة" : "With Assets")
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-filter="empty" id="btnFilterEmpty">
+                            <i class="fa-solid fa-inbox me-1"></i> @(isAr ? "فارغة (0 أصل)" : "Empty (0 Assets)")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-2 text-md-end text-muted small fw-semibold">
+                    <span id="categoryCounter">@Model.Count() @(isAr ? "فئة أصول" : "categories")</span>
+                </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="categoriesTable">
+                <thead class="table-light small text-uppercase">
+                    <tr>
+                        <th style="width: 24%;">@Loc["Category Name"]</th>
+                        <th style="width: 20%;">@(isAr ? "الاسم العربي" : "Arabic Name")</th>
+                        <th style="width: 12%;">@Loc["Department"]</th>
+                        <th style="width: 12%;">@(isAr ? "الأجهزة المسجلة" : "Linked Assets")</th>
+                        <th style="width: 20%;">@(isAr ? "الأعطال المرتبطة (Multi-to-Multi)" : "Linked Issues")</th>
+                        <th style="width: 12%;" class="text-end">@Loc["Actions"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr id="emptyRowServer">
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-inbox fs-3 d-block mb-2"></i>
+                                @(isAr ? "لا توجد فئات أصول معرفة حالياً." : "No asset categories defined yet.")
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in Model)
+                        {
+                            var assetCount = item.Assets?.Count ?? 0;
+                            var issueCount = item.IssueCategories?.Count ?? 0;
+                            <tr class="category-row"
+                                data-name="@(item.Name?.ToLower() ?? "")"
+                                data-name-ar="@(item.NameAr?.ToLower() ?? "")"
+                                data-desc="@(item.Description?.ToLower() ?? "")"
+                                data-dept="@(item.Department?.ToUpper() ?? "")"
+                                data-asset-count="@assetCount">
+                                <td>
+                                    <div class="fw-bold text-dark">
+                                        <i class="fa-solid fa-folder me-2 text-primary opacity-75"></i> <span class="cat-name-display">@item.Name</span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(item.Description))
+                                    {
+                                        <div class="small text-muted text-truncate cat-desc-display" style="max-width: 300px;">@item.Description</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-secondary cat-namear-display">@(item.NameAr ?? "-")</span>
+                                </td>
+                                <td>
+                                    <span class="badge @(item.Department == MaintenanceTeams.IT ? "bg-primary-subtle text-primary border border-primary-subtle" : item.Department == MaintenanceTeams.Biomedical ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning-emphasis border border-warning-subtle")">
+                                        @Loc.TargetTeam(item.Department)
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @(assetCount > 0 ? "bg-primary-subtle text-primary border" : "bg-light text-muted border")">
+                                        @assetCount @(isAr ? "أصل" : "asset(s)")
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (issueCount > 0)
+                                    {
+                                        <div class="d-flex flex-wrap gap-1 align-items-center">
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-semibold">
+                                                <i class="fa-solid fa-check-double me-1"></i>@issueCount @(isAr ? "عطل مرتبط" : "issues")
+                                            </span>
+                                            @foreach (var issue in (item.IssueCategories ?? Enumerable.Empty<StockPortal.Models.IssueCategory>()).Take(2))
+                                            {
+                                                <span class="badge bg-light text-dark border small text-truncate" style="max-width: 140px;" title="@issue.DisplayName">@issue.DisplayName</span>
+                                            }
+                                            @if (issueCount > 2)
+                                            {
+                                                <span class="text-muted small">+@(issueCount - 2)</span>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-muted border">
+                                            <i class="fa-solid fa-circle-exclamation me-1 text-warning"></i> @(isAr ? "عام / غير محدد" : "General fallback")
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary" title="@Loc["Edit"]">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
+                                    </a>
+                                    <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('@(isAr ? "هل أنت متأكد من حذف هذه الفئة؟" : "Are you sure you want to delete this category?")')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="@Loc["Delete"]">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        <tr id="noResultsClientRow" style="display: none;">
+                            <td colspan="6" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-filter-circle-xmark fs-3 d-block mb-2"></i>
+                                @(isAr ? "لا توجد نتائج تطابق معايير البحث الحالية." : "No categories match the active filter criteria.")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
 }
 else
 {
-    <!-- Department Indicator for Maintenance Users (Departmental Isolation preserved) -->
-    <div class="d-flex align-items-center gap-2 mb-3">
-        <span class="badge bg-primary fs-6 px-3 py-2">
-            <i class="fa-solid fa-shield-halved me-1"></i> @(isAr ? $"فئات أصول قسم: {Loc.TargetTeam(userDept)}" : $"{userDept} Department Categories")
-        </span>
+    <!-- ========================================== -->
+    <!-- TAB 2: ISSUE CATEGORIES TABLE (WITH DEPARTMENT COLUMN) -->
+    <!-- ========================================== -->
+    <div class="card shadow-sm border-0 mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </span>
+                        <input type="text" id="issueLiveSearch" class="form-control border-start-0" placeholder="@(isAr ? "ابحث بالاسم، الاسم العربي، أو القسم..." : "Search by issue name, Arabic name, or department...")" autocomplete="off" />
+                        <button class="btn btn-outline-secondary" type="button" id="clearIssueSearchBtn" title="@Loc["Reset"]">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="col-md-6 text-md-end text-muted small fw-semibold">
+                    <span id="issueCounter">@issueCategories.Count @(isAr ? "فئة عطل معرفة" : "issue categories defined")</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="issuesTable">
+                <thead class="table-light small text-uppercase">
+                    <tr>
+                        <th style="width: 25%;">@(isAr ? "اسم العطل / المشكلة (EN)" : "Issue Category (English)")</th>
+                        <th style="width: 22%;">@(isAr ? "اسم العطل بالعربية" : "Arabic Name")</th>
+                        <th style="width: 15%;"><i class="fa-solid fa-building me-1 text-primary"></i> @Loc["Department"]</th>
+                        <th style="width: 26%;">@(isAr ? "فئات الأصول المرتبطة بها" : "Linked Asset Categories")</th>
+                        <th style="width: 12%;" class="text-end">@Loc["Actions"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!issueCategories.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-triangle-exclamation fs-2 d-block mb-2 text-warning opacity-75"></i>
+                                @(isAr ? "لا توجد فئات أعطال مسجلة لهذا القسم حالياً." : "No issue categories registered for this department.")
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createIssueModal">
+                                        <i class="fa-solid fa-plus me-1"></i> @(isAr ? "إضافة فئة عطل الآن" : "Add First Issue Category")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var issue in issueCategories)
+                        {
+                            var linkedCats = issue.AssetCategories?.ToList() ?? new List<StockPortal.Models.AssetCategory>();
+                            <tr class="issue-row"
+                                data-name="@(issue.Name?.ToLower() ?? "")"
+                                data-name-ar="@(issue.NameAr?.ToLower() ?? "")"
+                                data-dept="@(issue.Department?.ToUpper() ?? "")"
+                                data-desc="@(issue.Description?.ToLower() ?? "")">
+                                <td>
+                                    <div class="fw-bold text-dark">
+                                        <i class="fa-solid fa-circle-exclamation me-2 text-danger opacity-75"></i>
+                                        <span class="issue-name-display">@issue.Name</span>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(issue.Description))
+                                    {
+                                        <div class="small text-muted text-truncate" style="max-width: 320px;">@issue.Description</div>
+                                    }
+                                </td>
+                                <td>
+                                    <span class="fw-semibold text-secondary">@(issue.NameAr ?? "-")</span>
+                                </td>
+                                <td>
+                                    <!-- REQUIRED: DEPARTMENT COLUMN -->
+                                    <span class="badge @(issue.Department == MaintenanceTeams.IT ? "bg-primary-subtle text-primary border border-primary-subtle" : issue.Department == MaintenanceTeams.Biomedical ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning-emphasis border border-warning-subtle") fs-7">
+                                        <i class="fa-solid @(issue.Department == MaintenanceTeams.IT ? "fa-laptop" : issue.Department == MaintenanceTeams.Biomedical ? "fa-heart-pulse" : "fa-wrench") me-1"></i>
+                                        @Loc.TargetTeam(issue.Department)
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (linkedCats.Any())
+                                    {
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach (var c in linkedCats.Take(3))
+                                            {
+                                                <span class="badge bg-light text-dark border small" title="@c.DisplayName">
+                                                    <i class="fa-solid fa-folder me-1 text-primary small"></i>@c.DisplayName
+                                                </span>
+                                            }
+                                            @if (linkedCats.Count > 3)
+                                            {
+                                                <span class="badge bg-secondary-subtle text-secondary border small">+@(linkedCats.Count - 3)</span>
+                                            }
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-muted border small">@(isAr ? "غير مرتبطة بأصل محدد (عامة)" : "Available to all assets")</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary edit-issue-btn"
+                                            data-id="@issue.Id"
+                                            data-name="@issue.Name"
+                                            data-namear="@issue.NameAr"
+                                            data-dept="@issue.Department"
+                                            data-desc="@issue.Description"
+                                            data-linked='@Html.Raw(System.Text.Json.JsonSerializer.Serialize(linkedCats.Select(c => c.Id)))'
+                                            title="@Loc["Edit"]">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
+                                    </button>
+                                    <form asp-action="DeleteIssue" asp-route-id="@issue.Id" method="post" class="d-inline" onsubmit="return confirm('@(isAr ? "هل أنت متأكد من حذف فئة العطل هذه؟" : "Are you sure you want to delete this issue category?")')">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="returnTab" value="issues" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="@Loc["Delete"]">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        <tr id="noIssuesClientRow" style="display: none;">
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-filter-circle-xmark fs-3 d-block mb-2"></i>
+                                @(isAr ? "لا توجد أعطال تطابق معايير البحث." : "No issue categories match your search.")
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 }
 
-<!-- Dynamic Filters Toolbar for All Users -->
-<div class="card shadow-sm border-0 mb-3">
-    <div class="card-body py-2">
-        <div class="row g-2 align-items-center">
-            <!-- Dynamic Search Input -->
-            <div class="col-md-5">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text bg-white border-end-0 text-muted">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                    </span>
-                    <input type="text" id="categoryLiveSearch" class="form-control border-start-0" placeholder="@(isAr ? "بحث فوري بالاسم، الاسم العربي، الوصف..." : "Quick filter by name, Arabic name, or description...")" value="@searchTerm" autocomplete="off" />
-                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" title="@Loc["Reset"]">
-                        <i class="fa-solid fa-xmark"></i>
+<!-- ========================================== -->
+<!-- MODAL: CREATE ISSUE CATEGORY -->
+<!-- ========================================== -->
+<div class="modal fade" id="createIssueModal" tabindex="-1" aria-labelledby="createIssueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <form asp-action="CreateIssue" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnTab" value="issues" />
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="createIssueModalLabel">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i> @(isAr ? "إضافة فئة عطل وبلاغ جديدة" : "New Technical Issue Category")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@(isAr ? "اسم العطل (بالإنجليزية)" : "Issue Name (English)") <span class="text-danger">*</span></label>
+                            <input type="text" name="Name" class="form-control" placeholder="e.g. Paper Jam / Blue Screen / Sensor Error" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@(isAr ? "اسم العطل بالعربية" : "Issue Name (Arabic)")</label>
+                            <input type="text" name="NameAr" class="form-control" placeholder="مثال: انحشار الورق / الشاشة الزرقاء / عطل الحساس" dir="rtl" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold"><i class="fa-solid fa-building text-primary me-1"></i> @Loc["Department"] <span class="text-danger">*</span></label>
+                            @if (isAdmin)
+                            {
+                                <select name="Department" id="modalCreateIssueDept" class="form-select">
+                                    @foreach (var dept in availableDepts)
+                                    {
+                                        <option value="@dept" selected="@(selectedDept == dept)">@Loc.TargetTeam(dept)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control" value="@Loc.TargetTeam(userDept)" readonly />
+                                <input type="hidden" name="Department" value="@userDept" />
+                            }
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">@Loc["Description"]</label>
+                            <textarea name="Description" class="form-control" rows="2" placeholder="@(isAr ? "وصف تفصيلي للأعراض المرتبطة بهذا العطل..." : "Description or technical symptoms of this problem...")"></textarea>
+                        </div>
+
+                        <!-- Multi-to-Multi: Link Asset Categories -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">
+                                <i class="fa-solid fa-boxes-stacked text-primary me-1"></i>
+                                @(isAr ? "ربط فئات الأصول بهذا العطل (Multi-to-Multi):" : "Link Asset Categories (Multi-to-Multi):")
+                            </label>
+                            <div class="border rounded p-2 bg-light-subtle" style="max-height: 180px; overflow-y: auto;">
+                                @if (!allAssetCategories.Any())
+                                {
+                                    <div class="text-muted small p-2">@(isAr ? "لا توجد فئات أصول مسجلة حالياً." : "No asset categories available.")</div>
+                                }
+                                else
+                                {
+                                    @foreach (var cat in allAssetCategories)
+                                    {
+                                        <div class="form-check py-1 border-bottom border-light asset-cat-checkbox-item" data-dept="@cat.Department">
+                                            <input class="form-check-input" type="checkbox" name="linkedAssetCategoryIds" value="@cat.Id" id="create_cat_@cat.Id" />
+                                            <label class="form-check-label small d-flex justify-content-between align-items-center" for="create_cat_@cat.Id">
+                                                <span><strong class="text-dark">@cat.DisplayName</strong> <span class="text-muted">(@cat.Name)</span></span>
+                                                <span class="badge bg-light text-muted border">@cat.Department</span>
+                                            </label>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                            <div class="form-text small text-muted">
+                                @(isAr ? "يمكنك اختيار فئة أصول واحدة أو عدة فئات لتظهر هذه المشكلة في بلاغاتها." : "You can link multiple asset categories. When a user reports on those assets, this issue will appear.")
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> @(isAr ? "إضافة فئة العطل" : "Create Issue Category")
                     </button>
                 </div>
-            </div>
-
-            <!-- In-Use vs Empty Filter Buttons -->
-            <div class="col-md-5">
-                <div class="btn-group btn-group-sm w-100" role="group" id="categoryFilterGroup">
-                    <button type="button" class="btn btn-outline-secondary active" data-filter="all" id="btnFilterAll">
-                        <i class="fa-solid fa-layer-group me-1"></i> @(isAr ? "كافة الفئات" : "All Categories")
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" data-filter="with_assets" id="btnFilterWithAssets">
-                        <i class="fa-solid fa-boxes-stacked me-1"></i> @(isAr ? "فئات بها أجهزة" : "With Assets")
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" data-filter="empty" id="btnFilterEmpty">
-                        <i class="fa-solid fa-inbox me-1"></i> @(isAr ? "فئات فارغة (0 أصل)" : "Empty (0 Assets)")
-                    </button>
-                </div>
-            </div>
-
-            <!-- Live Item Counter -->
-            <div class="col-md-2 text-md-end text-muted small fw-semibold">
-                <span id="categoryCounter">@Model.Count() @(isAr ? "فئة" : "categories")</span>
-            </div>
+            </form>
         </div>
     </div>
 </div>
 
-<div class="card shadow-sm border-0">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="categoriesTable">
-            <thead class="table-light small text-uppercase">
-                <tr>
-                    <th style="width: 25%;">@Loc["Category Name"]</th>
-                    <th style="width: 25%;">@(isAr ? "الاسم العربي" : "Arabic Name")</th>
-                    <th style="width: 15%;">@Loc["Department"]</th>
-                    <th style="width: 15%;">@(isAr ? "عدد الأصول المسجلة" : "Linked Assets")</th>
-                    <th style="width: 20%;" class="text-end">@Loc["Actions"]</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!Model.Any())
-                {
-                    <tr id="emptyRowServer">
-                        <td colspan="5" class="text-center py-4 text-muted">
-                            <i class="fa-solid fa-inbox fs-3 d-block mb-2"></i>
-                            @(isAr ? "لا توجد فئات معرفة حالياً لهذا القسم." : "No categories defined for this department yet.")
-                        </td>
-                    </tr>
-                }
-                else
-                {
-                    @foreach (var item in Model)
-                    {
-                        var assetCount = item.Assets?.Count ?? 0;
-                        <tr class="category-row"
-                            data-name="@(item.Name?.ToLower() ?? "")"
-                            data-name-ar="@(item.NameAr?.ToLower() ?? "")"
-                            data-desc="@(item.Description?.ToLower() ?? "")"
-                            data-dept="@(item.Department?.ToUpper() ?? "")"
-                            data-asset-count="@assetCount">
-                            <td>
-                                <div class="fw-bold text-dark">
-                                    <i class="fa-solid fa-folder me-2 text-primary opacity-75"></i> <span class="cat-name-display">@item.Name</span>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(item.Description))
+<!-- ========================================== -->
+<!-- MODAL: EDIT ISSUE CATEGORY -->
+<!-- ========================================== -->
+<div class="modal fade" id="editIssueModal" tabindex="-1" aria-labelledby="editIssueModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <form asp-action="EditIssue" method="post" id="editIssueForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="returnTab" value="issues" />
+                <input type="hidden" name="id" id="editIssueId" />
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title fw-bold" id="editIssueModalLabel">
+                        <i class="fa-solid fa-pen-to-square me-2"></i> @(isAr ? "تعديل فئة العطل" : "Edit Issue Category")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@(isAr ? "اسم العطل (بالإنجليزية)" : "Issue Name (English)") <span class="text-danger">*</span></label>
+                            <input type="text" name="Name" id="editIssueName" class="form-control" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">@(isAr ? "اسم العطل بالعربية" : "Issue Name (Arabic)")</label>
+                            <input type="text" name="NameAr" id="editIssueNameAr" class="form-control" dir="rtl" />
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold"><i class="fa-solid fa-building text-primary me-1"></i> @Loc["Department"] <span class="text-danger">*</span></label>
+                            @if (isAdmin)
+                            {
+                                <select name="Department" id="editIssueDept" class="form-select">
+                                    @foreach (var dept in availableDepts)
+                                    {
+                                        <option value="@dept">@Loc.TargetTeam(dept)</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control" id="editIssueDeptReadonly" readonly />
+                                <input type="hidden" name="Department" id="editIssueDeptHidden" />
+                            }
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label fw-semibold">@Loc["Description"]</label>
+                            <textarea name="Description" id="editIssueDesc" class="form-control" rows="2"></textarea>
+                        </div>
+
+                        <!-- Multi-to-Multi: Link Asset Categories -->
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">
+                                <i class="fa-solid fa-boxes-stacked text-primary me-1"></i>
+                                @(isAr ? "فئات الأصول المرتبطة (Multi-to-Multi):" : "Linked Asset Categories:")
+                            </label>
+                            <div class="border rounded p-2 bg-light-subtle" style="max-height: 180px; overflow-y: auto;">
+                                @foreach (var cat in allAssetCategories)
                                 {
-                                    <div class="small text-muted text-truncate cat-desc-display" style="max-width: 320px;">@item.Description</div>
+                                    <div class="form-check py-1 border-bottom border-light">
+                                        <input class="form-check-input edit-cat-checkbox" type="checkbox" name="linkedAssetCategoryIds" value="@cat.Id" id="edit_cat_@cat.Id" />
+                                        <label class="form-check-label small d-flex justify-content-between align-items-center" for="edit_cat_@cat.Id">
+                                            <span><strong class="text-dark">@cat.DisplayName</strong> <span class="text-muted">(@cat.Name)</span></span>
+                                            <span class="badge bg-light text-muted border">@cat.Department</span>
+                                        </label>
+                                    </div>
                                 }
-                            </td>
-                            <td>
-                                <span class="fw-semibold text-secondary cat-namear-display">@(item.NameAr ?? "-")</span>
-                            </td>
-                            <td>
-                                <span class="badge @(item.Department == MaintenanceTeams.IT ? "bg-primary-subtle text-primary border border-primary-subtle" : item.Department == MaintenanceTeams.Biomedical ? "bg-danger-subtle text-danger border border-danger-subtle" : "bg-warning-subtle text-warning-emphasis border border-warning-subtle")">
-                                    @Loc.TargetTeam(item.Department)
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge @(assetCount > 0 ? "bg-primary-subtle text-primary border" : "bg-light text-muted border")">
-                                    @assetCount @(isAr ? "أصل" : "asset(s)")
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-secondary">
-                                    <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
-                                </a>
-                                <form asp-action="Delete" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('@(isAr ? "هل أنت متأكد من حذف هذه الفئة؟" : "Are you sure you want to delete this category?")')">
-                                    @Html.AntiForgeryToken()
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                    }
-                    <tr id="noResultsClientRow" style="display: none;">
-                        <td colspan="5" class="text-center py-4 text-muted">
-                            <i class="fa-solid fa-filter-circle-xmark fs-3 d-block mb-2"></i>
-                            @(isAr ? "لا توجد نتائج تطابق معايير البحث الحالية." : "No categories match the active filter criteria.")
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> @Loc["Save Changes"]
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
 @section Scripts {
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        const isAr = @(isAr ? "true" : "false");
+
+        // 1. Asset Categories Client Search & Filter
         const searchInput = document.getElementById("categoryLiveSearch");
         const clearBtn = document.getElementById("clearSearchBtn");
         const filterGroup = document.getElementById("categoryFilterGroup");
         const counterSpan = document.getElementById("categoryCounter");
         const rows = document.querySelectorAll(".category-row");
         const noResultsRow = document.getElementById("noResultsClientRow");
-        const isAr = @(isAr ? "true" : "false");
 
         let currentActiveFilter = "all";
 
-        function applyClientFilter() {
+        function applyCatFilter() {
+            if (!rows.length) return;
             const query = (searchInput ? searchInput.value : "").trim().toLowerCase();
             let visibleCount = 0;
 
@@ -234,20 +611,13 @@ else
             }
         }
 
-        if (searchInput) {
-            searchInput.addEventListener("input", applyClientFilter);
-        }
-
+        if (searchInput) searchInput.addEventListener("input", applyCatFilter);
         if (clearBtn) {
             clearBtn.addEventListener("click", function () {
-                if (searchInput) {
-                    searchInput.value = "";
-                    searchInput.focus();
-                }
-                applyClientFilter();
+                if (searchInput) { searchInput.value = ""; searchInput.focus(); }
+                applyCatFilter();
             });
         }
-
         if (filterGroup) {
             filterGroup.querySelectorAll("button").forEach(btn => {
                 btn.addEventListener("click", function () {
@@ -257,15 +627,103 @@ else
                     });
                     this.classList.add("active", "btn-secondary");
                     this.classList.remove("btn-outline-secondary");
-
                     currentActiveFilter = this.getAttribute("data-filter") || "all";
-                    applyClientFilter();
+                    applyCatFilter();
                 });
             });
         }
+        applyCatFilter();
 
-        // Run initial filter in case search input was restored
-        applyClientFilter();
+        // 2. Issue Categories Client Search
+        const issueSearch = document.getElementById("issueLiveSearch");
+        const clearIssueBtn = document.getElementById("clearIssueSearchBtn");
+        const issueRows = document.querySelectorAll(".issue-row");
+        const noIssuesRow = document.getElementById("noIssuesClientRow");
+        const issueCounter = document.getElementById("issueCounter");
+
+        function applyIssueFilter() {
+            if (!issueRows.length) return;
+            const query = (issueSearch ? issueSearch.value : "").trim().toLowerCase();
+            let count = 0;
+
+            issueRows.forEach(row => {
+                const name = row.getAttribute("data-name") || "";
+                const nameAr = row.getAttribute("data-name-ar") || "";
+                const dept = row.getAttribute("data-dept") || "";
+                const desc = row.getAttribute("data-desc") || "";
+
+                if (!query || name.includes(query) || nameAr.includes(query) || dept.includes(query) || desc.includes(query)) {
+                    row.style.display = "";
+                    count++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+
+            if (noIssuesRow) {
+                noIssuesRow.style.display = (count === 0 && issueRows.length > 0) ? "" : "none";
+            }
+
+            if (issueCounter) {
+                issueCounter.textContent = isAr 
+                    ? `عرض ${count} من ${issueRows.length} فئة عطل` 
+                    : `Showing ${count} of ${issueRows.length}`;
+            }
+        }
+
+        if (issueSearch) issueSearch.addEventListener("input", applyIssueFilter);
+        if (clearIssueBtn) {
+            clearIssueBtn.addEventListener("click", function () {
+                if (issueSearch) { issueSearch.value = ""; issueSearch.focus(); }
+                applyIssueFilter();
+            });
+        }
+        applyIssueFilter();
+
+        // 3. Edit Issue Modal Population
+        const editButtons = document.querySelectorAll(".edit-issue-btn");
+        const editModal = new bootstrap.Modal(document.getElementById("editIssueModal"));
+        const editForm = document.getElementById("editIssueForm");
+        const editIdInput = document.getElementById("editIssueId");
+        const editNameInput = document.getElementById("editIssueName");
+        const editNameArInput = document.getElementById("editIssueNameAr");
+        const editDeptSelect = document.getElementById("editIssueDept");
+        const editDeptReadonly = document.getElementById("editIssueDeptReadonly");
+        const editDeptHidden = document.getElementById("editIssueDeptHidden");
+        const editDescInput = document.getElementById("editIssueDesc");
+        const editCheckboxes = document.querySelectorAll(".edit-cat-checkbox");
+
+        editButtons.forEach(btn => {
+            btn.addEventListener("click", function () {
+                const id = this.getAttribute("data-id");
+                const name = this.getAttribute("data-name") || "";
+                const nameAr = this.getAttribute("data-namear") || "";
+                const dept = this.getAttribute("data-dept") || "IT";
+                const desc = this.getAttribute("data-desc") || "";
+                let linked = [];
+                try {
+                    linked = JSON.parse(this.getAttribute("data-linked") || "[]");
+                } catch(e) {}
+
+                if (editForm) editForm.action = `/AssetCategories/EditIssue/${id}`;
+                if (editIdInput) editIdInput.value = id;
+                if (editNameInput) editNameInput.value = name;
+                if (editNameArInput) editNameArInput.value = nameAr;
+                if (editDescInput) editDescInput.value = desc;
+
+                if (editDeptSelect) editDeptSelect.value = dept;
+                if (editDeptReadonly) editDeptReadonly.value = dept;
+                if (editDeptHidden) editDeptHidden.value = dept;
+
+                // Check linked asset categories
+                editCheckboxes.forEach(cb => {
+                    const catId = parseInt(cb.value, 10);
+                    cb.checked = linked.includes(catId);
+                });
+
+                editModal.show();
+            });
+        });
     });
 </script>
 }

@@ -47,18 +47,38 @@
         <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom">
             <a href="@Url.Action("Index")" class="btn btn-sm @(string.IsNullOrEmpty(currentFilter) && ViewBag.SelectedStatusId == null ? "btn-primary" : "btn-light border")">
                 <i class="fa-solid fa-inbox me-1"></i> @Loc["All Tickets"]
+                @if (ViewBag.AllCount != null && (int)ViewBag.AllCount > 0)
+                {
+                    <span class="badge @(string.IsNullOrEmpty(currentFilter) && ViewBag.SelectedStatusId == null ? "bg-white text-primary" : "bg-secondary text-white") ms-1 rounded-pill">@ViewBag.AllCount</span>
+                }
             </a>
             <a href="@Url.Action("Index", new { filter = "my_assigned" })" class="btn btn-sm @(currentFilter == "my_assigned" ? "btn-primary" : "btn-light border")">
                 <i class="fa-solid fa-user-check me-1"></i> @Loc["My Assigned Tickets"]
+                @if (ViewBag.MyAssignedCount != null && (int)ViewBag.MyAssignedCount > 0)
+                {
+                    <span class="badge @(currentFilter == "my_assigned" ? "bg-white text-primary" : "bg-primary text-white") ms-1 rounded-pill">@ViewBag.MyAssignedCount</span>
+                }
             </a>
             <a href="@Url.Action("Index", new { filter = "my_opened" })" class="btn btn-sm @(currentFilter == "my_opened" ? "btn-primary" : "btn-light border")">
                 <i class="fa-solid fa-user-pen me-1"></i> @Loc["Opened by Me"]
+                @if (ViewBag.MyOpenedCount != null && (int)ViewBag.MyOpenedCount > 0)
+                {
+                    <span class="badge @(currentFilter == "my_opened" ? "bg-white text-primary" : "bg-secondary text-white") ms-1 rounded-pill">@ViewBag.MyOpenedCount</span>
+                }
             </a>
             <a href="@Url.Action("Index", new { filter = "unassigned" })" class="btn btn-sm @(currentFilter == "unassigned" ? "btn-warning text-dark fw-bold" : "btn-light border text-warning-emphasis")">
                 <i class="fa-solid fa-triangle-exclamation me-1"></i> @Loc["Unassigned"]
+                @if (ViewBag.UnassignedCount != null && (int)ViewBag.UnassignedCount > 0)
+                {
+                    <span class="badge @(currentFilter == "unassigned" ? "bg-dark text-white" : "bg-warning text-dark") ms-1 rounded-pill">@ViewBag.UnassignedCount</span>
+                }
             </a>
             <a href="@Url.Action("Index", new { filter = "maintenance" })" class="btn btn-sm @(currentFilter == "maintenance" || ViewBag.SelectedStatusId == 6 ? "btn-warning text-dark fw-bold shadow-sm" : "btn-light border text-warning-emphasis")">
-                <i class="fa-solid fa-screwdriver-wrench me-1 text-warning"></i> @Loc["In Maintenance"] (@(ViewBag.MaintenanceCount ?? 0))
+                <i class="fa-solid fa-screwdriver-wrench me-1 text-warning"></i> @Loc["In Maintenance"]
+                @if (ViewBag.MaintenanceCount != null && (int)ViewBag.MaintenanceCount > 0)
+                {
+                    <span class="badge @(currentFilter == "maintenance" || ViewBag.SelectedStatusId == 6 ? "bg-dark text-white" : "bg-warning text-dark") ms-1 rounded-pill">@ViewBag.MaintenanceCount</span>
+                }
             </a>
         </div>
 
@@ -195,10 +215,14 @@
                                         </span>
                                         break;
                                     case 3:
-                                        <span class="badge bg-secondary">@ticket.Status?.DisplayStatus</span>
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary">
+                                            <i class="fa-solid fa-clock me-1"></i> @ticket.Status?.DisplayStatus
+                                        </span>
                                         break;
                                     case 4:
-                                        <span class="badge bg-dark">@ticket.Status?.DisplayStatus</span>
+                                        <span class="badge bg-dark bg-opacity-10 text-dark border border-dark">
+                                            <i class="fa-solid fa-ban me-1"></i> @ticket.Status?.DisplayStatus
+                                        </span>
                                         break;
                                     case 5:
                                         <span class="badge bg-success bg-opacity-10 text-success border border-success">
@@ -206,12 +230,12 @@
                                         </span>
                                         break;
                                     case 6:
-                                        <span class="badge bg-warning text-dark">
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info">
                                             <i class="fa-solid fa-screwdriver-wrench me-1"></i> @ticket.Status?.DisplayStatus
                                         </span>
                                         break;
                                     default:
-                                        <span class="badge bg-light text-dark">@ticket.Status?.DisplayStatus</span>
+                                        <span class="badge bg-light text-dark border">@ticket.Status?.DisplayStatus</span>
                                         break;
                                 }
                             </td>

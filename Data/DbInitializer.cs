@@ -52,6 +52,50 @@ namespace StockPortal.Data
             }
             catch {}
 
+            // Ensure issue_categories & asset_category_issue_categories tables exist
+            try
+            {
+                var isSqlite = context.Database.ProviderName?.Contains("Sqlite") == true;
+                if (isSqlite)
+                {
+                    context.Database.ExecuteSqlRaw(@"
+                        CREATE TABLE IF NOT EXISTS issue_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL,
+                            name_ar TEXT NULL,
+                            department TEXT NOT NULL,
+                            description TEXT NULL,
+                            is_active INTEGER NOT NULL DEFAULT 1,
+                            created_at TEXT NOT NULL
+                        );
+                        CREATE TABLE IF NOT EXISTS asset_category_issue_categories (
+                            AssetCategoriesId INTEGER NOT NULL,
+                            IssueCategoriesId INTEGER NOT NULL,
+                            PRIMARY KEY (AssetCategoriesId, IssueCategoriesId)
+                        );");
+                }
+                else
+                {
+                    context.Database.ExecuteSqlRaw(@"
+                        CREATE TABLE IF NOT EXISTS `issue_categories` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `name` varchar(255) NOT NULL,
+                            `name_ar` varchar(255) NULL,
+                            `department` varchar(50) NOT NULL,
+                            `description` varchar(1024) NULL,
+                            `is_active` tinyint(1) NOT NULL DEFAULT 1,
+                            `created_at` datetime NOT NULL,
+                            PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                        CREATE TABLE IF NOT EXISTS `asset_category_issue_categories` (
+                            `AssetCategoriesId` int NOT NULL,
+                            `IssueCategoriesId` int NOT NULL,
+                            PRIMARY KEY (`AssetCategoriesId`, `IssueCategoriesId`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+                }
+            }
+            catch {}
+
             // Ensure Ticket Statuses
             if (!context.TicketStatuses.Any())
             {
@@ -1594,7 +1638,71 @@ namespace StockPortal.Data
                 }
                 context.SaveChanges();
 
-                // 2. Seed Spare Part Forms (Task 1)
+                // Seed Issue Categories (Task 3)
+                try
+                {
+                    if (!context.IssueCategories.Any())
+                    {
+                        var issues = new System.Collections.Generic.List<IssueCategory>
+                        {
+                            // IT Issues
+                            new IssueCategory { Name = "Hardware Breakdown", NameAr = "عطل عتادي / توقف كامل / انقطاع الطاقة", Department = MaintenanceTeams.IT, Description = "Hardware failure, electrical supply or physical unit damage" },
+                            new IssueCategory { Name = "OS & Software Crash", NameAr = "انهيار نظام التشغيل / الشاشة الزرقاء / خطأ بالبرامج", Department = MaintenanceTeams.IT, Description = "Operating system crash, BSOD or critical application malfunction" },
+                            new IssueCategory { Name = "Network & Connectivity", NameAr = "الشبكة والإنترنت / الشبكة المحلية / واي فاي / تعارض IP", Department = MaintenanceTeams.IT, Description = "LAN cable disconnected, WiFi dropouts, IP collision or DNS error" },
+                            new IssueCategory { Name = "Account & Password", NameAr = "حساب المستخدم / تسجيل الدخول / الصلاحيات / كلمة المرور", Department = MaintenanceTeams.IT, Description = "Locked domain user account, expired credentials or permission access" },
+                            new IssueCategory { Name = "Printer & Peripherals", NameAr = "الطابعة / الماسح الضوئي / قارئ الباركود / الشاشة", Department = MaintenanceTeams.IT, Description = "Paper jam, toner low, scanner feeder issue or monitor display artifact" },
+                            new IssueCategory { Name = "Server & Storage", NameAr = "الخادم / المجلدات المشتركة / التخزين الشبكي", Department = MaintenanceTeams.IT, Description = "Storage full, mapped drive unavailable or server service stopped" },
+                            new IssueCategory { Name = "Cybersecurity Alert", NameAr = "تنبيه مضاد الفيروسات / برمجيات خبيثة / نشاط مريب", Department = MaintenanceTeams.IT, Description = "Endpoint security threat, malware detection or suspicious email" },
+                            new IssueCategory { Name = "Data Backup & Recovery", NameAr = "استعادة الملفات / النسخ الاحتياطي", Department = MaintenanceTeams.IT, Description = "File recovery or backup snapshot restoration" },
+                            new IssueCategory { Name = "Preventive IT Inspection", NameAr = "فحص دوري وقائي لمحطة العمل", Department = MaintenanceTeams.IT, Description = "Routine workstation cleaning, physical health and software audit" },
+
+                            // Biomedical Issues
+                            new IssueCategory { Name = "Patient Monitor / Sensor", NameAr = "شاشة مراقبة المريض / حساسات التخطيط والحرارة والأكسجين", Department = MaintenanceTeams.Biomedical, Description = "ECG, SpO2, NIBP transducer or sensor disconnection and readings fault" },
+                            new IssueCategory { Name = "Ventilator Alarm / Flow", NameAr = "جهاز التنفس الصناعي / تدفق الغازات / إنذار الضغط", Department = MaintenanceTeams.Biomedical, Description = "Gas supply, pressure alarm, peep valve or bellows leak" },
+                            new IssueCategory { Name = "Defibrillator / Pacing", NameAr = "جهاز الصدمات الكهربائية / البطارية / الفحص الدوري", Department = MaintenanceTeams.Biomedical, Description = "Battery discharge, paddle contact, pacing test or capacitor charge" },
+                            new IssueCategory { Name = "Ultrasound / Probe", NameAr = "جهاز السونار / مجس الفحص / جودة الصورة", Department = MaintenanceTeams.Biomedical, Description = "Transducer acoustic lens damage, beam artifact or software freeze" },
+                            new IssueCategory { Name = "X-Ray & Imaging Unit", NameAr = "جهاز الأشعة / المولد / كاشف الإشعاع", Department = MaintenanceTeams.Biomedical, Description = "Radiation detector error, collimator issue or exposure warning" },
+                            new IssueCategory { Name = "Infusion & Syringe Pump", NameAr = "مضخة التسريب الوريدي / مضخة الحقن / معايرة التدفق", Department = MaintenanceTeams.Biomedical, Description = "Occlusion alarm, flow rate calibration or battery backup drop" },
+                            new IssueCategory { Name = "Dialysis System Error", NameAr = "جهاز غسيل الكلى / السوائل / إنذار الموصلية", Department = MaintenanceTeams.Biomedical, Description = "Fluidics pump error, dialysate conductivity alarm or filter blockage" },
+                            new IssueCategory { Name = "Surgical Diathermy", NameAr = "جهاز الكي الجراحي / لوحة التماس الأرضي", Department = MaintenanceTeams.Biomedical, Description = "Electrosurgical generator fault, neutral plate contact error" },
+                            new IssueCategory { Name = "Sensor & Device Calibration", NameAr = "معايرة الحساسات والمقاييس الطبية", Department = MaintenanceTeams.Biomedical, Description = "Periodic biomedical gauge zero and standard reference alignment" },
+                            new IssueCategory { Name = "Periodic Safety Inspection", NameAr = "فحص السلامة الكهربائية الدوري للأجهزة الطبية", Department = MaintenanceTeams.Biomedical, Description = "Electrical leakage and biomedical electrical safety PM" },
+
+                            // General Maintenance Issues
+                            new IssueCategory { Name = "HVAC & Temperature", NameAr = "التكييف المركزي / التبريد / ارتفاع حرارة الغرفة", Department = MaintenanceTeams.General, Description = "AC compressor fault, room overheating, chilled water flow or fan failure" },
+                            new IssueCategory { Name = "Cleanroom HEPA & Pressure", NameAr = "غرف العزل والعمليات / ضغط الهواء / فلاتر HEPA", Department = MaintenanceTeams.General, Description = "Negative/positive pressure differential drop, HEPA airflow resistance" },
+                            new IssueCategory { Name = "Emergency Generator & ATS", NameAr = "مولد الطوارئ / محول التبديل التلقائي ATS", Department = MaintenanceTeams.General, Description = "ATS transfer failure, generator battery, coolant or diesel level" },
+                            new IssueCategory { Name = "Central UPS & Clean Power", NameAr = "وحدات UPS الطبية / تذبذب الجهد الكهربائي", Department = MaintenanceTeams.General, Description = "UPS battery bank degradation, harmonic distortion or inverter bypass" },
+                            new IssueCategory { Name = "Medical Gas & Vacuum", NameAr = "الغازات الطبية / الأكسجين / شبكة الشفط المركزي", Department = MaintenanceTeams.General, Description = "Low pipeline pressure in O2, medical air, vacuum or manifold alarm" },
+                            new IssueCategory { Name = "Plumbing & Water Supply", NameAr = "السباكة / تسريب مياه / شبكة مياه التناضح العكسي RO", Department = MaintenanceTeams.General, Description = "Pipe burst, sanitary drain blockage, RO water purifier failure" },
+                            new IssueCategory { Name = "Fire Alarm & Sprinklers", NameAr = "إنذار الحريق / كواشف الدخان / رشاشات الإطفاء", Department = MaintenanceTeams.General, Description = "Fire panel trouble, detector head fault or booster pump warning" },
+                            new IssueCategory { Name = "Electrical Power & Outlets", NameAr = "القواطع الكهربائية / المقابس / لوحات الإنارة", Department = MaintenanceTeams.General, Description = "Tripped MCCB/MCB breaker, burnt electrical outlet or lighting panel issue" },
+                            new IssueCategory { Name = "Door Access & Security", NameAr = "الأبواب الإلكترونية / قارئات البطاقات / أقفال الأبواب", Department = MaintenanceTeams.General, Description = "Access control card reader malfunction, magnetic door release stuck" },
+                            new IssueCategory { Name = "Facility Structural Repairs", NameAr = "إصلاحات عامة في الأسقف / الأرضيات / الجدران", Department = MaintenanceTeams.General, Description = "Ceiling tile drop, floor epoxy damage, drywall or architectural repair" },
+                            new IssueCategory { Name = "Plant Room & Boiler", NameAr = "المراجل / خطوط البخار / فحص غرف المضخات", Department = MaintenanceTeams.General, Description = "Steam boiler pressure, condensate pump, mechanical room inspection" }
+                        };
+
+                        context.IssueCategories.AddRange(issues);
+                        context.SaveChanges();
+
+                        // Link initial issues to existing asset categories by department
+                        var allDbIssues = context.IssueCategories.ToList();
+                        var cats = context.AssetCategories.Include(c => c.IssueCategories).ToList();
+                        foreach (var cat in cats)
+                        {
+                            if (!cat.IssueCategories.Any())
+                            {
+                                var matchingIssues = allDbIssues.Where(i => i.Department == cat.Department).ToList();
+                                foreach (var mi in matchingIssues)
+                                {
+                                    cat.IssueCategories.Add(mi);
+                                }
+                            }
+                        }
+                        context.SaveChanges();
+                    }
+                }
+                catch {}
                 if (!context.SparePartForms.Any())
                 {
                     var spForms = new System.Collections.Generic.List<SparePartForm>

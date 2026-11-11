@@ -3,17 +3,24 @@
 @{
     ViewData["Title"] = Loc["Edit Asset Category"];
     var availableDepts = ViewBag.AvailableDepartments as string[] ?? MaintenanceTeams.All;
+    var allIssues = ViewBag.AllIssues as List<StockPortal.Models.IssueCategory> ?? new List<StockPortal.Models.IssueCategory>();
+    var selectedIssueIds = ViewBag.SelectedIssueIds as List<int> ?? new List<int>();
     var isAr = Loc.IsArabic;
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-7">
+    <div class="col-lg-8">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white py-3 border-bottom">
                 <div class="d-flex align-items-center justify-content-between">
-                    <h5 class="mb-0 fw-bold text-dark">
-                        <i class="fa-solid fa-pen-to-square text-primary me-2"></i> @(isAr ? "تعديل فئة الأصل" : "Edit Asset Category")
-                    </h5>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark">
+                            <i class="fa-solid fa-pen-to-square text-primary me-2"></i> @(isAr ? "تعديل فئة الأصل" : "Edit Asset Category")
+                        </h5>
+                        <div class="text-muted small">
+                            @(isAr ? "تعديل بيانات فئة الأجهزة والأعطال والبلاغات المرتبطة بها" : "Edit asset category details and associated fault issue categories")
+                        </div>
+                    </div>
                     <a asp-action="Index" class="btn btn-sm btn-outline-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Back to List"]
                     </a>
@@ -21,15 +28,35 @@
             </div>
 
             <div class="card-body p-4">
-                <form asp-action="Edit" method="post">
+                <form asp-action="Edit" method="post" id="editCategoryForm">
                     @Html.AntiForgeryToken()
                     <input type="hidden" asp-for="Id" />
                     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-                    <div class="mb-3">
-                        <label asp-for="Name" class="form-label fw-bold">@(isAr ? "اسم الفئة (بالإنجليزية)" : "Category Name (English)") <span class="text-danger">*</span></label>
-                        <input asp-for="Name" class="form-control form-control-lg" required />
-                        <span asp-validation-for="Name" class="text-danger small"></span>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <label asp-for="Name" class="form-label fw-bold">@(isAr ? "اسم الفئة (بالإنجليزية)" : "Category Name (English)") <span class="text-danger">*</span></label>
+                            <input asp-for="Name" class="form-control" required />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-5">
+                            <label asp-for="Department" class="form-label fw-bold">@Loc["Department"] <span class="text-danger">*</span></label>
+                            @if (CurrentUser.IsAdmin())
+                            {
+                                <select asp-for="Department" class="form-select" id="categoryDept">
+                                    @foreach (var dept in availableDepts)
+                                    {
+                                        <option value="@dept">@dept</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input type="text" class="form-control" value="@Model.Department" readonly id="categoryDept" />
+                                <input type="hidden" asp-for="Department" />
+                            }
+                            <span asp-validation-for="Department" class="text-danger small"></span>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -38,28 +65,42 @@
                         <span asp-validation-for="NameAr" class="text-danger small"></span>
                     </div>
 
-                    <div class="mb-3">
-                        <label asp-for="Department" class="form-label fw-bold">@Loc["Department"] <span class="text-danger">*</span></label>
-                        @if (CurrentUser.IsAdmin())
-                        {
-                            <select asp-for="Department" class="form-select">
-                                @foreach (var dept in availableDepts)
-                                {
-                                    <option value="@dept">@dept</option>
-                                }
-                            </select>
-                        }
-                        else
-                        {
-                            <input type="text" class="form-control" value="@Model.Department" readonly />
-                            <input type="hidden" asp-for="Department" />
-                        }
-                        <span asp-validation-for="Department" class="text-danger small"></span>
+                    <!-- Searchable Multi-Select Issue Categories -->
+                    <div class="mb-4 p-3 rounded border bg-light-subtle">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                            <div>
+                                <label class="form-label fw-bold mb-0 text-dark">
+                                    <i class="fa-solid fa-list-check text-primary me-1"></i>
+                                    @(isAr ? "الأعطال والبلاغات المتاحة لهذه الفئة (Multi-Select)" : "Linked Issue Categories (Multi-Select)")
+                                </label>
+                                <div class="text-muted small">
+                                    @(isAr ? "حدد المشاكل الفنية التي ستظهر للمستخدم عند الإبلاغ عن أجهزة هذه الفئة:" : "Select which fault categories will be offered to users filing tickets for this asset:")
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary py-0" id="selectAllIssuesBtn">@(isAr ? "تحديد الكل" : "Select All")</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="deselectAllIssuesBtn">@(isAr ? "إلغاء الكل" : "Clear All")</button>
+                                <span class="badge bg-primary rounded-pill" id="selectedIssuesCountBadge">0 @(isAr ? "محدد" : "selected")</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Search Input for Issues -->
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                            </span>
+                            <input type="text" id="issueSearchInput" class="form-control border-start-0" placeholder="@(isAr ? "ابحث في قائمة الأعطال..." : "Search issues in this department...")" autocomplete="off" />
+                        </div>
+
+                        <!-- Scrollable Checklist Container -->
+                        <div class="border rounded p-2 bg-white" id="issuesListContainer" style="max-height: 250px; overflow-y: auto;">
+                            <!-- Populated dynamically by department -->
+                        </div>
                     </div>
 
                     <div class="mb-4">
                         <label asp-for="Description" class="form-label fw-semibold">@Loc["Description"]</label>
-                        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                        <textarea asp-for="Description" class="form-control" rows="2"></textarea>
                         <span asp-validation-for="Description" class="text-danger small"></span>
                     </div>
 
@@ -74,3 +115,134 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const isAr = @(isAr ? "true" : "false");
+        const allIssues = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(allIssues.Select(i => new { id = i.Id, name = i.Name, nameAr = i.NameAr, dept = i.Department, display = i.DisplayName })));
+        const initialSelected = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(selectedIssueIds));
+
+        const deptSelect = document.getElementById("categoryDept");
+        const issuesContainer = document.getElementById("issuesListContainer");
+        const issueSearch = document.getElementById("issueSearchInput");
+        const selectAllBtn = document.getElementById("selectAllIssuesBtn");
+        const deselectAllBtn = document.getElementById("deselectAllIssuesBtn");
+        const countBadge = document.getElementById("selectedIssuesCountBadge");
+
+        let selectedIds = new Set(initialSelected);
+
+        function renderIssues() {
+            if (!issuesContainer) return;
+            const currentDept = (deptSelect ? (deptSelect.value || deptSelect.getAttribute("value")) : "IT").trim().toUpperCase();
+            const filterText = (issueSearch ? issueSearch.value : "").trim().toLowerCase();
+
+            const deptIssues = allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept);
+            const visibleIssues = deptIssues.filter(i => !filterText || (i.name && i.name.toLowerCase().includes(filterText)) || (i.nameAr && i.nameAr.toLowerCase().includes(filterText)));
+
+            issuesContainer.innerHTML = "";
+            if (deptIssues.length === 0) {
+                issuesContainer.innerHTML = `<div class="p-3 text-center text-muted small"><i class="fa-solid fa-circle-info me-1"></i> ${isAr ? "لا توجد أعطال مسجلة لهذا القسم حالياً." : "No issue categories defined for this department."}</div>`;
+                updateBadge();
+                return;
+            }
+
+            if (visibleIssues.length === 0) {
+                issuesContainer.innerHTML = `<div class="p-3 text-center text-muted small"><i class="fa-solid fa-magnifying-glass me-1"></i> ${isAr ? "لا توجد نتائج تطابق البحث." : "No matching issues found."}</div>`;
+                updateBadge();
+                return;
+            }
+
+            const row = document.createElement("div");
+            row.className = "row g-2";
+
+            visibleIssues.forEach(issue => {
+                const col = document.createElement("div");
+                col.className = "col-md-6";
+
+                const isChecked = selectedIds.has(issue.id);
+                const checkId = `issue_chk_${issue.id}`;
+
+                col.innerHTML = `
+                    <div class="form-check p-2 rounded border issue-check-card ${isChecked ? 'bg-primary-subtle border-primary' : 'bg-light'}">
+                        <input class="form-check-input ms-1 issue-checkbox" type="checkbox" name="selectedIssueIds" value="${issue.id}" id="${checkId}" ${isChecked ? 'checked' : ''}>
+                        <label class="form-check-label w-100 cursor-pointer d-flex justify-content-between align-items-center" for="${checkId}">
+                            <span class="fw-semibold small">${escapeHtml(issue.display)}</span>
+                            <span class="badge bg-secondary-subtle text-secondary font-monospace" style="font-size: 0.68rem;">#${issue.id}</span>
+                        </label>
+                    </div>
+                `;
+
+                const checkbox = col.querySelector(".issue-checkbox");
+                checkbox.addEventListener("change", function () {
+                    const card = this.closest(".issue-check-card");
+                    if (this.checked) {
+                        selectedIds.add(issue.id);
+                        if (card) {
+                            card.classList.add("bg-primary-subtle", "border-primary");
+                            card.classList.remove("bg-light");
+                        }
+                    } else {
+                        selectedIds.delete(issue.id);
+                        if (card) {
+                            card.classList.remove("bg-primary-subtle", "border-primary");
+                            card.classList.add("bg-light");
+                        }
+                    }
+                    updateBadge();
+                });
+
+                row.appendChild(col);
+            });
+
+            issuesContainer.appendChild(row);
+            updateBadge();
+        }
+
+        function updateBadge() {
+            if (!countBadge) return;
+            const currentDept = (deptSelect ? (deptSelect.value || deptSelect.getAttribute("value")) : "IT").trim().toUpperCase();
+            const deptIssues = allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept);
+            const countInDept = deptIssues.filter(i => selectedIds.has(i.id)).length;
+            countBadge.textContent = `${countInDept} ${isAr ? "محدد" : "selected"}`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return "";
+            return str.replace(/[&<>"']/g, function (m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+            });
+        }
+
+        if (deptSelect && deptSelect.tagName === "SELECT") {
+            deptSelect.addEventListener("change", function () {
+                renderIssues();
+            });
+        }
+
+        if (issueSearch) {
+            issueSearch.addEventListener("input", function () {
+                renderIssues();
+            });
+        }
+
+        if (selectAllBtn) {
+            selectAllBtn.addEventListener("click", function () {
+                const currentDept = (deptSelect ? (deptSelect.value || deptSelect.getAttribute("value")) : "IT").trim().toUpperCase();
+                allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept).forEach(i => selectedIds.add(i.id));
+                renderIssues();
+            });
+        }
+
+        if (deselectAllBtn) {
+            deselectAllBtn.addEventListener("click", function () {
+                const currentDept = (deptSelect ? (deptSelect.value || deptSelect.getAttribute("value")) : "IT").trim().toUpperCase();
+                allIssues.filter(i => (i.dept || "IT").toUpperCase() === currentDept).forEach(i => selectedIds.delete(i.id));
+                renderIssues();
+            });
+        }
+
+        renderIssues();
+    });
+</script>
+}

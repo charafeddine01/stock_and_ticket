@@ -729,6 +729,7 @@ namespace StockPortal.Controllers
             string? status = null, 
             string? type = null, 
             int? roomId = null, 
+            int? categoryId = null,
             string? warranty = null, 
             string? calibration = null, 
             string? ids = null)
@@ -790,6 +791,7 @@ namespace StockPortal.Controllers
                 if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
                 if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
                 if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId.Value);
+                if (categoryId.HasValue) query = query.Where(a => a.CategoryId == categoryId.Value);
 
                 if (!string.IsNullOrWhiteSpace(warranty))
                 {
@@ -880,6 +882,7 @@ namespace StockPortal.Controllers
             string? status = null, 
             string? type = null, 
             int? roomId = null, 
+            int? categoryId = null,
             string? warranty = null, 
             string? calibration = null, 
             string? ids = null)
@@ -941,6 +944,7 @@ namespace StockPortal.Controllers
                 if (!string.IsNullOrWhiteSpace(status)) query = query.Where(a => a.Status == status);
                 if (!string.IsNullOrWhiteSpace(type)) query = query.Where(a => a.Type == type);
                 if (roomId.HasValue) query = query.Where(a => a.RoomId == roomId.Value);
+                if (categoryId.HasValue) query = query.Where(a => a.CategoryId == categoryId.Value);
 
                 if (!string.IsNullOrWhiteSpace(warranty))
                 {

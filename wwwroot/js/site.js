@@ -862,12 +862,105 @@
     };
 
     /* ==========================================================================
+       6b. DYNAMIC TRANSPARENT BRAND VIDEO PROCESSOR
+       Renders the animated brand video onto a transparent canvas, automatically
+       stripping dark backgrounds or checkerboard grids in real-time.
+       ========================================================================== */
+    function initTransparentBrandVideo() {
+        const video = document.getElementById("solvisBrandVideo");
+        const canvas = document.getElementById("solvisBrandCanvas");
+        if (!video || !canvas) return;
+
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return;
+
+        // Render transparent fallback logo immediately so there's zero blank flash
+        const poster = new Image();
+        poster.onload = function () {
+            if (canvas.width <= 300) {
+                canvas.width = poster.naturalWidth || 808;
+                canvas.height = poster.naturalHeight || 324;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(poster, 0, 0, canvas.width, canvas.height);
+            }
+        };
+        poster.src = "/images/solvis-logo-transparent.png";
+
+        let animId = null;
+
+        function renderFrame() {
+            if (video.readyState >= 2 && !video.paused && !video.ended) {
+                const vw = video.videoWidth || 300;
+                const vh = video.videoHeight || 169;
+
+                if (canvas.width !== vw || canvas.height !== vh) {
+                    canvas.width = vw;
+                    canvas.height = vh;
+                }
+
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imgData.data;
+                const len = data.length;
+
+                // Inspect top-left corner to determine background type
+                const cR = data[0], cG = data[1], cB = data[2];
+                const isLightBg = cR > 180 && cG > 180 && cB > 180;
+
+                if (isLightBg) {
+                    // Key out light / checkerboard pixels
+                    for (let i = 0; i < len; i += 4) {
+                        const r = data[i], g = data[i + 1], b = data[i + 2];
+                        const min = Math.min(r, g, b);
+                        const max = Math.max(r, g, b);
+                        const sat = max - min;
+                        if (min > 210 && sat < 22) {
+                            data[i + 3] = 0; // Transparent
+                        } else if (min > 190 && sat < 18) {
+                            data[i + 3] = Math.round(((210 - min) / 20) * 255);
+                        }
+                    }
+                } else {
+                    // Key out dark background
+                    for (let i = 0; i < len; i += 4) {
+                        const r = data[i], g = data[i + 1], b = data[i + 2];
+                        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                        if (lum < 28) {
+                            data[i + 3] = 0; // 100% transparent
+                        } else if (lum < 60) {
+                            data[i + 3] = Math.min(255, Math.round(((lum - 28) / 32) * 255));
+                        }
+                    }
+                }
+
+                ctx.putImageData(imgData, 0, 0);
+            }
+            animId = requestAnimationFrame(renderFrame);
+        }
+
+        video.addEventListener("play", function () {
+            if (!animId) animId = requestAnimationFrame(renderFrame);
+        });
+
+        video.addEventListener("loadeddata", function () {
+            if (!animId) animId = requestAnimationFrame(renderFrame);
+        });
+
+        if (video.paused) {
+            video.play().catch(function () {});
+        } else {
+            animId = requestAnimationFrame(renderFrame);
+        }
+    }
+
+    /* ==========================================================================
        7. INITIALIZATION ON DOM READY
        ========================================================================== */
     document.addEventListener("DOMContentLoaded", function () {
         initModalFixes();
         initTheme();
         initSidebar();
+        initTransparentBrandVideo();
         initPageTransitions();
         initTableSorting();
         checkUnreadNotifications();

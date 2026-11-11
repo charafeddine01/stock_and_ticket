@@ -86,6 +86,7 @@
                              !string.IsNullOrWhiteSpace(ViewBag.SelectedStatus as string) ||
                              !string.IsNullOrWhiteSpace(ViewBag.SelectedType as string) ||
                              (ViewBag.SelectedRoomId != null) ||
+                             (ViewBag.SelectedCategoryId != null) ||
                              !string.IsNullOrWhiteSpace(ViewBag.SelectedWarranty as string) ||
                              !string.IsNullOrWhiteSpace(ViewBag.SelectedCalibration as string);
 
@@ -99,6 +100,7 @@
                 status = ViewBag.SelectedStatus, 
                 type = ViewBag.SelectedType, 
                 roomId = ViewBag.SelectedRoomId,
+                categoryId = ViewBag.SelectedCategoryId,
                 warranty = ViewBag.SelectedWarranty,
                 calibration = ViewBag.SelectedCalibration,
                 ids = activeIdsParam
@@ -111,6 +113,7 @@
                 status = ViewBag.SelectedStatus, 
                 type = ViewBag.SelectedType, 
                 roomId = ViewBag.SelectedRoomId,
+                categoryId = ViewBag.SelectedCategoryId,
                 warranty = ViewBag.SelectedWarranty,
                 calibration = ViewBag.SelectedCalibration,
                 ids = activeIdsParam

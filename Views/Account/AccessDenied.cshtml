@@ -111,8 +111,13 @@
 <body>
     <div class="auth-card">
         <!-- SOLVIS Brand Header -->
-        <div class="text-center pt-4 pb-3 border-bottom" style="background: #080d1a;">
-            <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 48px; max-width: 85%; object-fit: contain;" />
+        <div class="text-center pt-3 pb-2 border-bottom" style="background: #080d1a;">
+            <video autoplay loop muted playsinline poster="~/images/solvis-logo-transparent.png" 
+                   class="solvis-brand-video"
+                   style="height: 104px; width: 100%; max-width: 320px; object-fit: contain; mix-blend-mode: screen; background: transparent; filter: contrast(1.15) brightness(1.08);">
+                <source src="~/images/solvis-logo.mp4" type="video/mp4" />
+                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 104px; max-width: 320px; object-fit: contain;" />
+            </video>
         </div>
         @if (reason.Equals("ForbiddenResource", StringComparison.OrdinalIgnoreCase))
         {
