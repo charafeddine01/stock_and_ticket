@@ -234,6 +234,11 @@
                                             <i class="fa-solid fa-screwdriver-wrench me-1"></i> @ticket.Status?.DisplayStatus
                                         </span>
                                         break;
+                                    case 7:
+                                        <span class="badge bg-warning bg-opacity-10 text-dark border border-warning" style="background-color: rgba(234, 179, 8, 0.2) !important;">
+                                            <i class="fa-solid fa-circle-pause me-1 text-warning"></i> @ticket.Status?.DisplayStatus
+                                        </span>
+                                        break;
                                     default:
                                         <span class="badge bg-light text-dark border">@ticket.Status?.DisplayStatus</span>
                                         break;

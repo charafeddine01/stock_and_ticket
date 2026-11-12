@@ -230,14 +230,17 @@ namespace StockPortal.Controllers
             var currentUserId = _currentUserService.GetUserId();
             await PopulateDropdowns(assetId, currentUserId, currentUserId);
 
-            // Task 11: Check if an active ticket exists for this asset (Status != Closed/Canceled and ClosedDT is null)
+            // Check if an active ticket exists for this asset (Status != Closed/Canceled/Hold and ClosedDT is null)
             if (assetId.HasValue && assetId.Value > 0)
             {
                 var existingActiveTicket = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == assetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
+                    .FirstOrDefaultAsync(t => t.AssetId == assetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.StatusId != 7 && t.ClosedDT == null);
                 if (existingActiveTicket != null)
                 {
-                    ViewBag.ActiveTicketWarning = $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. Please resolve or view the existing ticket before opening a new one.";
+                    bool isAr = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
+                    ViewBag.ActiveTicketWarning = isAr
+                        ? $"الجهاز مرتبط بتذكرة نشطة حالياً برقم #{existingActiveTicket.Id}. إذا كنت بحاجة لفتح تذكرة جديدة لنفس الجهاز لحالة خاصة، يرجى التواصل مع فريق الصيانة لوضع التذكرة الحالية في حالة تعليق (Hold)."
+                        : $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. If you need to open another ticket for this asset for a special situation, please ask the Maintenance Team to change ticket #{existingActiveTicket.Id} to 'Hold'.";
                     ViewBag.ExistingActiveTicketId = existingActiveTicket.Id;
                 }
             }
@@ -266,15 +269,19 @@ namespace StockPortal.Controllers
 
             bool isOnBehalfOf = ticket.OnBehalfOf.HasValue && ticket.OnBehalfOf.Value != ticket.OpenedBy;
 
-            // Task 11: Block opening another ticket if an active ticket already exists for the asset
+            // Block opening another ticket if an active ticket already exists for the asset (and not in Hold status)
             if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
             {
                 var existingActiveTicket = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == ticket.AssetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
+                    .FirstOrDefaultAsync(t => t.AssetId == ticket.AssetId.Value && t.StatusId != 4 && t.StatusId != 5 && t.StatusId != 7 && t.ClosedDT == null);
                 if (existingActiveTicket != null)
                 {
-                    ModelState.AddModelError("AssetId", $"Cannot open a new ticket for this asset. Active ticket #{existingActiveTicket.Id} is currently open.");
-                    ViewBag.ActiveTicketWarning = $"An active ticket (#{existingActiveTicket.Id}) is already open for this asset. Please resolve or view the existing ticket before opening a new one.";
+                    bool isAr = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
+                    var warningMsg = isAr
+                        ? $"لا يمكن فتح تذكرة جديدة لهذا الجهاز لوجود التذكرة النشطة #{existingActiveTicket.Id}. إذا كنت بحاجة لفتح تذكرة جديدة لنفس الجهاز لحالة خاصة، يرجى التواصل مع فريق الصيانة لوضع التذكرة الحالية في حالة تعليق (Hold)."
+                        : $"Cannot open a new ticket for this asset. Active ticket #{existingActiveTicket.Id} is currently open. If you need to open another ticket for this asset for a special situation, please ask the Maintenance Team to change ticket #{existingActiveTicket.Id} to 'Hold'.";
+                    ModelState.AddModelError("AssetId", warningMsg);
+                    ViewBag.ActiveTicketWarning = warningMsg;
                     ViewBag.ExistingActiveTicketId = existingActiveTicket.Id;
                     await PopulateDropdowns(ticket.AssetId, ticket.OnBehalfOf, currentUserId);
                     return View(ticket);
@@ -496,14 +503,17 @@ namespace StockPortal.Controllers
                     .FirstOrDefaultAsync(a => a.HospitalNo != null && a.HospitalNo.ToLower() == search);
             }
 
-            // Task 11: If asset has an active ticket, redirect to existing ticket
+            // If asset has an active ticket, redirect to existing ticket unless in Hold status
             if (asset != null)
             {
                 var existingActive = await _context.Tickets
-                    .FirstOrDefaultAsync(t => t.AssetId == asset.Id && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null);
+                    .FirstOrDefaultAsync(t => t.AssetId == asset.Id && t.StatusId != 4 && t.StatusId != 5 && t.StatusId != 7 && t.ClosedDT == null);
                 if (existingActive != null)
                 {
-                    TempData["ErrorMessage"] = $"An active ticket (#{existingActive.Id}) already exists for this equipment. Redirecting to existing ticket.";
+                    bool isAr = CultureInfo.CurrentUICulture.Name.StartsWith("ar");
+                    TempData["ErrorMessage"] = isAr
+                        ? $"يوجد بلاغ نشط برقم #{existingActive.Id} لهذا الجهاز. لفتح تذكرة لحالة خاصة يرجى الطلب من فريق الصيانة تعليق التذكرة الحالية (Hold). جاري توجيهك للتذكرة الحالية."
+                        : $"An active ticket (#{existingActive.Id}) already exists for this equipment. To open another ticket for a special situation, ask the Maintenance Team to put ticket #{existingActive.Id} on Hold. Redirecting to existing ticket.";
                     return RedirectToAction(nameof(Details), new { id = existingActive.Id });
                 }
             }
@@ -1339,7 +1349,7 @@ namespace StockPortal.Controllers
             }
 
             var activeTickets = await _context.Tickets
-                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null)
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.StatusId != 7 && t.ClosedDT == null)
                 .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
                 .ToListAsync();
             var activeTicketsDict = activeTickets
@@ -1625,7 +1635,7 @@ namespace StockPortal.Controllers
         private async Task PopulateDropdowns(int? selectedAssetId = null, int? defaultUserId = null, int? currentUserId = null)
         {
             var activeTickets = await _context.Tickets
-                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.ClosedDT == null)
+                .Where(t => t.AssetId.HasValue && t.StatusId != 4 && t.StatusId != 5 && t.StatusId != 7 && t.ClosedDT == null)
                 .Select(t => new { AssetId = t.AssetId!.Value, TicketId = t.Id })
                 .ToListAsync();
             var activeTicketsDict = activeTickets

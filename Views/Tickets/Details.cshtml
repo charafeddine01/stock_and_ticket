@@ -373,6 +373,10 @@
                             {
                                 <span class="badge bg-warning text-dark fs-6 border border-warning"><i class="fa-solid fa-screwdriver-wrench me-1 text-warning"></i> @Loc["Under Maintenance"]</span>
                             }
+                            else if (ticket.StatusId == 7 || string.Equals(ticket.Status?.Status, "hold", StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="badge bg-warning text-dark fs-6 border border-warning" style="background-color: rgba(234, 179, 8, 0.2) !important;"><i class="fa-solid fa-circle-pause me-1 text-warning"></i> @(ticket.Status?.DisplayStatus ?? (Loc.IsArabic ? "معلقة" : "Hold"))</span>
+                            }
                             else
                             {
                                 <span class="badge bg-info text-dark fs-6">@(ticket.Status?.DisplayStatus ?? Loc.Status(ticket.Status?.Status))</span>

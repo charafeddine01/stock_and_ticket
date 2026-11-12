@@ -1009,6 +1009,7 @@ namespace StockPortal.Models
         public const int Canceled = 4;
         public const int Closed = 5;
         public const int Maintenance = 6;
+        public const int Hold = 7;
     }
 
     [Table("device_forms")]

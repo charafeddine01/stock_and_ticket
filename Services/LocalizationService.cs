@@ -248,6 +248,8 @@ namespace StockPortal.Services
             ["My Assigned Tickets"] = "التذاكر المعينة لي",
             ["Opened by Me"] = "التذاكر التي فتحتها",
             ["Unassigned"] = "تذاكر غير معينة",
+            ["Hold"] = "معلقة",
+            ["On Hold"] = "معلقة",
             ["In Maintenance"] = "قيد الصيانة",
             ["All Statuses"] = "جميع الحالات",
             ["All Priorities"] = "جميع الأولويات",
@@ -621,6 +623,8 @@ namespace StockPortal.Services
                 "delayed" => "مؤجلة",
                 "canceled" => "ملغاة",
                 "closed" => "مغلقة",
+                "hold" => "معلقة",
+                "on hold" => "معلقة",
                 "maintenance" => "قيد الصيانة",
                 "in service" => "في الخدمة",
                 "in stock" => "في المخزن (احتياطي)",
@@ -768,6 +772,8 @@ namespace StockPortal.Services
                 "delayed" => "مؤجلة",
                 "canceled" => "ملغاة",
                 "closed" => "مغلقة",
+                "hold" => "معلقة",
+                "on hold" => "معلقة",
                 "completed" => "مكتمل",
                 _ => status
             };

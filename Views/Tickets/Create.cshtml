@@ -167,8 +167,14 @@
                     <div class="d-flex align-items-center gap-2">
                         <i class="fa-solid fa-triangle-exclamation fs-4 text-danger flex-shrink-0"></i>
                         <div>
-                            <strong class="text-danger">@(Loc.IsArabic ? "لا يمكن فتح تذكرة جديدة لهذا الجهاز:" : "Active Ticket Conflict:")</strong>
+                            <strong class="text-danger">@(Loc.IsArabic ? "لا يمكن فتح تذكرة جديدة لهذا الجهاز حالياً:" : "Active Ticket Conflict:")</strong>
                             <div class="mt-1 small">@ViewBag.ActiveTicketWarning</div>
+                            <div class="mt-2 p-2 rounded bg-white bg-opacity-75 border border-danger-subtle text-dark small">
+                                <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                                @(Loc.IsArabic
+                                    ? "ملاحظة للحالات الخاصة: إذا كنت بحاجة ملحة لفتح تذكرة ثانية لنفس الجهاز، يرجى طلب وضع التذكرة الحالية في حالة تعليق (Hold) من فريق الصيانة."
+                                    : "Special Note: If you need to open an additional ticket for this equipment for an exceptional situation, please ask the Maintenance Team to change the existing ticket status to 'Hold'.")
+                            </div>
                         </div>
                     </div>
                     @if (ViewBag.ExistingActiveTicketId != null)
@@ -186,6 +192,12 @@
                     <div>
                         <strong class="text-danger">@(Loc.IsArabic ? "تنبيه: هذا الجهاز لديه تذكرة قيد المعالجة حالياً!" : "Warning: Active Ticket Already In Progress!")</strong>
                         <div class="mt-1 small" id="clientSideActiveTicketMsg"></div>
+                        <div class="mt-2 p-2 rounded bg-white bg-opacity-75 border border-danger-subtle text-dark small">
+                            <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                            @(Loc.IsArabic
+                                ? "ملاحظة للحالات الخاصة: لفتح تذكرة ثانية لنفس الجهاز، اطلب من فريق الصيانة تغيير حالة التذكرة المفتوحة إلى \"معلقة\" (Hold)."
+                                : "Special Note: To open another ticket for this device, ask the Maintenance Team to change the existing ticket's status to 'Hold'.")
+                        </div>
                     </div>
                 </div>
                 <a href="#" id="clientSideActiveTicketLink" class="btn btn-danger btn-sm text-nowrap ms-3" target="_blank">
@@ -1112,8 +1124,8 @@
             if (item && item.hasActiveTicket && item.activeTicketId) {
                 if (clientAlert && clientAlertMsg && clientAlertLink) {
                     clientAlertMsg.textContent = isAr 
-                        ? `الجهاز [${item.display || item.hospitalNo}] مرتبط بتذكرة نشطة حالياً برقم #${item.activeTicketId}. لا يمكن فتح تذكرة جديدة حتى يتم إغلاق التذكرة السابقة.`
-                        : `Asset [${item.display || item.hospitalNo}] already has an active open ticket (#${item.activeTicketId}). You cannot open another ticket until it is closed or canceled.`;
+                        ? `الجهاز [${item.display || item.hospitalNo}] مرتبط بتذكرة نشطة حالياً برقم #${item.activeTicketId}. لا يمكن فتح تذكرة جديدة حتى يتم إغلاق التذكرة السابقة أو وضعها في حالة تعليق (Hold).`
+                        : `Asset [${item.display || item.hospitalNo}] already has an active open ticket (#${item.activeTicketId}). You cannot open another ticket until it is closed, canceled, or placed on Hold.`;
                     clientAlertLink.href = `/Tickets/Details/${item.activeTicketId}`;
                     clientAlert.classList.remove("d-none");
                     clientAlert.classList.add("d-flex");
@@ -1121,7 +1133,7 @@
                 if (submitBtn) {
                     submitBtn.disabled = true;
                     submitBtn.classList.add("opacity-50");
-                    submitBtn.title = isAr ? "لا يمكن الإرسال لوجود تذكرة نشطة على هذا الجهاز" : "Cannot submit: an active ticket already exists for this device";
+                    submitBtn.title = isAr ? "لا يمكن الإرسال لوجود تذكرة نشطة (اطلب من فريق الصيانة وضعها في حالة تعليق Hold)" : "Cannot submit: active ticket exists (ask Maintenance to set on Hold)";
                 }
             } else {
                 if (clientAlert) {
@@ -1791,8 +1803,8 @@
                     if (sel && sel.hasActiveTicket && sel.activeTicketId) {
                         e.preventDefault();
                         alert(isAr 
-                            ? `تنبيه: لا يمكن إرسال تذكرة جديدة لهذا الجهاز لوجود تذكرة نشطة حالياً برقم #${sel.activeTicketId}.` 
-                            : `Warning: Cannot submit ticket. An active ticket (#${sel.activeTicketId}) is already in progress for this asset.`);
+                            ? `تنبيه: لا يمكن إرسال تذكرة جديدة لهذا الجهاز لوجود تذكرة نشطة حالياً برقم #${sel.activeTicketId}. لفتح تذكرة جديدة لحالة خاصة، اطلب من فريق الصيانة وضع التذكرة السابقة في حالة تعليق (Hold).` 
+                            : `Warning: Cannot submit ticket. An active ticket (#${sel.activeTicketId}) is already in progress for this asset. If you need to open another ticket for a special situation, please ask the Maintenance Team to change ticket #${sel.activeTicketId} to 'Hold'.`);
                         return false;
                     }
                 }
