@@ -28,14 +28,11 @@ namespace StockPortal.Controllers
         /// </summary>
         private string GetRequestDomainUser()
         {
-            string? rawUser = HttpContext?.Request?.Headers["LOGON_USER"].FirstOrDefault()
-                ?? HttpContext?.Request?.Headers["REMOTE_USER"].FirstOrDefault()
-                ?? HttpContext?.Request?.Headers["X-Remote-User"].FirstOrDefault()
-                ?? HttpContext?.User?.Identity?.Name;
-
+            // Prioritize server-verified authenticated identity
+            string? rawUser = _currentUserService.GetDomainUser();
             if (string.IsNullOrWhiteSpace(rawUser))
             {
-                rawUser = _currentUserService.GetDomainUser();
+                rawUser = HttpContext?.User?.Identity?.Name;
             }
 
             if (string.IsNullOrWhiteSpace(rawUser))
