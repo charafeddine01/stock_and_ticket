@@ -1,7 +1,7 @@
 <?php
 /**
  * SOLVIS Database Engine & Schema Initializer
- * Auto-initializes SQLite database with rich hospital sample data on first run
+ * Auto-initializes MySQL/MariaDB or SQLite database with rich hospital sample data on first run
  */
 
 require_once __DIR__ . '/../config.php';
@@ -14,8 +14,9 @@ class Database {
             return self::$pdo;
         }
 
-        try {
-            if (DB_DRIVER === 'mysql') {
+        // Try MySQL first if configured
+        if (DB_DRIVER === 'mysql') {
+            try {
                 $dsn = sprintf(
                     'mysql:host=%s;port=%d;dbname=%s;charset=%s',
                     DB_MYSQL_HOST,
@@ -28,36 +29,59 @@ class Database {
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
                 ]);
-            } else {
-                // SQLite Driver
-                $dbDir = dirname(DB_SQLITE_PATH);
-                if (!is_dir($dbDir)) {
-                    @mkdir($dbDir, 0777, true);
+
+                // Check if MySQL database has tables; if empty, auto-import schema.sql
+                $check = self::$pdo->query("SHOW TABLES LIKE 'departments'");
+                if ($check->rowCount() === 0) {
+                    self::initMySqlSchemaAndSeed(self::$pdo);
                 }
 
-                $isNewDb = !file_exists(DB_SQLITE_PATH) || filesize(DB_SQLITE_PATH) === 0;
+                return self::$pdo;
+            } catch (PDOException $e) {
+                // If MySQL fails (e.g. offline, local development, or access error), log and fallback to SQLite
+                error_log("SOLVIS: MySQL connection failed (" . $e->getMessage() . "). Falling back to SQLite.");
+            }
+        }
 
-                self::$pdo = new PDO('sqlite:' . DB_SQLITE_PATH, null, null, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ]);
+        // SQLite Driver (Zero-config fallback)
+        try {
+            $dbDir = dirname(DB_SQLITE_PATH);
+            if (!is_dir($dbDir)) {
+                @mkdir($dbDir, 0777, true);
+            }
 
-                // Enable foreign keys and WAL mode for high concurrency
-                self::$pdo->exec('PRAGMA foreign_keys = ON;');
-                self::$pdo->exec('PRAGMA journal_mode = WAL;');
+            $isNewDb = !file_exists(DB_SQLITE_PATH) || filesize(DB_SQLITE_PATH) === 0;
 
-                if ($isNewDb) {
-                    self::initSchemaAndSeed(self::$pdo);
-                }
+            self::$pdo = new PDO('sqlite:' . DB_SQLITE_PATH, null, null, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            ]);
+
+            // Enable foreign keys and WAL mode for high concurrency
+            self::$pdo->exec('PRAGMA foreign_keys = ON;');
+            self::$pdo->exec('PRAGMA journal_mode = WAL;');
+
+            if ($isNewDb) {
+                self::initSqliteSchemaAndSeed(self::$pdo);
             }
 
             return self::$pdo;
         } catch (PDOException $e) {
-            die("Database Connection Error: " . htmlspecialchars($e->getMessage()));
+            die("Database Error: " . htmlspecialchars($e->getMessage()));
         }
     }
 
-    public static function initSchemaAndSeed(PDO $db): void {
+    public static function initMySqlSchemaAndSeed(PDO $db): void {
+        $schemaFile = __DIR__ . '/../database/schema.sql';
+        if (file_exists($schemaFile)) {
+            $sql = file_get_contents($schemaFile);
+            if (!empty($sql)) {
+                $db->exec($sql);
+            }
+        }
+    }
+
+    public static function initSqliteSchemaAndSeed(PDO $db): void {
         $db->beginTransaction();
 
         try {
