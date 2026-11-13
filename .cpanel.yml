@@ -1,0 +1,8 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=$(if [ -d "$HOME/public_html/solvis" ]; then echo "$HOME/public_html/solvis"; elif [ -d "$HOME/solvis.charafeddine.xyz" ]; then echo "$HOME/solvis.charafeddine.xyz"; else echo "$HOME/public_html"; fi)
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/cp -R * $DEPLOYPATH/ 2>/dev/null || true
+    - /bin/cp -a .htaccess $DEPLOYPATH/ 2>/dev/null || true
+    - /bin/chmod -R 755 $DEPLOYPATH/database 2>/dev/null || true

@@ -1,4 +1,8 @@
-# Database files
+# Archives & Packages
+*.zip
+*.tar.gz
+*.tar.xz
+
 *.db
 *.db-shm
 *.db-wal
