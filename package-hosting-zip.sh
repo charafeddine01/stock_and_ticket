@@ -14,6 +14,7 @@ mkdir -p database
 zip -q -r "${ZIP_NAME}" \
     index.php \
     config.php \
+    build.sh \
     .htaccess \
     .cpanel.yml \
     maintenance_flowchart.html \
@@ -21,6 +22,7 @@ zip -q -r "${ZIP_NAME}" \
     app/ \
     templates/ \
     database/ \
+    public_html/ \
     wwwroot/ \
     DEPLOY_HOSTING_COM.md
 

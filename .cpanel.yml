@@ -1,8 +1,9 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=$(if [ -d "$HOME/public_html/solvis" ]; then echo "$HOME/public_html/solvis"; elif [ -d "$HOME/solvis.charafeddine.xyz" ]; then echo "$HOME/solvis.charafeddine.xyz"; else echo "$HOME/public_html"; fi)
+    - git config --global init.defaultBranch main 2>/dev/null || true
+    - export DEPLOYPATH=$(if [ -d "$HOME/public_html" ]; then echo "$HOME/public_html"; elif [ -d "$HOME/solvis.charafeddine.xyz" ]; then echo "$HOME/solvis.charafeddine.xyz"; else echo "$HOME/public_html"; fi)
     - /bin/mkdir -p $DEPLOYPATH
-    - /bin/cp -R * $DEPLOYPATH/ 2>/dev/null || true
-    - /bin/cp -a .htaccess $DEPLOYPATH/ 2>/dev/null || true
-    - /bin/chmod -R 755 $DEPLOYPATH/database 2>/dev/null || true
+    - if [ -d "public_html" ]; then /bin/cp -rf public_html/* $DEPLOYPATH/ 2>/dev/null || true; /bin/cp -a public_html/.htaccess $DEPLOYPATH/ 2>/dev/null || true; else /bin/cp -R * $DEPLOYPATH/ 2>/dev/null || true; /bin/cp -a .htaccess $DEPLOYPATH/ 2>/dev/null || true; fi
+    - /bin/chmod -R 775 $DEPLOYPATH/database 2>/dev/null || true
+    - /bin/chmod -R 755 $DEPLOYPATH 2>/dev/null || true
