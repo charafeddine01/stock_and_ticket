@@ -64,7 +64,7 @@ dotnet run
 ```
 
 Open your browser at:
-`http://localhost:5174` (or the port specified in your terminal output).
+`https://solvis.local` (or `https://localhost`).
 
 On initial startup, **SOLVIS** automatically initializes the database schema (`SOLVIS_DB` or `solvis.db`) and seeds initial department directories, equipment templates, and administrator profiles.
 

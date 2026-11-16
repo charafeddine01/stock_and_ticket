@@ -64,7 +64,14 @@
             string userDashboardUrl = Url.Action("Index", "Home")!;
             if (CurrentUser.IsMaintenance())
             {
-                userDashboardUrl = Url.Action("Index", "Home", new { tab = "analytics" })!;
+                if (CurrentUser.CanAccessTeamAnalytics() || CurrentUser.CanViewOwnAnalytics())
+                {
+                    userDashboardUrl = Url.Action("Index", "Home", new { tab = "analytics" })!;
+                }
+                else
+                {
+                    userDashboardUrl = Url.Action("Index", "Home", new { tab = "overview" })!;
+                }
             }
             else if (CurrentUser.IsEndUser())
             {
@@ -605,6 +612,8 @@
                         {
                             <li><a class="dropdown-item" href="@Url.Action("Profile", "Account")"><i class="fa-solid fa-users me-2 text-warning"></i> @Loc["Switch User (Testing)"]</a></li>
                         }
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="@Url.Action("Logout", "Account")"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i> @Loc["Log Out"]</a></li>
                     </ul>
                 </div>
 

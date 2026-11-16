@@ -98,9 +98,25 @@
                                     <td>
                                         @if (u.Role?.ToUpperInvariant() == "MAINTENANCE")
                                         {
-                                            <span class="badge @(u.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : u.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-dark")">
-                                                @Loc.TargetTeam(u.MaintenanceTeam ?? "IT")
-                                            </span>
+                                            <div>
+                                                <span class="badge @(u.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : u.MaintenanceTeam == "GENERAL" ? "bg-warning text-dark" : "bg-dark")">
+                                                    @Loc.TargetTeam(u.MaintenanceTeam ?? "IT")
+                                                </span>
+                                            </div>
+                                            <div class="mt-1 d-flex flex-wrap gap-1">
+                                                <span class="badge @(u.CanPrintAssetTags ? "bg-light text-primary border" : "bg-light text-muted opacity-50")" title="@(Loc.IsArabic ? "صلاحية طباعة الملصقات" : "Print Tags Privilege")">
+                                                    <i class="fa-solid fa-print"></i>
+                                                </span>
+                                                <span class="badge @(u.CanEditAssetTags ? "bg-light text-success border" : "bg-light text-muted opacity-50")" title="@(Loc.IsArabic ? "صلاحية تعديل الأجهزة" : "Edit Assets Privilege")">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                </span>
+                                                <span class="badge @(u.CanAccessTeamAnalytics ? "bg-light text-info border" : "bg-light text-muted opacity-50")" title="@(Loc.IsArabic ? "تحليلات الفريق" : "Team Analytics Privilege")">
+                                                    <i class="fa-solid fa-chart-line"></i>
+                                                </span>
+                                                <span class="badge @(u.CanViewOwnAnalytics ? "bg-light text-warning border" : "bg-light text-muted opacity-50")" title="@(Loc.IsArabic ? "التحليلات الشخصية" : "Personal Analytics Privilege")">
+                                                    <i class="fa-solid fa-user-check"></i>
+                                                </span>
+                                            </div>
                                         }
                                         else
                                         {
@@ -122,6 +138,9 @@
                                         }
                                     </td>
                                     <td class="text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-warning me-1" data-bs-toggle="modal" data-bs-target="#resetPasswordModal-@u.Id" title="@Loc["Reset Password"]">
+                                            <i class="fa-solid fa-key"></i> @Loc["Reset Password"]
+                                        </button>
                                         <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editRoleModal-@u.Id" title="@Loc["Manage Role & Team"]">
                                             <i class="fa-solid fa-user-gear"></i> @Loc["Manage Role & Team"]
                                         </button>
@@ -132,6 +151,45 @@
                                                 @(u.IsActive == true ? Loc["Deactivate"] : Loc["Activate"])
                                             </button>
                                         </form>
+
+                                        <!-- Modal: Reset Password -->
+                                        <div class="modal fade text-start" id="resetPasswordModal-@u.Id" tabindex="-1">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <form asp-action="ResetPassword" method="post">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@u.Id" />
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title fw-bold">
+                                                                <i class="fa-solid fa-key text-warning me-2"></i> @Loc["Reset Password"]: @u.DisplayFullName
+                                                            </h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="alert alert-info py-2 small mb-3">
+                                                                <i class="fa-solid fa-circle-info me-1"></i>
+                                                                @(Loc.IsArabic ? $"إعادة تعيين كلمة المرور للمستخدم ({u.DomainUser}). سيتمكن المستخدم من تسجيل الدخول بها فوراً." : $"Reset password for ({u.DomainUser}). The user will be able to log in with this new password immediately.")
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold small">@Loc["New Password"] <span class="text-danger">*</span></label>
+                                                                <input type="password" name="newPassword" class="form-control" placeholder="••••••••" required minlength="6" />
+                                                                <div class="form-text small text-muted">@(Loc.IsArabic ? "الحد الأدنى 6 أحرف" : "Minimum 6 characters")</div>
+                                                            </div>
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold small">@Loc["Confirm Password"] <span class="text-danger">*</span></label>
+                                                                <input type="password" name="confirmPassword" class="form-control" placeholder="••••••••" required minlength="6" />
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                                <i class="fa-solid fa-check me-1"></i> @Loc["Reset Password"]
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
 
                                         <!-- Modal: Edit Role & Team -->
                                         <div class="modal fade text-start" id="editRoleModal-@u.Id" tabindex="-1">
@@ -160,7 +218,41 @@
                                                                     <option value="BIOMEDICAL" selected="@(u.MaintenanceTeam == "BIOMEDICAL")">@Loc.TargetTeam("BIOMEDICAL")</option>
                                                                     <option value="GENERAL" selected="@(u.MaintenanceTeam == "GENERAL")">@Loc.TargetTeam("GENERAL")</option>
                                                                 </select>
-                                                                <div class="form-text small">@(Loc.IsArabic ? "مستخدمو الصيانة يمكنهم معالجة تذاكر فريقهم فقط." : "Maintenance users can view and handle tickets directed to their team only.")</div>
+                                                                <div class="form-text small mb-3">@(Loc.IsArabic ? "مستخدمو الصيانة يمكنهم معالجة تذاكر فريقهم فقط." : "Maintenance users can view and handle tickets directed to their team only.")</div>
+
+                                                                <div class="border rounded p-3 bg-light">
+                                                                    <label class="form-label fw-bold text-dark mb-2">
+                                                                        <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
+                                                                    </label>
+                                                                    <div class="form-check form-switch mb-2">
+                                                                        <input class="form-check-input" type="checkbox" role="switch" name="canPrintAssetTags" id="printTags-@u.Id" value="true" @(u.CanPrintAssetTags ? "checked" : "") />
+                                                                        <label class="form-check-label fw-semibold" for="printTags-@u.Id">
+                                                                            <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
+                                                                        </label>
+                                                                        <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
+                                                                    </div>
+                                                                    <div class="form-check form-switch mb-2">
+                                                                        <input class="form-check-input" type="checkbox" role="switch" name="canEditAssetTags" id="editTags-@u.Id" value="true" @(u.CanEditAssetTags ? "checked" : "") />
+                                                                        <label class="form-check-label fw-semibold" for="editTags-@u.Id">
+                                                                            <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
+                                                                        </label>
+                                                                        <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
+                                                                    </div>
+                                                                    <div class="form-check form-switch mb-2">
+                                                                        <input class="form-check-input" type="checkbox" role="switch" name="canAccessTeamAnalytics" id="teamAnalytics-@u.Id" value="true" @(u.CanAccessTeamAnalytics ? "checked" : "") />
+                                                                        <label class="form-check-label fw-semibold" for="teamAnalytics-@u.Id">
+                                                                            <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
+                                                                        </label>
+                                                                        <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
+                                                                    </div>
+                                                                    <div class="form-check form-switch mb-1">
+                                                                        <input class="form-check-input" type="checkbox" role="switch" name="canViewOwnAnalytics" id="ownAnalytics-@u.Id" value="true" @(u.CanViewOwnAnalytics ? "checked" : "") />
+                                                                        <label class="form-check-label fw-semibold" for="ownAnalytics-@u.Id">
+                                                                            <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
+                                                                        </label>
+                                                                        <div class="form-text small text-muted">@Loc["View own individual technician workload statistics and generate member activity report."]</div>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                         <div class="modal-footer">
@@ -437,11 +529,44 @@
                     </div>
                     <div class="mb-3" id="newUserTeamContainer" style="display: none;">
                         <label class="form-label fw-semibold">@Loc["Target Maintenance Team"]</label>
-                        <select name="MaintenanceTeam" class="form-select">
+                        <select name="MaintenanceTeam" class="form-select mb-3">
                             <option value="IT" selected>@Loc.TargetTeam("IT")</option>
                             <option value="BIOMEDICAL">@Loc.TargetTeam("BIOMEDICAL")</option>
                             <option value="GENERAL">@Loc.TargetTeam("GENERAL")</option>
                         </select>
+                        <div class="border rounded p-3 bg-light">
+                            <label class="form-label fw-bold text-dark mb-2">
+                                <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
+                            </label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="CanPrintAssetTags" id="newPrintTags" value="true" checked />
+                                <label class="form-check-label fw-semibold" for="newPrintTags">
+                                    <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
+                                </label>
+                                <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="CanEditAssetTags" id="newEditTags" value="true" checked />
+                                <label class="form-check-label fw-semibold" for="newEditTags">
+                                    <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
+                                </label>
+                                <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
+                            </div>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" name="CanAccessTeamAnalytics" id="newTeamAnalytics" value="true" checked />
+                                <label class="form-check-label fw-semibold" for="newTeamAnalytics">
+                                    <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
+                                </label>
+                                <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
+                            </div>
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" role="switch" name="CanViewOwnAnalytics" id="newOwnAnalytics" value="true" checked />
+                                <label class="form-check-label fw-semibold" for="newOwnAnalytics">
+                                    <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
+                                </label>
+                                <div class="form-text small text-muted">@Loc["View own individual technician workload statistics and generate member activity report."]</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">@Loc["Department Name"]</label>
@@ -452,6 +577,15 @@
                                 <option value="@d.Id">@d.DisplayName</option>
                             }
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">
+                            <i class="fa-solid fa-key me-1 text-primary"></i> @Loc["Initial Password"]
+                        </label>
+                        <input type="password" name="initialPassword" class="form-control" placeholder="••••••••" minlength="6" />
+                        <div class="form-text small text-muted">
+                            @(Loc.IsArabic ? "اختياري لتسجيل الدخول من الهواتف والأجهزة غير المرتبطة بالدومين. إذا تُرك فارغاً سيتم تعيين كلمة مرور افتراضية تلقائياً." : "Optional for login on mobile devices or outside Windows SSO. Defaults to standard password if left blank.")
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

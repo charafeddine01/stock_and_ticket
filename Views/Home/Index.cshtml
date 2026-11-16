@@ -1,4 +1,5 @@
 @model StockPortal.ViewModels.DashboardViewModel
+@inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
     ViewData["Title"] = Loc.IsArabic ? "لوحة التحكم والتحليلات" : "Executive IT & Maintenance Dashboard";
     bool isAr = Loc.IsArabic;
@@ -11,15 +12,26 @@
             <i class="fa-solid fa-chart-line me-2 text-primary"></i> @Loc["Executive Overview"]
         </button>
     </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link @(Model.ActiveTab == "analytics" ? "active" : "") fw-bold px-4 py-2" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#tab-analytics" type="button" role="tab" aria-controls="tab-analytics" aria-selected="@(Model.ActiveTab == "analytics" ? "true" : "false")">
-            <i class="fa-solid fa-users-gear me-2 text-info"></i> @Loc["Maintenance Team Analytics"]
-            @if (Model.FilteredClosedTickets > 0)
-            {
-                <span class="badge bg-success ms-1">@Model.FilteredClosedTickets @Loc["Closed Resolved"]</span>
-            }
-        </button>
-    </li>
+    @if (Model.CanAccessTeamAnalytics || (CurrentUser.IsMaintenance() && Model.CanViewOwnAnalytics))
+    {
+        <li class="nav-item" role="presentation">
+            <button class="nav-link @(Model.ActiveTab == "analytics" ? "active" : "") fw-bold px-4 py-2" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#tab-analytics" type="button" role="tab" aria-controls="tab-analytics" aria-selected="@(Model.ActiveTab == "analytics" ? "true" : "false")">
+                <i class="fa-solid @(!Model.CanAccessTeamAnalytics && Model.CanViewOwnAnalytics ? "fa-user-gear" : "fa-users-gear") me-2 text-info"></i>
+                @if (!Model.CanAccessTeamAnalytics && Model.CanViewOwnAnalytics)
+                {
+                    <span>@Loc["My Performance & Analytics"]</span>
+                }
+                else
+                {
+                    <span>@Loc["Maintenance Team Analytics"]</span>
+                }
+                @if (Model.FilteredClosedTickets > 0)
+                {
+                    <span class="badge bg-success ms-1">@Model.FilteredClosedTickets @Loc["Closed Resolved"]</span>
+                }
+            </button>
+        </li>
+    }
 </ul>
 
 <div class="tab-content" id="dashboardTabsContent">
@@ -448,6 +460,8 @@
     <!-- ========================================== -->
     <!-- TAB 2: MAINTENANCE & TEAMS ANALYTICS -->
     <!-- ========================================== -->
+    @if (Model.CanAccessTeamAnalytics || (CurrentUser.IsMaintenance() && Model.CanViewOwnAnalytics))
+    {
     <div class="tab-pane fade @(Model.ActiveTab == "analytics" ? "show active" : "")" id="tab-analytics" role="tabpanel" aria-labelledby="analytics-tab">
         
         <!-- Filter Bar Card -->
@@ -507,16 +521,29 @@
                         }
                     </div>
                     <div class="col-md-3 col-sm-6">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-white"><i class="fa-solid fa-user-gear me-1"></i> @Loc["Team Member / Specialist"]</span>
-                            <select name="techId" id="filterTechId" class="form-select" onchange="onTechFilterChanged()">
-                                <option value="">@Loc["All Team Members"]</option>
-                                @foreach (var member in Model.AvailableTechnicians)
-                                {
-                                    <option value="@member.Id" selected="@(Model.SelectedTechUserId == member.Id)">@member.DisplayFullName (@member.RoleDisplay)</option>
-                                }
-                            </select>
-                        </div>
+                        @if (!Model.CanAccessTeamAnalytics && Model.CanViewOwnAnalytics)
+                        {
+                            <input type="hidden" name="techId" value="@Model.SelectedTechUserId" />
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white text-muted"><i class="fa-solid fa-user-lock me-1"></i> @Loc["Team Member / Specialist"]</span>
+                                <span class="form-control bg-light fw-bold text-primary">
+                                    @(CurrentUser.GetFullName())
+                                </span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white"><i class="fa-solid fa-user-gear me-1"></i> @Loc["Team Member / Specialist"]</span>
+                                <select name="techId" id="filterTechId" class="form-select" onchange="onTechFilterChanged()">
+                                    <option value="">@Loc["All Team Members"]</option>
+                                    @foreach (var member in Model.AvailableTechnicians)
+                                    {
+                                        <option value="@member.Id" selected="@(Model.SelectedTechUserId == member.Id)">@member.DisplayFullName (@member.RoleDisplay)</option>
+                                    }
+                                </select>
+                            </div>
+                        }
                     </div>
                     <div class="col-md-2 col-sm-12 d-flex gap-2 align-items-center">
                         <span class="badge bg-success-subtle text-success border border-success-subtle py-2 px-2 w-100 d-flex align-items-center justify-content-center gap-1 small" title="@(isAr ? "التصفية تعمل فوراً وتلقائياً عند تغيير أي خيار" : "Filters update instantly on selection")">
@@ -635,6 +662,13 @@
                     <i class="fa-solid fa-users me-1"></i> @Model.TechnicianStats.Count @(isAr ? "فني ومختص" : "Technicians")
                 </span>
             </div>
+            @if (!Model.CanViewOwnAnalytics && CurrentUser.IsMaintenance())
+            {
+                <div class="alert alert-info py-2 px-3 m-3 mb-0 small">
+                    <i class="fa-solid fa-circle-info me-1"></i>
+                    @(isAr ? "تم تعطيل صلاحية استعراض التقارير والتحليلات الفردية من قِبل مسؤول النظام." : "Individual technician workload analytics has been restricted by system administrator.")
+                </div>
+            }
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
@@ -725,9 +759,12 @@
                                     </td>
                                     <td class="text-center">
                                         <div class="d-flex align-items-center justify-content-center gap-1">
-                                            <a href="@Url.Action("PrintMemberReport", new { userId = tech.UserId, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2" title="@Loc["Print Member Activity Report"]">
-                                                <i class="fa-solid fa-print me-1"></i> <span class="small">@Loc["Print Report"]</span>
-                                            </a>
+                                            @if (CurrentUser.IsAdmin() || (tech.UserId == CurrentUser.GetUserId() && Model.CanViewOwnAnalytics) || (tech.UserId != CurrentUser.GetUserId() && Model.CanAccessTeamAnalytics))
+                                            {
+                                                <a href="@Url.Action("PrintMemberReport", new { userId = tech.UserId, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2" title="@Loc["Print Member Activity Report"]">
+                                                    <i class="fa-solid fa-print me-1"></i> <span class="small">@Loc["Print Report"]</span>
+                                                </a>
+                                            }
                                             @if (Model.SelectedTechUserId != tech.UserId)
                                             {
                                                 <a href="@Url.Action("Index", new { tab = "analytics", teamFilter = Model.SelectedTeam, techId = tech.UserId, fromDate = Model.FromDate?.ToString("yyyy-MM-dd"), toDate = Model.ToDate?.ToString("yyyy-MM-dd"), datePreset = Model.DatePreset })" class="btn btn-sm btn-light border py-1 px-2" title="@Loc["Filter by this member"]">
@@ -746,59 +783,62 @@
 
         <!-- SECTION 2: Maintenance Teams Comparison & Issue Category Breakdown -->
         <div class="row g-4 mb-4">
-            <!-- Team Performance Cards -->
-            <div class="col-lg-7">
-                <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white py-3">
-                        <h6 class="fw-bold mb-0 text-dark">
-                            <i class="fa-solid fa-chart-column text-success me-2"></i> @(Model.CanFilterTeam ? Loc["Team Performance Comparison"] : Loc["My Team Analysis"])
-                        </h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            @foreach (var team in Model.TeamStats)
-                            {
-                                <div class="@(Model.TeamStats.Count == 1 ? "col-12" : "col-md-4")">
-                                    <div class="border rounded p-3 bg-light h-100 d-flex flex-column justify-content-between">
-                                        <div>
-                                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                                <span class="badge @(team.TeamCode == "IT" ? "bg-info text-dark" : team.TeamCode == "BIOMEDICAL" ? "bg-success" : "bg-warning text-dark") fs-6">
-                                                    @(isAr ? LocHelper.TranslateTargetTeam(team.TeamCode) : team.TeamCode)
+            @if (Model.TeamStats.Any())
+            {
+                <!-- Team Performance Cards -->
+                <div class="col-lg-7">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-white py-3">
+                            <h6 class="fw-bold mb-0 text-dark">
+                                <i class="fa-solid fa-chart-column text-success me-2"></i> @(Model.CanFilterTeam ? Loc["Team Performance Comparison"] : Loc["My Team Analysis"])
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                @foreach (var team in Model.TeamStats)
+                                {
+                                    <div class="@(Model.TeamStats.Count == 1 ? "col-12" : "col-md-4")">
+                                        <div class="border rounded p-3 bg-light h-100 d-flex flex-column justify-content-between">
+                                            <div>
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="badge @(team.TeamCode == "IT" ? "bg-info text-dark" : team.TeamCode == "BIOMEDICAL" ? "bg-success" : "bg-warning text-dark") fs-6">
+                                                        @(isAr ? LocHelper.TranslateTargetTeam(team.TeamCode) : team.TeamCode)
+                                                    </span>
+                                                    <span class="small fw-bold text-success">@team.ResolutionRate%</span>
+                                                </div>
+                                                <div class="progress mb-3" style="height: 6px;">
+                                                    <div class="progress-bar bg-success" style="width: @team.ResolutionRate%;"></div>
+                                                </div>
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span>@Loc["Closed Resolved"]:</span>
+                                                    <span class="fw-bold text-success">@team.ClosedTickets</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span>@Loc["Active Queue"]:</span>
+                                                    <span class="fw-bold text-warning">@team.ActiveTickets</span>
+                                                </div>
+                                                <div class="d-flex justify-content-between small text-muted mb-1">
+                                                    <span>@Loc["Urgent"]:</span>
+                                                    <span class="fw-bold text-danger">@team.UrgentTickets</span>
+                                                </div>
+                                            </div>
+                                            <div class="border-top pt-2 mt-2 d-flex justify-content-between small">
+                                                <span class="text-muted">@Loc["Avg Turnaround"]:</span>
+                                                <span class="fw-bold text-dark">
+                                                    @(team.AverageResolutionHours > 24 ? $"{Math.Round(team.AverageResolutionHours / 24.0, 1)} {Loc["Days"]}" : $"{team.AverageResolutionHours} {Loc["Hours"]}")
                                                 </span>
-                                                <span class="small fw-bold text-success">@team.ResolutionRate%</span>
                                             </div>
-                                            <div class="progress mb-3" style="height: 6px;">
-                                                <div class="progress-bar bg-success" style="width: @team.ResolutionRate%;"></div>
-                                            </div>
-                                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                                <span>@Loc["Closed Resolved"]:</span>
-                                                <span class="fw-bold text-success">@team.ClosedTickets</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                                <span>@Loc["Active Queue"]:</span>
-                                                <span class="fw-bold text-warning">@team.ActiveTickets</span>
-                                            </div>
-                                            <div class="d-flex justify-content-between small text-muted mb-1">
-                                                <span>@Loc["Urgent"]:</span>
-                                                <span class="fw-bold text-danger">@team.UrgentTickets</span>
-                                            </div>
-                                        </div>
-                                        <div class="border-top pt-2 mt-2 d-flex justify-content-between small">
-                                            <span class="text-muted">@Loc["Avg Turnaround"]:</span>
-                                            <span class="fw-bold text-dark">
-                                                @(team.AverageResolutionHours > 24 ? $"{Math.Round(team.AverageResolutionHours / 24.0, 1)} {Loc["Days"]}" : $"{team.AverageResolutionHours} {Loc["Hours"]}")
-                                            </span>
                                         </div>
                                     </div>
-                                </div>
-                            }
+                                }
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            }
 
             <!-- Issue Categories Breakdown -->
-            <div class="col-lg-5">
+            <div class="@(Model.TeamStats.Any() ? "col-lg-5" : "col-12")">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white py-3">
                         <h6 class="fw-bold mb-0 text-dark">
@@ -960,6 +1000,7 @@
         </div>
 
     </div>
+    }
 </div>
 
 @section Scripts {

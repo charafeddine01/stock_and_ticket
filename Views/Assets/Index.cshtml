@@ -95,19 +95,22 @@
                 : null;
         }
         <div class="d-flex gap-2 align-items-center">
-            <a href="@Url.Action("PrintBulkTags", new { 
-                search = ViewBag.Search, 
-                status = ViewBag.SelectedStatus, 
-                type = ViewBag.SelectedType, 
-                roomId = ViewBag.SelectedRoomId,
-                categoryId = ViewBag.SelectedCategoryId,
-                warranty = ViewBag.SelectedWarranty,
-                calibration = ViewBag.SelectedCalibration,
-                ids = activeIdsParam
-            })" class="btn btn-outline-dark btn-sm shadow-sm" target="_blank" title="@(isArabic ? (isFiltered ? $"طباعة ملصقات QR للأجهزة المصفاة فقط ({Model.Count()} أصل)" : "طباعة ملصقات QR لكافة الأجهزة") : (isFiltered ? $"Print QR Tags for filtered devices only ({Model.Count()} assets)" : "Print QR Tags for all devices"))">
-                <i class="fa-solid fa-qrcode me-1 text-primary"></i>
-                <span>@(isArabic ? (isFiltered ? $"طباعة ملصقات QR المصفاة ({Model.Count()})" : "طباعة ملصقات QR") : (isFiltered ? $"Print Filtered QR Tags ({Model.Count()})" : "Print QR Tags"))</span>
-            </a>
+            @if (CurrentUser.CanPrintAssetTags())
+            {
+                <a href="@Url.Action("PrintBulkTags", new { 
+                    search = ViewBag.Search, 
+                    status = ViewBag.SelectedStatus, 
+                    type = ViewBag.SelectedType, 
+                    roomId = ViewBag.SelectedRoomId,
+                    categoryId = ViewBag.SelectedCategoryId,
+                    warranty = ViewBag.SelectedWarranty,
+                    calibration = ViewBag.SelectedCalibration,
+                    ids = activeIdsParam
+                })" class="btn btn-outline-dark btn-sm shadow-sm" target="_blank" title="@(isArabic ? (isFiltered ? $"طباعة ملصقات QR للأجهزة المصفاة فقط ({Model.Count()} أصل)" : "طباعة ملصقات QR لكافة الأجهزة") : (isFiltered ? $"Print QR Tags for filtered devices only ({Model.Count()} assets)" : "Print QR Tags for all devices"))">
+                    <i class="fa-solid fa-qrcode me-1 text-primary"></i>
+                    <span>@(isArabic ? (isFiltered ? $"طباعة ملصقات QR المصفاة ({Model.Count()})" : "طباعة ملصقات QR") : (isFiltered ? $"Print Filtered QR Tags ({Model.Count()})" : "Print QR Tags"))</span>
+                </a>
+            }
             <a href="@Url.Action("ExportCsv", new { 
                 search = ViewBag.Search, 
                 status = ViewBag.SelectedStatus, 
@@ -289,10 +292,13 @@
                                     <a href="@Url.Action("Details", new { id = item.Id })" class="btn btn-outline-primary" title="@Loc["View Details"]">
                                         <i class="fa-solid fa-eye"></i>
                                     </a>
-                                    <a href="@Url.Action("PrintTag", new { id = item.Id })" class="btn btn-outline-dark" title="@(isArabic ? "طباعة ملصق الأصل ورمز QR" : "Print QR Tag Label")" target="_blank">
-                                        <i class="fa-solid fa-qrcode"></i>
-                                    </a>
-                                    @if (CurrentUser.CanManageAsset(item))
+                                    @if (CurrentUser.CanPrintAssetTag(item))
+                                    {
+                                        <a href="@Url.Action("PrintTag", new { id = item.Id })" class="btn btn-outline-dark" title="@(isArabic ? "طباعة ملصق الأصل ورمز QR" : "Print QR Tag Label")" target="_blank">
+                                            <i class="fa-solid fa-qrcode"></i>
+                                        </a>
+                                    }
+                                    @if (CurrentUser.CanManageAsset(item) && CurrentUser.CanEditAsset(item))
                                     {
                                         <a href="@Url.Action("Edit", new { id = item.Id })" class="btn btn-outline-secondary" title="@Loc["Edit"]">
                                             <i class="fa-solid fa-pen"></i>

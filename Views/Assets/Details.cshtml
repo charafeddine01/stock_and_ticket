@@ -22,9 +22,12 @@
         </div>
     </div>
     <div class="d-flex gap-2 flex-wrap">
-        <a href="@Url.Action("PrintTag", new { id = asset.Id })" class="btn btn-outline-dark" target="_blank">
-            <i class="fa-solid fa-print me-1"></i> @Loc["Print Tag"]
-        </a>
+        @if (CurrentUser.CanPrintAssetTag(asset))
+        {
+            <a href="@Url.Action("PrintTag", new { id = asset.Id })" class="btn btn-outline-dark" target="_blank">
+                <i class="fa-solid fa-print me-1"></i> @Loc["Print Tag"]
+            </a>
+        }
         @if (asset.HasVendorMaintenance)
         {
             <a href="@Url.Action("VendorMaintenanceSticker", new { id = asset.Id })" class="btn btn-outline-info text-dark" target="_blank" title="@(Loc.IsArabic ? "طباعة ملصق الصيانة المجانية بعد البيع" : "Print Vendor Maintenance Sticker")">
@@ -58,9 +61,12 @@
             <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
                 <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
             </button>
-            <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
-                <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
-            </a>
+            @if (CurrentUser.CanEditAsset(asset))
+            {
+                <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
+                    <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
+                </a>
+            }
             <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
                 <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
             </button>
@@ -196,7 +202,7 @@
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0 fw-bold"><i class="fa-solid fa-cube text-primary me-2"></i> @(Loc.IsArabic ? "حزم البرامج المثبتة على محطة العمل" : "Installed Workstation Software Packages")</h6>
-                @if (canManage)
+                @if (canManage && CurrentUser.CanEditAsset(asset))
                 {
                     <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-outline-primary btn-sm">
                         <i class="fa-solid fa-pen-to-square me-1"></i> @(Loc.IsArabic ? "تهيئة البرامج" : "Configure Softwares")
@@ -235,7 +241,7 @@
                     <span class="badge bg-secondary ms-1">@asset.CompatibleSpareParts.Count</span>
                 </h6>
                 <div class="d-flex gap-2">
-                    @if (canManage)
+                    @if (canManage && CurrentUser.CanEditAsset(asset))
                     {
                         <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-outline-secondary btn-sm" title="@(Loc.IsArabic ? "تعديل قطع الغيار المتوافقة" : "Manage Compatibility")">
                             <i class="fa-solid fa-link me-1"></i> @(Loc.IsArabic ? "إدارة التوافق" : "Link Parts")
@@ -345,7 +351,7 @@
                             <i class="fa-solid fa-circle-info me-1"></i>
                             @(Loc.IsArabic ? "لم يتم تفعيل صيانة المورد المجانية بعد البيع لهذا الأصل." : "Free vendor maintenance coverage is not enabled for this asset.")
                         </div>
-                        @if (canManage)
+                        @if (canManage && CurrentUser.CanEditAsset(asset))
                         {
                             <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-sm btn-outline-secondary">
                                 <i class="fa-solid fa-toggle-on me-1"></i> @(Loc.IsArabic ? "تفعيل من التعديل" : "Enable via Edit")

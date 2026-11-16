@@ -65,6 +65,10 @@ namespace StockPortal.Tests
             mock.Setup(s => s.CanManageAssets()).Returns(true);
             mock.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
             mock.Setup(s => s.CanAccessAsset(It.IsAny<Asset>())).Returns(true);
+            mock.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(true);
+            mock.Setup(s => s.CanEditAssetTags()).Returns(true);
+            mock.Setup(s => s.CanPrintAssetTags()).Returns(true);
+            mock.Setup(s => s.CanPrintAssetTag(It.IsAny<Asset>())).Returns(true);
             mock.Setup(s => s.CanCreateAssetInDepartment(It.IsAny<string>())).Returns(true);
             return mock;
         }

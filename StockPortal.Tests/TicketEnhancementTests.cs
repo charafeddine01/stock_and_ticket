@@ -889,6 +889,8 @@ namespace StockPortal.Tests
             mockUserService.Setup(s => s.IsAdmin()).Returns(false);
             mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
             mockUserService.Setup(s => s.GetUserId()).Returns(601);
+            mockUserService.Setup(s => s.CanAccessTeamAnalytics()).Returns(true);
+            mockUserService.Setup(s => s.CanViewOwnAnalytics()).Returns(true);
 
             var controller = new HomeController(context, mockUserService.Object);
 
@@ -1005,6 +1007,8 @@ namespace StockPortal.Tests
             mockUserService.Setup(s => s.CanAccessDashboard()).Returns(true);
             mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
             mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUserService.Setup(s => s.CanAccessTeamAnalytics()).Returns(true);
+            mockUserService.Setup(s => s.CanViewOwnAnalytics()).Returns(true);
 
             var controller = new HomeController(context, mockUserService.Object);
 
@@ -1034,7 +1038,9 @@ namespace StockPortal.Tests
             var mockUserService = new Mock<ICurrentUserService>();
             mockUserService.Setup(s => s.CanAccessDashboard()).Returns(true);
             mockUserService.Setup(s => s.IsMaintenance()).Returns(true);
-            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT"); // IT user attempting to inspect Biomedical tech!
+            mockUserService.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUserService.Setup(s => s.CanAccessTeamAnalytics()).Returns(true);
+            mockUserService.Setup(s => s.CanViewOwnAnalytics()).Returns(true); // IT user attempting to inspect Biomedical tech!
             mockUserService.Setup(s => s.GetUserId()).Returns(999);
 
             var controller = new HomeController(context, mockUserService.Object);

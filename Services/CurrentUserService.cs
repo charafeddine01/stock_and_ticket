@@ -32,6 +32,17 @@ namespace StockPortal.Services
         bool CanManageDeviceForm(DeviceForm form);
         bool CanManageUsers();
         bool CanAccessDashboard();
+
+        // Maintenance Privilege Toggles & Team Isolation Guards
+        bool CanPrintAssetTags();
+        bool CanPrintAssetTag(Asset? asset);
+        bool CanEditAssetTags();
+        bool CanEditAsset(Asset? asset);
+        bool CanAccessTeamAnalytics();
+        bool CanViewOwnAnalytics();
+
+        // Authentication Method (Password vs Windows SSO)
+        string GetAuthMethod();
     }
 
     public class CurrentUserService : ICurrentUserService
@@ -102,6 +113,17 @@ namespace StockPortal.Services
             }
 
             return SystemRoles.EndUser;
+        }
+
+        public string GetAuthMethod()
+        {
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null) return "WindowsSSO";
+            if (context.Items.TryGetValue("AuthMethod", out var authObj) && authObj != null)
+            {
+                return authObj.ToString()!;
+            }
+            return context.User.FindFirst("AuthMethod")?.Value ?? "WindowsSSO";
         }
 
         private static bool CheckIsAdminRole(string? role)
@@ -298,6 +320,70 @@ namespace StockPortal.Services
         public bool CanAccessDashboard()
         {
             return IsAdmin() || IsMaintenance();
+        }
+
+        public bool CanPrintAssetTags()
+        {
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            var user = GetCurrentUser();
+            if (user != null) return user.CanPrintAssetTags;
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanPrintAssetTags");
+            if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
+            return true;
+        }
+
+        public bool CanPrintAssetTag(Asset? asset)
+        {
+            if (asset == null) return false;
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            if (!CanPrintAssetTags()) return false;
+            var myTeam = GetMaintenanceTeam();
+            return string.Equals(asset.MaintenanceTeam, myTeam, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool CanEditAssetTags()
+        {
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            var user = GetCurrentUser();
+            if (user != null) return user.CanEditAssetTags;
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanEditAssetTags");
+            if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
+            return true;
+        }
+
+        public bool CanEditAsset(Asset? asset)
+        {
+            if (asset == null) return false;
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            if (!CanEditAssetTags()) return false;
+            var myTeam = GetMaintenanceTeam();
+            return string.Equals(asset.MaintenanceTeam, myTeam, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public bool CanAccessTeamAnalytics()
+        {
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            var user = GetCurrentUser();
+            if (user != null) return user.CanAccessTeamAnalytics;
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanAccessTeamAnalytics");
+            if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
+            return true;
+        }
+
+        public bool CanViewOwnAnalytics()
+        {
+            if (IsAdmin()) return true;
+            if (!IsMaintenance()) return false;
+            var user = GetCurrentUser();
+            if (user != null) return user.CanViewOwnAnalytics;
+            var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanViewOwnAnalytics");
+            if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
+            return true;
         }
     }
 }

@@ -230,6 +230,26 @@ namespace StockPortal.Data
                 }
             }
 
+            // Ensure all users have a secure password hash if null
+            try
+            {
+                var usersWithoutPassword = context.Users.Where(u => string.IsNullOrEmpty(u.PasswordHash)).ToList();
+                if (usersWithoutPassword.Any())
+                {
+                    var hasher = new Microsoft.AspNetCore.Identity.PasswordHasher<User>();
+                    foreach (var u in usersWithoutPassword)
+                    {
+                        string defaultPass = (u.Role == SystemRoles.Admin || (u.Role != null && u.Role.Contains("ADMIN"))) ? "Admin@123" : "Solvis@2026";
+                        u.PasswordHash = hasher.HashPassword(u, defaultPass);
+                    }
+                    context.SaveChanges();
+                }
+            }
+            catch
+            {
+                // Ignore transient schema transitions
+            }
+
             // Seed Assets if empty
             if (!context.Assets.Any())
             {
@@ -724,6 +744,12 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN name_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE users ADD COLUMN full_name_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE users ADD COLUMN role_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN maintenance_team TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN can_print_asset_tags INTEGER NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN can_edit_asset_tags INTEGER NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN can_access_team_analytics INTEGER NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN can_view_own_analytics INTEGER NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE users ADD COLUMN password_hash TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE rooms ADD COLUMN room_name_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN equipment_type_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN status_ar TEXT NULL;");
@@ -888,6 +914,12 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `name_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `full_name_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `role_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `maintenance_team` varchar(50) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `can_print_asset_tags` tinyint(1) NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `can_edit_asset_tags` tinyint(1) NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `can_access_team_analytics` tinyint(1) NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `can_view_own_analytics` tinyint(1) NOT NULL DEFAULT 1;");
+                    TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `password_hash` varchar(512) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `rooms` ADD COLUMN IF NOT EXISTS `room_name_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `equipment_type_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");

@@ -28,6 +28,8 @@ namespace StockPortal.ViewModels
 
         // Maintenance & Teams Analytics Tab Properties
         public string ActiveTab { get; set; } = "overview"; // "overview" or "analytics"
+        public bool CanAccessTeamAnalytics { get; set; } = true;
+        public bool CanViewOwnAnalytics { get; set; } = true;
         public DateTime? FromDate { get; set; }
         public DateTime? ToDate { get; set; }
         public string SelectedTeam { get; set; } = "ALL";
@@ -229,5 +231,60 @@ namespace StockPortal.ViewModels
         public SparePart? FilterPart { get; set; }
         public int? TicketId { get; set; }
         public string? Department { get; set; }
+    }
+
+    public class LoginViewModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Username is required")]
+        [System.ComponentModel.DataAnnotations.Display(Name = "Username")]
+        public string Username { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required")]
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Display(Name = "Password")]
+        public string Password { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Display(Name = "Remember Me")]
+        public bool RememberMe { get; set; } = true;
+
+        public string? ReturnUrl { get; set; }
+    }
+
+    public class ChangePasswordViewModel
+    {
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Display(Name = "Current Password")]
+        public string? CurrentPassword { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "New password is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters")]
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Display(Name = "New Password")]
+        public string NewPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Please confirm your new password")]
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Compare("NewPassword", ErrorMessage = "Passwords do not match")]
+        [System.ComponentModel.DataAnnotations.Display(Name = "Confirm New Password")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+
+    public class AdminResetPasswordViewModel
+    {
+        public int UserId { get; set; }
+        public string? FullName { get; set; }
+        public string? DomainUser { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "New password is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters")]
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Display(Name = "New Password")]
+        public string NewPassword { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Please confirm the new password")]
+        [System.ComponentModel.DataAnnotations.DataType(System.ComponentModel.DataAnnotations.DataType.Password)]
+        [System.ComponentModel.DataAnnotations.Compare("NewPassword", ErrorMessage = "Passwords do not match")]
+        [System.ComponentModel.DataAnnotations.Display(Name = "Confirm Password")]
+        public string ConfirmPassword { get; set; } = "";
     }
 }

@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StockPortal.Data;
 using StockPortal.Models;
+using StockPortal.Services;
 
 namespace StockPortal.Middleware
 {
@@ -29,12 +30,15 @@ namespace StockPortal.Middleware
         {
             var path = context.Request.Path.Value?.ToLower() ?? "";
 
-            // 1. Bypass authentication check for static assets and the AccessDenied rejection page & public ticket submission
+            // 1. Bypass authentication check for static assets, Login, Logout, AutoLogin, AccessDenied rejection page & public ticket submission
             if (path.StartsWith("/css") ||
                 path.StartsWith("/js") ||
                 path.StartsWith("/lib") ||
                 path.StartsWith("/images") ||
                 path.StartsWith("/favicon.ico") ||
+                path.StartsWith("/account/login") ||
+                path.StartsWith("/account/logout") ||
+                path.StartsWith("/account/autologin") ||
                 path.StartsWith("/account/accessdenied") ||
                 path.StartsWith("/account/submitaccessticket"))
             {
@@ -42,7 +46,69 @@ namespace StockPortal.Middleware
                 return;
             }
 
-            // 2. Resolve Physical Workstation / PC Username
+            // 2. Check if user already has an active, authenticated Cookie session
+            var idClaim = context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (context.User?.Identity?.IsAuthenticated == true && int.TryParse(idClaim, out int authUserId) && authUserId > 0)
+            {
+                var cookieUser = await dbContext.Users
+                    .Include(u => u.Department)
+                    .FirstOrDefaultAsync(u => u.Id == authUserId);
+
+                if (cookieUser != null && cookieUser.IsActive == true)
+                {
+                    bool isAuthAdmin = string.Equals(cookieUser.Role, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
+                                       (cookieUser.Role != null && (cookieUser.Role.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) || cookieUser.Role.Contains("SYSADMIN", StringComparison.OrdinalIgnoreCase)));
+
+                    User effectiveUser = cookieUser;
+                    var cookieSessionUserId = HasSession(context) ? context.Session.GetInt32("ActiveUserId") : null;
+
+                    if (cookieSessionUserId.HasValue)
+                    {
+                        if (isAuthAdmin)
+                        {
+                            var switchedUser = await dbContext.Users
+                                .Include(u => u.Department)
+                                .FirstOrDefaultAsync(u => u.Id == cookieSessionUserId.Value);
+
+                            if (switchedUser != null && switchedUser.IsActive == true)
+                            {
+                                effectiveUser = switchedUser;
+                            }
+                            else if (HasSession(context))
+                            {
+                                context.Session.Remove("ActiveUserId");
+                            }
+                        }
+                        else if (HasSession(context))
+                        {
+                            context.Session.Remove("ActiveUserId");
+                        }
+                    }
+
+                    context.Items["CurrentUser"] = effectiveUser;
+                    context.Items["PhysicalUser"] = cookieUser;
+                    context.Items["IsPhysicalAdmin"] = isAuthAdmin;
+                    context.Items["AuthMethod"] = context.User.FindFirst("AuthMethod")?.Value ?? "Password";
+
+                    await _next(context);
+                    return;
+                }
+                else
+                {
+                    await SafeSignOutAsync(context);
+                    context.Response.Redirect("/Account/Login");
+                    return;
+                }
+            }
+
+            // 3. Check if user explicitly logged out on this browser
+            if (context.Request.Cookies.ContainsKey("SOLVIS.SignedOut"))
+            {
+                context.Response.Redirect($"/Account/Login?returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
+                return;
+            }
+
+            // 4. Resolve Physical Workstation / PC Username for Windows SSO Auto-Login
             // In production, prioritize server-verified Windows identity (IIS / Kestrel Negotiate).
             string? rawUser = null;
             if (context.User?.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(context.User.Identity.Name))
@@ -53,7 +119,7 @@ namespace StockPortal.Middleware
             // Reverse-proxy identity headers are honored ONLY if explicitly trusted in config and from loopback/trusted proxy
             bool trustProxyHeaders = configuration.GetValue<bool>("Authentication:TrustProxyHeaders");
             var remoteIp = context.Connection.RemoteIpAddress;
-            bool isLoopbackOrLocal = remoteIp != null && (IPAddress.IsLoopback(remoteIp) || remoteIp.ToString() == "127.0.0.1" || remoteIp.ToString() == "::1");
+            bool isLoopbackOrLocal = remoteIp != null && NetworkInfoHelper.IsLocalHost(remoteIp);
 
             if (string.IsNullOrWhiteSpace(rawUser) && trustProxyHeaders && isLoopbackOrLocal)
             {
@@ -62,10 +128,19 @@ namespace StockPortal.Middleware
                     ?? context.Request.Headers["X-Remote-User"].FirstOrDefault();
             }
 
-            // In local development environment ONLY, allow fallback to host process username for frictionless dev
-            if (string.IsNullOrWhiteSpace(rawUser) && env.IsDevelopment())
+            // In local development environment, allow fallback to host developer username ONLY for loopback (PC itself).
+            // Remote devices / phones connecting over LAN must never automatically inherit the developer/admin account!
+            if (string.IsNullOrWhiteSpace(rawUser))
             {
-                rawUser = Environment.UserName;
+                if (env.IsDevelopment() && isLoopbackOrLocal)
+                {
+                    rawUser = Environment.UserName;
+                }
+                else
+                {
+                    // Phones and non-local network devices: resolve client device name
+                    rawUser = NetworkInfoHelper.GetClientDeviceName(context);
+                }
             }
 
             // Normalize PC username: strip DOMAIN\ or user@domain
@@ -80,15 +155,15 @@ namespace StockPortal.Middleware
             }
             cleanUsername = cleanUsername.Trim();
 
-            // If no username can be resolved at all, reject
+            // If no username can be resolved at all, redirect to Login
             if (string.IsNullOrWhiteSpace(cleanUsername))
             {
                 await SafeSignOutAsync(context);
-                context.Response.Redirect("/Account/AccessDenied?reason=NotFound&username=Unknown");
+                context.Response.Redirect($"/Account/Login?returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
                 return;
             }
 
-            // 3. Query database strictly for the physical PC user first
+            // 5. Query database strictly for the physical PC user first
             var search = cleanUsername.ToLower();
             var rawSearch = rawUser?.ToLower();
 
@@ -98,15 +173,16 @@ namespace StockPortal.Middleware
                     (u.DomainUser != null && (u.DomainUser.ToLower() == search || (rawSearch != null && u.DomainUser.ToLower() == rawSearch))) ||
                     (u.FullName != null && u.FullName.ToLower() == search)
                 );
-            // 4. REJECTION CHECK 1: Physical PC user not registered in database
+
+            // 6. REJECTION CHECK 1: Physical PC user not registered in database -> Redirect to Login
             if (pcUser == null)
             {
                 await SafeSignOutAsync(context);
-                context.Response.Redirect($"/Account/AccessDenied?reason=NotFound&username={Uri.EscapeDataString(cleanUsername)}");
+                context.Response.Redirect($"/Account/Login?returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
                 return;
             }
 
-            // 5. REJECTION CHECK 2: Physical PC user is INACTIVE (isActive == 0 / false)
+            // 7. REJECTION CHECK 2: Physical PC user is INACTIVE (isActive == 0 / false)
             if (pcUser.IsActive != true)
             {
                 await SafeSignOutAsync(context);
@@ -114,7 +190,7 @@ namespace StockPortal.Middleware
                 return;
             }
 
-            // 6. Check physical user admin privileges for optional testing profile switch
+            // 8. Check physical user admin privileges for optional testing profile switch
             bool isPhysicalAdmin = string.Equals(pcUser.Role, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
                                    (pcUser.Role != null && (pcUser.Role.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) || pcUser.Role.Contains("SYSADMIN", StringComparison.OrdinalIgnoreCase)));
 
@@ -147,10 +223,11 @@ namespace StockPortal.Middleware
                 }
             }
 
-            // 7. AUTO-LOGIN: User found and ACTIVE!
+            // 9. AUTO-LOGIN: User found and ACTIVE!
             context.Items["CurrentUser"] = matchedUser;
             context.Items["PhysicalUser"] = pcUser;
             context.Items["IsPhysicalAdmin"] = isPhysicalAdmin;
+            context.Items["AuthMethod"] = "WindowsSSO";
 
             var claims = new List<Claim>
             {
@@ -160,13 +237,19 @@ namespace StockPortal.Middleware
                 new Claim("DomainUser", matchedUser.DomainUser ?? cleanUsername),
                 new Claim("Department", matchedUser.Department?.Name ?? "General"),
                 new Claim("PhysicalUserRole", pcUser.Role ?? SystemRoles.EndUser),
-                new Claim("IsPhysicalAdmin", isPhysicalAdmin ? "true" : "false")
+                new Claim("IsPhysicalAdmin", isPhysicalAdmin ? "true" : "false"),
+                new Claim("AuthMethod", "WindowsSSO")
             };
 
             if (!string.IsNullOrWhiteSpace(matchedUser.MaintenanceTeam))
             {
                 claims.Add(new Claim("MaintenanceTeam", matchedUser.MaintenanceTeam));
             }
+
+            claims.Add(new Claim("CanPrintAssetTags", matchedUser.CanPrintAssetTags ? "true" : "false"));
+            claims.Add(new Claim("CanEditAssetTags", matchedUser.CanEditAssetTags ? "true" : "false"));
+            claims.Add(new Claim("CanAccessTeamAnalytics", matchedUser.CanAccessTeamAnalytics ? "true" : "false"));
+            claims.Add(new Claim("CanViewOwnAnalytics", matchedUser.CanViewOwnAnalytics ? "true" : "false"));
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             context.User = new ClaimsPrincipal(identity);

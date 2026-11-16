@@ -403,6 +403,10 @@ namespace StockPortal.Controllers
             {
                 return Forbid();
             }
+            if (!_currentUserService.IsAdmin() && !_currentUserService.CanEditAsset(asset))
+            {
+                return Forbid();
+            }
 
             // Find matching device form
             var matchingForm = await _context.DeviceForms.FirstOrDefaultAsync(f => 
@@ -447,6 +451,10 @@ namespace StockPortal.Controllers
 
             // RBAC Guard: URL tampering prevention
             if (!_currentUserService.CanAccessAsset(existing) || !_currentUserService.CanManageAsset(existing))
+            {
+                return Forbid();
+            }
+            if (!_currentUserService.IsAdmin() && !_currentUserService.CanEditAsset(existing))
             {
                 return Forbid();
             }
@@ -719,6 +727,7 @@ namespace StockPortal.Controllers
             if (asset == null) return NotFound();
 
             if (!_currentUserService.CanAccessAsset(asset)) return Forbid();
+            if (!_currentUserService.IsAdmin() && !_currentUserService.CanPrintAssetTag(asset)) return Forbid();
 
             return View(asset);
         }
@@ -734,6 +743,7 @@ namespace StockPortal.Controllers
             string? calibration = null, 
             string? ids = null)
         {
+            if (!_currentUserService.IsAdmin() && !_currentUserService.CanPrintAssetTags()) return Forbid();
             var query = _context.Assets
                 .Include(a => a.User)
                 .Include(a => a.Room)

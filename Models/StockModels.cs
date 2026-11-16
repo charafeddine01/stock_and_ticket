@@ -269,6 +269,27 @@ namespace StockPortal.Models
         [Column("isActive")]
         public bool? IsActive { get; set; } = true;
 
+        [Column("password_hash")]
+        [StringLength(512)]
+        [Display(Name = "Password Hash")]
+        public string? PasswordHash { get; set; }
+
+        [Column("can_print_asset_tags")]
+        [Display(Name = "Can Print Asset Tags")]
+        public bool CanPrintAssetTags { get; set; } = true;
+
+        [Column("can_edit_asset_tags")]
+        [Display(Name = "Can Edit Asset Tags")]
+        public bool CanEditAssetTags { get; set; } = true;
+
+        [Column("can_access_team_analytics")]
+        [Display(Name = "Can Access Team Analytics")]
+        public bool CanAccessTeamAnalytics { get; set; } = true;
+
+        [Column("can_view_own_analytics")]
+        [Display(Name = "Can View Own Analytics")]
+        public bool CanViewOwnAnalytics { get; set; } = true;
+
         [NotMapped]
         public string RoleDisplay
         {

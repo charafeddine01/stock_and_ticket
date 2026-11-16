@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -16,11 +17,13 @@ namespace StockPortal.Controllers
     {
         private readonly StockDbContext _context;
         private readonly ICurrentUserService _currentUserService;
+        private readonly IPasswordHasher<User> _passwordHasher;
 
-        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService)
+        public DirectoryController(StockDbContext context, ICurrentUserService currentUserService, IPasswordHasher<User>? passwordHasher = null)
         {
             _context = context;
             _currentUserService = currentUserService;
+            _passwordHasher = passwordHasher ?? new PasswordHasher<User>();
         }
 
         /// <summary>
@@ -138,7 +141,7 @@ namespace StockPortal.Controllers
         // POST: Directory/CreateUser
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateUser(User user)
+        public async Task<IActionResult> CreateUser(User user, string? initialPassword = null)
         {
             if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
@@ -150,21 +153,82 @@ namespace StockPortal.Controllers
                     user.DomainUser = user.DomainUser.Trim();
                 }
                 user.Role = string.IsNullOrWhiteSpace(user.Role) ? SystemRoles.EndUser : user.Role.Trim().ToUpperInvariant();
-                if (user.Role != SystemRoles.Maintenance)
+                if (user.Role == SystemRoles.Maintenance)
+                {
+                    // Keep submitted privilege toggles
+                }
+                else if (user.Role == SystemRoles.Admin)
                 {
                     user.MaintenanceTeam = null;
+                    user.CanPrintAssetTags = true;
+                    user.CanEditAssetTags = true;
+                    user.CanAccessTeamAnalytics = true;
+                    user.CanViewOwnAnalytics = true;
                 }
+                else
+                {
+                    user.MaintenanceTeam = null;
+                    user.CanPrintAssetTags = false;
+                    user.CanEditAssetTags = false;
+                    user.CanAccessTeamAnalytics = false;
+                    user.CanViewOwnAnalytics = false;
+                }
+
+                string passToHash = !string.IsNullOrWhiteSpace(initialPassword) 
+                    ? initialPassword 
+                    : ((user.Role == SystemRoles.Admin) ? "Admin@123" : "Solvis@2026");
+                user.PasswordHash = _passwordHasher.HashPassword(user, passToHash);
+
                 _context.Users.Add(user);
                 await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"User {user.FullName} (PC Username: {user.DomainUser}, Role: {user.Role}) registered successfully with Auto-Login enabled.";
+                TempData["SuccessMessage"] = $"User {user.FullName} (Username: {user.DomainUser}, Role: {user.Role}) registered successfully with password authentication & auto-login enabled.";
             }
+            return RedirectToAction(nameof(Index), new { tab = "users" });
+        }
+
+        // POST: Directory/ResetPassword
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetPassword(int id, string newPassword, string confirmPassword)
+        {
+            if (!await ValidateRbacHandshakeAsync()) return Forbid();
+
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 6)
+            {
+                TempData["ErrorMessage"] = "Password must be at least 6 characters.";
+                return RedirectToAction(nameof(Index), new { tab = "users" });
+            }
+
+            if (newPassword != confirmPassword)
+            {
+                TempData["ErrorMessage"] = "Passwords do not match.";
+                return RedirectToAction(nameof(Index), new { tab = "users" });
+            }
+
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            user.PasswordHash = _passwordHasher.HashPassword(user, newPassword);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = $"Password for {user.FullName} ({user.DomainUser}) was successfully reset.";
             return RedirectToAction(nameof(Index), new { tab = "users" });
         }
 
         // POST: Directory/UpdateUserRole
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateUserRole(int id, string role, string? maintenanceTeam)
+        public async Task<IActionResult> UpdateUserRole(
+            int id, 
+            string role, 
+            string? maintenanceTeam,
+            bool canPrintAssetTags = false,
+            bool canEditAssetTags = false,
+            bool canAccessTeamAnalytics = false,
+            bool canViewOwnAnalytics = false)
         {
             if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
@@ -172,10 +236,33 @@ namespace StockPortal.Controllers
             if (user != null)
             {
                 user.Role = string.IsNullOrWhiteSpace(role) ? SystemRoles.EndUser : role.Trim().ToUpperInvariant();
-                user.MaintenanceTeam = (user.Role == SystemRoles.Maintenance) ? maintenanceTeam : null;
+                if (user.Role == SystemRoles.Maintenance)
+                {
+                    user.MaintenanceTeam = maintenanceTeam;
+                    user.CanPrintAssetTags = canPrintAssetTags;
+                    user.CanEditAssetTags = canEditAssetTags;
+                    user.CanAccessTeamAnalytics = canAccessTeamAnalytics;
+                    user.CanViewOwnAnalytics = canViewOwnAnalytics;
+                }
+                else if (user.Role == SystemRoles.Admin)
+                {
+                    user.MaintenanceTeam = null;
+                    user.CanPrintAssetTags = true;
+                    user.CanEditAssetTags = true;
+                    user.CanAccessTeamAnalytics = true;
+                    user.CanViewOwnAnalytics = true;
+                }
+                else
+                {
+                    user.MaintenanceTeam = null;
+                    user.CanPrintAssetTags = false;
+                    user.CanEditAssetTags = false;
+                    user.CanAccessTeamAnalytics = false;
+                    user.CanViewOwnAnalytics = false;
+                }
                 _context.Update(user);
                 await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"User {user.FullName} role updated to {user.Role} {(user.MaintenanceTeam != null ? $"({user.MaintenanceTeam})" : "")}.";
+                TempData["SuccessMessage"] = $"User {user.FullName} role and permissions updated.";
             }
             return RedirectToAction(nameof(Index), new { tab = "users" });
         }

@@ -38,6 +38,21 @@ namespace StockPortal.Controllers
             bool isAdmin = _currentUserService.IsAdmin();
             bool isMaint = _currentUserService.IsMaintenance();
             string? userMaintTeam = _currentUserService.GetMaintenanceTeam();
+            bool canAccessTeamAnalytics = !isMaint || _currentUserService.CanAccessTeamAnalytics();
+            bool canViewOwnAnalytics = !isMaint || _currentUserService.CanViewOwnAnalytics();
+            int currentUserId = _currentUserService.GetUserId();
+
+            if (isMaint)
+            {
+                if (!canAccessTeamAnalytics && !canViewOwnAnalytics)
+                {
+                    tab = "overview";
+                }
+                else if (!canAccessTeamAnalytics && canViewOwnAnalytics)
+                {
+                    techId = currentUserId;
+                }
+            }
 
             // End Users land directly on their tickets queue / workplace
             if (_currentUserService.IsEndUser())
@@ -198,6 +213,11 @@ namespace StockPortal.Controllers
                 )
             ).OrderBy(u => u.FullName).ToList();
 
+            if (isMaint && !canAccessTeamAnalytics && canViewOwnAnalytics)
+            {
+                availableTechnicians = availableTechnicians.Where(u => u.Id == currentUserId).ToList();
+            }
+
             // Prevent unauthorized cross-team technician filter
             if (techId.HasValue && techId.Value > 0)
             {
@@ -325,13 +345,31 @@ namespace StockPortal.Controllers
                 .ThenBy(s => s.FullName)
                 .ToList();
 
+            if (isMaint)
+            {
+                if (!canAccessTeamAnalytics && canViewOwnAnalytics)
+                {
+                    techStats = techStats.Where(s => s.UserId == currentUserId).ToList();
+                }
+                else if (canAccessTeamAnalytics && !canViewOwnAnalytics)
+                {
+                    techStats = new List<TechnicianWorkloadStat>();
+                }
+                else if (!canAccessTeamAnalytics && !canViewOwnAnalytics)
+                {
+                    techStats = new List<TechnicianWorkloadStat>();
+                }
+            }
+
             // ----------------------------------------------------
             // Team Performance Comparison (IT vs BIOMEDICAL vs GENERAL)
             // Admin sees all 3 teams; Maintenance user sees ONLY their team
             // ----------------------------------------------------
-            var teamCodes = isAdmin && normalizedTeam == "ALL"
-                ? new[] { MaintenanceTeams.IT, MaintenanceTeams.Biomedical, MaintenanceTeams.General }
-                : new[] { normalizedTeam };
+            var teamCodes = (isMaint && !canAccessTeamAnalytics)
+                ? Array.Empty<string>()
+                : (isAdmin && normalizedTeam == "ALL"
+                    ? new[] { MaintenanceTeams.IT, MaintenanceTeams.Biomedical, MaintenanceTeams.General }
+                    : new[] { normalizedTeam });
 
             var teamStats = new List<TeamAnalyticsStat>();
 
@@ -481,7 +519,9 @@ namespace StockPortal.Controllers
                 RecentMaintenance = recentMaintenance,
 
                 // Analytics Tab Data
-                ActiveTab = string.Equals(tab, "analytics", StringComparison.OrdinalIgnoreCase) ? "analytics" : "overview",
+                ActiveTab = string.Equals(tab, "analytics", StringComparison.OrdinalIgnoreCase) && (canAccessTeamAnalytics || (isMaint && canViewOwnAnalytics)) ? "analytics" : "overview",
+                CanAccessTeamAnalytics = canAccessTeamAnalytics,
+                CanViewOwnAnalytics = canViewOwnAnalytics,
                 FromDate = rangeStart,
                 ToDate = rangeEnd,
                 SelectedTeam = normalizedTeam,
@@ -527,10 +567,22 @@ namespace StockPortal.Controllers
             if (_currentUserService.IsMaintenance())
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
-                if (!string.Equals(targetUser.MaintenanceTeam, myTeam, StringComparison.OrdinalIgnoreCase) &&
-                    targetUser.Id != _currentUserService.GetUserId())
+                int currentUserId = _currentUserService.GetUserId();
+
+                if (targetUser.Id == currentUserId)
                 {
-                    return Forbid();
+                    if (!_currentUserService.CanViewOwnAnalytics())
+                    {
+                        return Forbid();
+                    }
+                }
+                else
+                {
+                    if (!_currentUserService.CanAccessTeamAnalytics() ||
+                        !string.Equals(targetUser.MaintenanceTeam, myTeam, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Forbid();
+                    }
                 }
             }
 

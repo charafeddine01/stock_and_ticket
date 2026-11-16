@@ -51,7 +51,7 @@
                     </div>
                     <div class="d-flex justify-content-between text-muted mt-1">
                         <span>@Loc["Machine / Host:"]</span>
-                        <strong class="text-dark">@Environment.UserDomainName</strong>
+                        <strong class="text-dark">@(ViewBag.ClientDevice ?? Environment.MachineName)</strong>
                     </div>
                     <div class="d-flex justify-content-between text-muted mt-1">
                         <span>@(Loc.IsArabic ? "عنوان IP للجهاز:" : "Client IP Address:")</span>
@@ -63,8 +63,29 @@
                     </div>
                     <div class="d-flex justify-content-between text-muted mt-1">
                         <span>@Loc["Authentication:"]</span>
-                        <span class="badge bg-success py-0">@Loc["Windows SSO (No Password)"]</span>
+                        @if (ViewBag.AuthMethod == "Password")
+                        {
+                            <span class="badge bg-primary py-0"><i class="fa-solid fa-key me-1"></i> @Loc["Username & Password"]</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success py-0"><i class="fa-brands fa-windows me-1"></i> @Loc["Windows SSO (No Password)"]</span>
+                        }
                     </div>
+
+                    @if (ViewBag.IsViewingSelf == true)
+                    {
+                        <div class="pt-3 border-top mt-3 d-flex flex-column gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                <i class="fa-solid fa-key"></i>
+                                <span>@Loc["Change Password"]</span>
+                            </button>
+                            <a asp-action="Logout" asp-controller="Account" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center gap-2">
+                                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                                <span>@Loc["Log Out"]</span>
+                            </a>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -219,6 +240,45 @@
                     </div>
                 }
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Change Password -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="ChangePassword" asp-controller="Account" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="changePasswordModalLabel">
+                        <i class="fa-solid fa-key text-primary me-2"></i> @Loc["Change Password"]
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">@Loc["Current Password"]</label>
+                        <input type="password" name="CurrentPassword" class="form-control" placeholder="••••••••" autocomplete="current-password" />
+                        <div class="form-text small text-muted">@(Loc.IsArabic ? "اتركه فارغاً إذا كنت تسجل كلمة المرور لأول مرة" : "Leave blank if setting a password for the first time")</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">@Loc["New Password"] <span class="text-danger">*</span></label>
+                        <input type="password" name="NewPassword" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="new-password" />
+                        <div class="form-text small text-muted">@(Loc.IsArabic ? "الحد الأدنى 6 أحرف" : "Minimum 6 characters")</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">@Loc["Confirm New Password"] <span class="text-danger">*</span></label>
+                        <input type="password" name="ConfirmPassword" class="form-control" placeholder="••••••••" required minlength="6" autocomplete="new-password" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">@Loc["Cancel"]</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="fa-solid fa-check me-1"></i> @Loc["Save Changes"]
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
