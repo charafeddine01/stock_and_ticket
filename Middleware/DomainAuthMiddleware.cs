@@ -88,7 +88,50 @@ namespace StockPortal.Middleware
                     context.Items["CurrentUser"] = effectiveUser;
                     context.Items["PhysicalUser"] = cookieUser;
                     context.Items["IsPhysicalAdmin"] = isAuthAdmin;
-                    context.Items["AuthMethod"] = context.User.FindFirst("AuthMethod")?.Value ?? "Password";
+                    var authMethod = context.User.FindFirst("AuthMethod")?.Value ?? "Password";
+
+                    bool canAccessWindowsAuth = SafeGetBool(configuration, "Authentication:CanAccessUsingWindowsAuth", true);
+                    bool canAccessPassword = SafeGetBool(configuration, "Authentication:CanAccessUsingUsernameAndPassword", true);
+
+                    if ((string.Equals(authMethod, "WindowsSSO", StringComparison.OrdinalIgnoreCase) || string.Equals(authMethod, "Windows", StringComparison.OrdinalIgnoreCase)) && !canAccessWindowsAuth)
+                    {
+                        await SafeSignOutAsync(context);
+                        context.Response.Redirect("/Account/Login");
+                        return;
+                    }
+
+                    if (string.Equals(authMethod, "Password", StringComparison.OrdinalIgnoreCase) && !canAccessPassword)
+                    {
+                        await SafeSignOutAsync(context);
+                        context.Response.Redirect("/Account/Login");
+                        return;
+                    }
+
+                    context.Items["AuthMethod"] = authMethod;
+
+                    var cookieClaims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.NameIdentifier, effectiveUser.Id.ToString()),
+                        new Claim(ClaimTypes.Name, effectiveUser.FullName ?? effectiveUser.DomainUser ?? "User"),
+                        new Claim(ClaimTypes.Role, effectiveUser.Role ?? SystemRoles.EndUser),
+                        new Claim("DomainUser", effectiveUser.DomainUser ?? string.Empty),
+                        new Claim("Department", effectiveUser.Department?.Name ?? "General"),
+                        new Claim("PhysicalUserRole", cookieUser.Role ?? SystemRoles.EndUser),
+                        new Claim("IsPhysicalAdmin", isAuthAdmin ? "true" : "false"),
+                        new Claim("AuthMethod", authMethod),
+                        new Claim("CanPrintAssetTags", effectiveUser.CanPrintAssetTags ? "true" : "false"),
+                        new Claim("CanEditAssetTags", effectiveUser.CanEditAssetTags ? "true" : "false"),
+                        new Claim("CanAccessTeamAnalytics", effectiveUser.CanAccessTeamAnalytics ? "true" : "false"),
+                        new Claim("CanViewOwnAnalytics", effectiveUser.CanViewOwnAnalytics ? "true" : "false")
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(effectiveUser.MaintenanceTeam))
+                    {
+                        cookieClaims.Add(new Claim("MaintenanceTeam", effectiveUser.MaintenanceTeam));
+                    }
+
+                    var cookieIdentity = new ClaimsIdentity(cookieClaims, CookieAuthenticationDefaults.AuthenticationScheme);
+                    context.User = new ClaimsPrincipal(cookieIdentity);
 
                     await _next(context);
                     return;
@@ -109,6 +152,15 @@ namespace StockPortal.Middleware
             }
 
             // 4. Resolve Physical Workstation / PC Username for Windows SSO Auto-Login
+            bool canAccessWindowsSSO = SafeGetBool(configuration, "Authentication:CanAccessUsingWindowsAuth", true);
+            if (!canAccessWindowsSSO)
+            {
+                // Windows SSO is disabled by administrator. Redirect directly to username/password Login.
+                await SafeSignOutAsync(context);
+                context.Response.Redirect($"/Account/Login?returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
+                return;
+            }
+
             // In production, prioritize server-verified Windows identity (IIS / Kestrel Negotiate).
             string? rawUser = null;
             if (context.User?.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(context.User.Identity.Name))
@@ -117,11 +169,11 @@ namespace StockPortal.Middleware
             }
 
             // Reverse-proxy identity headers are honored ONLY if explicitly trusted in config and from loopback/trusted proxy
-            bool trustProxyHeaders = configuration.GetValue<bool>("Authentication:TrustProxyHeaders");
-            var remoteIp = context.Connection.RemoteIpAddress;
-            bool isLoopbackOrLocal = remoteIp != null && NetworkInfoHelper.IsLocalHost(remoteIp);
+            bool trustProxyHeaders = SafeGetBool(configuration, "Authentication:TrustProxyHeaders", false);
+            var clientIp = NetworkInfoHelper.GetClientIpAddress(context);
+            bool isLoopbackOrLocal = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == NetworkInfoHelper.GetLocalPrimaryIpAddress();
 
-            if (string.IsNullOrWhiteSpace(rawUser) && trustProxyHeaders && isLoopbackOrLocal)
+            if (string.IsNullOrWhiteSpace(rawUser) && trustProxyHeaders)
             {
                 rawUser = context.Request.Headers["LOGON_USER"].FirstOrDefault()
                     ?? context.Request.Headers["REMOTE_USER"].FirstOrDefault()
@@ -260,6 +312,21 @@ namespace StockPortal.Middleware
         private static bool HasSession(HttpContext context)
         {
             return context.Features.Get<Microsoft.AspNetCore.Http.Features.ISessionFeature>()?.Session != null;
+        }
+
+        private static bool SafeGetBool(IConfiguration? config, string key, bool defaultValue = true)
+        {
+            if (config == null) return defaultValue;
+            try
+            {
+                var section = config.GetSection(key);
+                if (section == null || string.IsNullOrWhiteSpace(section.Value)) return defaultValue;
+                return bool.TryParse(section.Value, out bool val) ? val : defaultValue;
+            }
+            catch
+            {
+                return defaultValue;
+            }
         }
 
         private static async Task SafeSignOutAsync(HttpContext context)

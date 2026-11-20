@@ -102,6 +102,13 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure HTTP pipeline
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto,
+    KnownNetworks = { },
+    KnownProxies = { System.Net.IPAddress.Parse("127.0.0.1"), System.Net.IPAddress.Parse("::1") }
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");

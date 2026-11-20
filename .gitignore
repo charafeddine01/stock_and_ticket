@@ -36,6 +36,8 @@ x86/
 bld/
 [Bb]in/
 [Oo]bj/
+publish_bin/
+publish_linux/
 
 # User-specific files
 *.rsuser

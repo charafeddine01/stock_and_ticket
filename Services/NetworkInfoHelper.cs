@@ -237,13 +237,13 @@ namespace StockPortal.Services
         {
             if (httpContext == null) return "Unknown-Device";
 
-            var remoteIp = httpContext.Connection.RemoteIpAddress;
-            if (IsLocalHost(remoteIp))
+            var clientIp = GetClientIpAddress(httpContext);
+
+            // Only return local machine name if the actual client IP is local loopback
+            if (clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == GetLocalPrimaryIpAddress())
             {
                 return Environment.MachineName;
             }
-
-            var clientIp = GetClientIpAddress(httpContext);
 
             // Attempt reverse DNS resolution on intranet LAN
             try

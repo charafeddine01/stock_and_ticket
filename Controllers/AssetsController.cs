@@ -164,6 +164,8 @@ namespace StockPortal.Controllers
                 .Include(a => a.MaintenanceRecords).ThenInclude(m => m.Supplier)
                 .Include(a => a.Tickets).ThenInclude(t => t.Status)
                 .Include(a => a.Tickets).ThenInclude(t => t.Handler).ThenInclude(h => h!.TechUser)
+                .Include(a => a.VendorMaintenanceLogs).ThenInclude(l => l.RecordedByUser)
+                .Include(a => a.VendorMaintenanceLogs).ThenInclude(l => l.Supplier)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (asset == null) return NotFound();
@@ -215,7 +217,7 @@ namespace StockPortal.Controllers
         // GET: Assets/Create
         public async Task<IActionResult> Create(int? deviceFormId = null)
         {
-            if (!_currentUserService.CanManageAssets()) return Forbid();
+            if (!_currentUserService.CanManageAssets() || !_currentUserService.CanEditAssetTags()) return Forbid();
 
             var formsQuery = _context.DeviceForms.AsQueryable();
             if (_currentUserService.IsMaintenance())
@@ -257,7 +259,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Asset asset, int deviceFormId, IFormCollection? formCollection = null, int[]? compatibleSparePartIds = null)
         {
-            if (!_currentUserService.CanManageAssets()) return Forbid();
+            if (!_currentUserService.CanManageAssets() || !_currentUserService.CanEditAssetTags()) return Forbid();
             formCollection ??= new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
 
             var selectedForm = await _context.DeviceForms.FindAsync(deviceFormId);
@@ -596,7 +598,7 @@ namespace StockPortal.Controllers
             var asset = await _context.Assets.FindAsync(assetId);
             if (asset == null) return NotFound();
 
-            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+            if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
             // Close existing history record if open
             var previousHistory = await _context.AssetHistories
@@ -640,7 +642,7 @@ namespace StockPortal.Controllers
             var asset = await _context.Assets.FindAsync(id);
             if (asset == null) return NotFound();
 
-            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+            if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
             asset.Status = "Retired";
             _context.Update(asset);
@@ -846,6 +848,9 @@ namespace StockPortal.Controllers
             }
 
             var assets = await query.OrderBy(a => a.HospitalNo ?? a.Id.ToString()).ToListAsync();
+            ViewBag.Department = _currentUserService.IsMaintenance()
+                ? _currentUserService.GetMaintenanceTeam()
+                : (assets.Select(a => a.MaintenanceTeam).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "IT");
             return View(assets);
         }
 
@@ -857,7 +862,7 @@ namespace StockPortal.Controllers
             var asset = await _context.Assets.FindAsync(assetId);
             if (asset == null) return NotFound();
 
-            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+            if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
             asset.NeedsCalibration = true;
             if (intervalDays.HasValue && intervalDays.Value > 0)
@@ -1071,7 +1076,7 @@ namespace StockPortal.Controllers
         {
             var asset = await _context.Assets.FindAsync(assetId);
             if (asset == null) return NotFound();
-            if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+            if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
             asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares ?? Array.Empty<string>());
             await _context.SaveChangesAsync();
@@ -1079,28 +1084,59 @@ namespace StockPortal.Controllers
             return RedirectToAction(nameof(Details), new { id = assetId });
         }
 
-        // POST: Assets/RecordVendorMaintenanceVisit (Task 5)
+        // POST: Assets/RecordVendorMaintenanceVisit (Task 3 & 5)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> RecordVendorMaintenanceVisit(int assetId, DateTime visitDate, string? engineerName, string? notes)
+        public async Task<IActionResult> RecordVendorMaintenanceVisit(
+            int assetId, 
+            DateTime visitDate, 
+            string? engineerName, 
+            string? engineerPhone = null,
+            string? serviceReportNumber = null,
+            string? notes = null,
+            string? status = "Completed")
         {
-            var asset = await _context.Assets.FindAsync(assetId);
+            var asset = await _context.Assets
+                .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceLogs)
+                .FirstOrDefaultAsync(a => a.Id == assetId);
             if (asset == null) return NotFound();
             if (!_currentUserService.CanManageAsset(asset)) return Forbid();
 
+            var currentLogs = asset.VendorMaintenanceLogs?.ToList() ?? new List<VendorMaintenanceLog>();
+            int visitNo = currentLogs.Any()
+                ? currentLogs.Max(l => l.VisitNumber) + 1
+                : (asset.VendorMaintenanceCompletedCount + 1);
+
+            var vendorLog = new VendorMaintenanceLog
+            {
+                AssetId = asset.Id,
+                SupplierId = asset.SupplierId,
+                VisitNumber = visitNo,
+                VisitDate = visitDate,
+                EngineerName = string.IsNullOrWhiteSpace(engineerName) ? (asset.Supplier?.Name ?? "Vendor Service Engineer") : engineerName.Trim(),
+                EngineerPhone = engineerPhone?.Trim(),
+                ServiceReportNumber = serviceReportNumber?.Trim(),
+                Notes = notes?.Trim(),
+                Status = string.IsNullOrWhiteSpace(status) ? "Completed" : status.Trim(),
+                RecordedByUserId = _currentUserService.GetUserId(),
+                CreatedAt = DateTime.Now
+            };
+
+            _context.VendorMaintenanceLogs.Add(vendorLog);
+
+            // Backward compatibility with JSON column
             var visits = asset.VendorVisitsList;
-            int visitNo = (asset.VendorMaintenanceCompletedCount) + 1;
             visits.Add(new VendorVisitItem
             {
                 VisitNumber = visitNo,
                 VisitDate = visitDate,
-                EngineerName = string.IsNullOrWhiteSpace(engineerName) ? "Vendor Service Engineer" : engineerName.Trim(),
-                Notes = notes?.Trim(),
+                EngineerName = vendorLog.EngineerName,
+                Notes = vendorLog.Notes,
                 RecordedAt = DateTime.Now
             });
-
             asset.VendorVisitsList = visits;
-            asset.VendorMaintenanceCompletedCount = visits.Count;
+            asset.VendorMaintenanceCompletedCount = Math.Max(asset.VendorMaintenanceCompletedCount + 1, visits.Count);
 
             // Also record in asset maintenance logs
             _context.AssetMaintenances.Add(new AssetMaintenance
@@ -1110,13 +1146,127 @@ namespace StockPortal.Controllers
                 TimStamp = DateTime.Now,
                 UserId = _currentUserService.GetUserId(),
                 SupplierId = asset.SupplierId,
-                WorkOrderStatus = "Completed",
-                Description = $"Vendor Free After-Sale Maintenance Visit #{visitNo} conducted on {visitDate:yyyy-MM-dd} by {engineerName ?? "Vendor Engineer"}. Notes: {notes ?? "Periodic free checkup completed successfully."}"
+                WorkOrderStatus = vendorLog.Status,
+                Description = $"Vendor Free After-Sale Maintenance Visit #{visitNo} conducted on {visitDate:yyyy-MM-dd} by {vendorLog.EngineerName}. Service Report: {serviceReportNumber ?? "N/A"}. Notes: {notes ?? "Periodic free checkup completed successfully."}"
             });
 
             await _context.SaveChangesAsync();
             TempData["SuccessMessage"] = $"Vendor Maintenance Visit #{visitNo} was successfully recorded for asset {asset.HospitalNo ?? ("#" + asset.Id)}!";
             return RedirectToAction(nameof(Details), new { id = assetId });
+        }
+
+        // GET: Assets/VendorMaintenanceLogs (Task 3)
+        [HttpGet]
+        public async Task<IActionResult> VendorMaintenanceLogs(
+            string? team = null,
+            int? supplierId = null,
+            string? search = null,
+            string? status = null,
+            string? datePreset = null)
+        {
+            var userTeam = _currentUserService.GetMaintenanceTeam();
+            bool isAdmin = _currentUserService.IsAdmin();
+
+            var query = _context.VendorMaintenanceLogs
+                .Include(l => l.Asset).ThenInclude(a => a!.Category)
+                .Include(l => l.Asset).ThenInclude(a => a!.Room)
+                .Include(l => l.Supplier)
+                .Include(l => l.RecordedByUser)
+                .AsQueryable();
+
+            // RBAC Filtering: non-admin maintenance users only see logs for their assigned team
+            if (!isAdmin && !string.IsNullOrWhiteSpace(userTeam))
+            {
+                query = query.Where(l => l.Asset != null && l.Asset.MaintenanceTeam == userTeam);
+            }
+            else if (!string.IsNullOrWhiteSpace(team) && team != "ALL")
+            {
+                query = query.Where(l => l.Asset != null && l.Asset.MaintenanceTeam == team);
+            }
+
+            // Vendor filter
+            if (supplierId.HasValue && supplierId.Value > 0)
+            {
+                query = query.Where(l => l.SupplierId == supplierId.Value || (l.Asset != null && l.Asset.SupplierId == supplierId.Value));
+            }
+
+            // Status filter
+            if (!string.IsNullOrWhiteSpace(status) && status != "ALL")
+            {
+                query = query.Where(l => l.Status == status);
+            }
+
+            // Date preset filter
+            if (!string.IsNullOrWhiteSpace(datePreset))
+            {
+                var now = DateTime.Today;
+                switch (datePreset.ToLowerInvariant())
+                {
+                    case "today":
+                        query = query.Where(l => l.VisitDate >= now);
+                        break;
+                    case "this_week":
+                        var startOfWeek = now.AddDays(-(int)now.DayOfWeek);
+                        query = query.Where(l => l.VisitDate >= startOfWeek);
+                        break;
+                    case "this_month":
+                        var startOfMonth = new DateTime(now.Year, now.Month, 1);
+                        query = query.Where(l => l.VisitDate >= startOfMonth);
+                        break;
+                    case "this_year":
+                        var startOfYear = new DateTime(now.Year, 1, 1);
+                        query = query.Where(l => l.VisitDate >= startOfYear);
+                        break;
+                }
+            }
+
+            // Search filter
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim().ToLower();
+                query = query.Where(l =>
+                    (l.EngineerName != null && l.EngineerName.ToLower().Contains(s)) ||
+                    (l.EngineerPhone != null && l.EngineerPhone.ToLower().Contains(s)) ||
+                    (l.ServiceReportNumber != null && l.ServiceReportNumber.ToLower().Contains(s)) ||
+                    (l.Notes != null && l.Notes.ToLower().Contains(s)) ||
+                    (l.Asset != null && l.Asset.HospitalNo != null && l.Asset.HospitalNo.ToLower().Contains(s)) ||
+                    (l.Asset != null && l.Asset.Brand != null && l.Asset.Brand.ToLower().Contains(s)) ||
+                    (l.Asset != null && l.Asset.SerialNo != null && l.Asset.SerialNo.ToLower().Contains(s)) ||
+                    (l.Supplier != null && l.Supplier.Name != null && l.Supplier.Name.ToLower().Contains(s))
+                );
+            }
+
+            var logs = await query.OrderByDescending(l => l.VisitDate).ThenByDescending(l => l.Id).ToListAsync();
+
+            // Compute statistics
+            var totalCount = logs.Count;
+            var thisMonthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            var thisMonthCount = logs.Count(l => l.VisitDate >= thisMonthStart);
+            var uniqueAssetsServiced = logs.Select(l => l.AssetId).Distinct().Count();
+
+            // Total assets with active vendor maintenance contracts in the scope
+            var contractsQuery = _context.Assets.Where(a => a.HasVendorMaintenance);
+            if (!isAdmin && !string.IsNullOrWhiteSpace(userTeam))
+            {
+                contractsQuery = contractsQuery.Where(a => a.MaintenanceTeam == userTeam);
+            }
+            var activeContracts = await contractsQuery.CountAsync();
+
+            ViewBag.TotalCount = totalCount;
+            ViewBag.ThisMonthCount = thisMonthCount;
+            ViewBag.UniqueAssetsCount = uniqueAssetsServiced;
+            ViewBag.ActiveContractsCount = activeContracts;
+
+            ViewBag.Suppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
+            ViewBag.SelectedTeam = team ?? (isAdmin ? "ALL" : userTeam);
+            ViewBag.SelectedSupplierId = supplierId;
+            ViewBag.Search = search;
+            ViewBag.SelectedStatus = status ?? "ALL";
+            ViewBag.SelectedDatePreset = datePreset;
+            ViewBag.UserTeam = userTeam;
+            ViewBag.IsAdmin = isAdmin;
+
+            return View(logs);
         }
 
         // GET: Assets/VendorMaintenanceSticker/5 (Task 5)

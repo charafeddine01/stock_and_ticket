@@ -1,0 +1,339 @@
+@model IEnumerable<StockPortal.Models.VendorMaintenanceLog>
+@inject StockPortal.Services.ILocalizationService Loc
+@inject StockPortal.Services.ICurrentUserService CurrentUser
+@{
+    var isArabic = Loc.IsArabic;
+    ViewData["Title"] = isArabic ? "سجل زيارات صيانة الموردين بعد البيع" : "Vendor After-Sale Maintenance Logs";
+    var suppliers = ViewBag.Suppliers as List<StockPortal.Models.Supplier> ?? new List<StockPortal.Models.Supplier>();
+    var selectedTeam = (ViewBag.SelectedTeam as string) ?? "ALL";
+    var selectedSupplierId = ViewBag.SelectedSupplierId as int?;
+    var selectedStatus = (ViewBag.SelectedStatus as string) ?? "ALL";
+    var selectedDatePreset = (ViewBag.SelectedDatePreset as string) ?? "";
+    var search = (ViewBag.Search as string) ?? "";
+    var isAdmin = (bool)(ViewBag.IsAdmin ?? false);
+    var userTeam = ViewBag.UserTeam as string;
+}
+
+<div class="container-fluid px-0">
+    <!-- Breadcrumb & Top Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a asp-controller="Assets" asp-action="Index" class="text-decoration-none">@Loc["Assets"]</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">@(isArabic ? "سجل صيانة الموردين" : "Vendor Maintenance Logs")</li>
+                </ol>
+            </nav>
+            <h3 class="fw-bold mb-0 text-dark">
+                <i class="fa-solid fa-clipboard-check text-primary me-2"></i>
+                @(isArabic ? "سجل زيارات صيانة الموردين المجانية (بعد البيع)" : "Vendor Free Maintenance Logs (After Sale)")
+            </h3>
+            <small class="text-muted">
+                @(isArabic 
+                    ? "متابعة وإثبات كافة زيارات الفحص الدوري المجانية الملتزم بها الموردون للأجهزة الطبية وتقنية المعلومات" 
+                    : "Centralized ledger tracking periodic free maintenance visits committed by vendors under warranty & supply agreements")
+            </small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a asp-action="Index" class="btn btn-outline-secondary btn-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> @(isArabic ? "العودة لقائمة الأصول" : "Back to Assets")
+            </a>
+            <button type="button" onclick="window.print()" class="btn btn-outline-dark btn-sm shadow-sm">
+                <i class="fa-solid fa-print me-1"></i> @(isArabic ? "طباعة السجل" : "Print Report")
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 bg-primary bg-opacity-10 border-start border-primary border-4">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold d-block">@(isArabic ? "إجمالي الزيارات المسجلة" : "Total Visits Recorded")</span>
+                            <h3 class="fw-bold mb-0 text-primary">@ViewBag.TotalCount</h3>
+                        </div>
+                        <div class="p-3 bg-white rounded-circle text-primary shadow-sm">
+                            <i class="fa-solid fa-calendar-check fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 bg-success bg-opacity-10 border-start border-success border-4">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold d-block">@(isArabic ? "زيارات هذا الشهر" : "Visits This Month")</span>
+                            <h3 class="fw-bold mb-0 text-success">@ViewBag.ThisMonthCount</h3>
+                        </div>
+                        <div class="p-3 bg-white rounded-circle text-success shadow-sm">
+                            <i class="fa-solid fa-calendar-day fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 bg-info bg-opacity-10 border-start border-info border-4">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold d-block">@(isArabic ? "أجهزة تمت صيانتها" : "Unique Assets Serviced")</span>
+                            <h3 class="fw-bold mb-0 text-info">@ViewBag.UniqueAssetsCount</h3>
+                        </div>
+                        <div class="p-3 bg-white rounded-circle text-info shadow-sm">
+                            <i class="fa-solid fa-laptop-medical fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100 bg-warning bg-opacity-10 border-start border-warning border-4">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small fw-semibold d-block">@(isArabic ? "أجهزة تحت الصيانة المجانية" : "Assets Under Coverage")</span>
+                            <h3 class="fw-bold mb-0 text-warning-emphasis">@ViewBag.ActiveContractsCount</h3>
+                        </div>
+                        <div class="p-3 bg-white rounded-circle text-warning-emphasis shadow-sm">
+                            <i class="fa-solid fa-file-contract fs-4"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Control Card -->
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 fw-bold">
+                    <i class="fa-solid fa-filter text-primary me-2"></i> @(isArabic ? "تصفية وبحث في سجلات الصيانة" : "Filter & Search Maintenance Ledger")
+                </h6>
+                @if (!string.IsNullOrWhiteSpace(search) || selectedSupplierId.HasValue || (isAdmin && selectedTeam != "ALL") || selectedStatus != "ALL" || !string.IsNullOrWhiteSpace(selectedDatePreset))
+                {
+                    <a asp-action="VendorMaintenanceLogs" class="btn btn-outline-danger btn-sm py-0">
+                        <i class="fa-solid fa-rotate-left me-1"></i> @(isArabic ? "إلغاء التصفية" : "Reset Filters")
+                    </a>
+                }
+            </div>
+        </div>
+        <div class="card-body">
+            <form asp-action="VendorMaintenanceLogs" method="get" class="row g-2 align-items-end">
+                @if (isAdmin)
+                {
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold text-muted">@(isArabic ? "فريق الصيانة" : "Maintenance Team")</label>
+                        <select name="team" class="form-select form-select-sm">
+                            <option value="ALL" selected="@(selectedTeam == "ALL")">@(isArabic ? "كافة الأقسام" : "All Teams")</option>
+                            <option value="IT" selected="@(selectedTeam == "IT")">@Loc["IT"]</option>
+                            <option value="BIOMEDICAL" selected="@(selectedTeam == "BIOMEDICAL")">@Loc["BIOMEDICAL"]</option>
+                            <option value="GENERAL" selected="@(selectedTeam == "GENERAL")">@Loc["GENERAL"]</option>
+                        </select>
+                    </div>
+                }
+                else
+                {
+                    <input type="hidden" name="team" value="@userTeam" />
+                }
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-muted">@(isArabic ? "المورد / الشركة" : "Vendor / Supplier")</label>
+                    <select name="supplierId" class="form-select form-select-sm">
+                        <option value="">@(isArabic ? "كافة الموردين" : "All Vendors")</option>
+                        @foreach (var sup in suppliers)
+                        {
+                            <option value="@sup.Id" selected="@(selectedSupplierId == sup.Id)">@sup.DisplayName</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold text-muted">@(isArabic ? "حالة الزيارة" : "Visit Status")</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="ALL" selected="@(selectedStatus == "ALL")">@(isArabic ? "كافة الحالات" : "All Statuses")</option>
+                        <option value="Completed" selected="@(selectedStatus == "Completed")">@(isArabic ? "مكتملة / ناجحة" : "Completed")</option>
+                        <option value="Pending Parts" selected="@(selectedStatus == "Pending Parts")">@(isArabic ? "بانتظار قطع" : "Pending Parts")</option>
+                        <option value="Follow-up Required" selected="@(selectedStatus == "Follow-up Required")">@(isArabic ? "تحتاج متابعة" : "Follow-up Required")</option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold text-muted">@(isArabic ? "فترة الزيارة" : "Date Period")</label>
+                    <select name="datePreset" class="form-select form-select-sm">
+                        <option value="" selected="@(string.IsNullOrEmpty(selectedDatePreset))">@(isArabic ? "كل التواريخ" : "All Dates")</option>
+                        <option value="today" selected="@(selectedDatePreset == "today")">@(isArabic ? "اليوم" : "Today")</option>
+                        <option value="this_week" selected="@(selectedDatePreset == "this_week")">@(isArabic ? "هذا الأسبوع" : "This Week")</option>
+                        <option value="this_month" selected="@(selectedDatePreset == "this_month")">@(isArabic ? "هذا الشهر" : "This Month")</option>
+                        <option value="this_year" selected="@(selectedDatePreset == "this_year")">@(isArabic ? "هذه السنة" : "This Year")</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold text-muted">@(isArabic ? "بحث شامل" : "Keyword Search")</label>
+                    <div class="input-group input-group-sm">
+                        <input type="text" name="search" value="@search" class="form-control" placeholder="@(isArabic ? "رقم الأصل، الماركة، المهندس، التقرير..." : "Tag, Brand, Engineer, Report #...")" />
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 fw-bold">
+                <i class="fa-solid fa-table-list text-primary me-2"></i>
+                @(isArabic ? $"سجلات الزيارات الميدانية ({Model.Count()})" : $"Field Visit Records ({Model.Count()})")
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            @if (Model.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light text-muted small">
+                            <tr>
+                                <th style="width: 5%;">#</th>
+                                <th style="width: 10%;">@(isArabic ? "الزيارة" : "Visit")</th>
+                                <th style="width: 12%;">@(isArabic ? "تاريخ الزيارة" : "Date")</th>
+                                <th style="width: 18%;">@(isArabic ? "الأصل والجهاز" : "Asset / Equipment")</th>
+                                <th style="width: 15%;">@(isArabic ? "المورد المسؤول" : "Vendor / Supplier")</th>
+                                <th style="width: 16%;">@(isArabic ? "مهندس الصيانة" : "Engineer & Contact")</th>
+                                <th style="width: 12%;">@(isArabic ? "تقرير الزيارة" : "Report #")</th>
+                                <th style="width: 12%;">@(isArabic ? "الحالة" : "Status")</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model)
+                            {
+                                var asset = log.Asset;
+                                <tr>
+                                    <td class="text-muted small">@log.Id</td>
+                                    <td>
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-bold">
+                                            #@log.VisitNumber
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="font-monospace fw-semibold text-dark">@log.VisitDate.ToString("yyyy-MM-dd")</div>
+                                        <small class="text-muted" style="font-size: 0.75rem;">
+                                            @(isArabic ? "مسجل:" : "Logged:") @log.CreatedAt.ToString("MM/dd HH:mm")
+                                        </small>
+                                    </td>
+                                    <td>
+                                        @if (asset != null)
+                                        {
+                                            <div>
+                                                <a asp-action="Details" asp-route-id="@asset.Id" class="fw-bold text-decoration-none">
+                                                    <i class="fa-solid fa-hashtag me-1"></i>@(asset.HospitalNo ?? ("#" + asset.Id))
+                                                </a>
+                                                @if (!string.IsNullOrWhiteSpace(asset.MaintenanceTeam))
+                                                {
+                                                    <span class="badge @(asset.MaintenanceTeam == "IT" ? "bg-primary" : asset.MaintenanceTeam == "BIOMEDICAL" ? "bg-info text-dark" : "bg-warning text-dark") ms-1" style="font-size: 0.7rem;">
+                                                        @asset.MaintenanceTeam
+                                                    </span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">
+                                                @(asset.Brand ?? "Generic") @(asset.Category?.Name ?? asset.Type ?? "")
+                                                @if (asset.Room != null)
+                                                {
+                                                    <span> • @asset.Room.RoomNo</span>
+                                                }
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">#@log.AssetId</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (log.Supplier != null)
+                                        {
+                                            <div class="fw-semibold text-dark"><i class="fa-solid fa-truck text-muted me-1"></i> @log.Supplier.DisplayName</div>
+                                            @if (!string.IsNullOrWhiteSpace(log.Supplier.FocalPointName))
+                                            {
+                                                <div class="small text-muted"><i class="fa-solid fa-user-tie me-1"></i> @log.Supplier.FocalPointName</div>
+                                            }
+                                        }
+                                        else if (asset?.Supplier != null)
+                                        {
+                                            <div class="fw-semibold text-dark"><i class="fa-solid fa-truck text-muted me-1"></i> @asset.Supplier.DisplayName</div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold text-dark">
+                                            <i class="fa-solid fa-user-gear text-primary me-1"></i> @(log.EngineerName ?? "Vendor Engineer")
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(log.EngineerPhone))
+                                        {
+                                            <div class="small text-muted">
+                                                <i class="fa-solid fa-phone me-1"></i> <a href="tel:@log.EngineerPhone" class="text-decoration-none text-muted">@log.EngineerPhone</a>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(log.ServiceReportNumber))
+                                        {
+                                            <span class="badge bg-light text-dark border font-monospace">@log.ServiceReportNumber</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(log.Notes))
+                                        {
+                                            <div class="small text-muted text-truncate mt-1" style="max-width: 180px;" title="@log.Notes">
+                                                <i class="fa-regular fa-note-sticky me-1"></i> @log.Notes
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @(log.Status == "Completed" ? "bg-success" : log.Status == "Pending Parts" ? "bg-warning text-dark" : "bg-info text-dark")">
+                                            @(isArabic 
+                                                ? (log.Status == "Completed" ? "مكتملة وناجحة" : log.Status == "Pending Parts" ? "بانتظار قطع" : log.Status)
+                                                : log.Status)
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <div class="text-muted mb-3">
+                        <i class="fa-solid fa-clipboard-check fs-1 opacity-25"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark">@(isArabic ? "لم يتم العثور على أي زيارات صيانة" : "No Maintenance Logs Found")</h5>
+                    <p class="text-muted small mb-3">
+                        @(isArabic 
+                            ? "لا توجد زيارات مسجلة تطابق معايير التصفية المحددة حالياً." 
+                            : "No vendor maintenance records match the selected filter criteria.")
+                    </p>
+                    <a asp-action="VendorMaintenanceLogs" class="btn btn-outline-primary btn-sm">
+                        <i class="fa-solid fa-rotate-left me-1"></i> @(isArabic ? "عرض كافة الزيارات" : "View All Logs")
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>

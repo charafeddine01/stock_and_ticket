@@ -166,6 +166,33 @@ namespace StockPortal.Models
         [Display(Name = "Supported Departments (JSON)")]
         public string? Departments { get; set; } = "[]";
 
+        // Task 4: Vendor Focal Point Contact Information
+        [Column("focal_point_name")]
+        [StringLength(255)]
+        [Display(Name = "Focal Point Name")]
+        public string? FocalPointName { get; set; }
+
+        [Column("focal_point_position")]
+        [StringLength(255)]
+        [Display(Name = "Focal Point Position")]
+        public string? FocalPointPosition { get; set; }
+
+        [Column("focal_point_phone1")]
+        [StringLength(100)]
+        [Display(Name = "Phone 1 (with Ext)")]
+        public string? FocalPointPhone1 { get; set; }
+
+        [Column("focal_point_phone2")]
+        [StringLength(100)]
+        [Display(Name = "Phone 2 (Mobile)")]
+        public string? FocalPointPhone2 { get; set; }
+
+        [Column("focal_point_email")]
+        [StringLength(255)]
+        [EmailAddress]
+        [Display(Name = "Focal Point Email")]
+        public string? FocalPointEmail { get; set; }
+
         [NotMapped]
         public string TypeName => Type switch
         {
@@ -641,6 +668,7 @@ namespace StockPortal.Models
         public virtual ICollection<AssetHistory> History { get; set; } = new List<AssetHistory>();
         public virtual ICollection<AssetMaintenance> MaintenanceRecords { get; set; } = new List<AssetMaintenance>();
         public virtual ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
+        public virtual ICollection<VendorMaintenanceLog> VendorMaintenanceLogs { get; set; } = new List<VendorMaintenanceLog>();
     }
 
     [Table("asset_history")]
@@ -1726,5 +1754,65 @@ namespace StockPortal.Models
         public string? EngineerName { get; set; }
         public string? Notes { get; set; }
         public DateTime RecordedAt { get; set; } = DateTime.Now;
+    }
+
+    [Table("vendor_maintenance_logs")]
+    public class VendorMaintenanceLog
+    {
+        [Key]
+        [Column("id")]
+        public int Id { get; set; }
+
+        [Column("asset_id")]
+        public int AssetId { get; set; }
+
+        [Column("supplier_id")]
+        public int? SupplierId { get; set; }
+
+        [Column("visit_number")]
+        public int VisitNumber { get; set; }
+
+        [Column("visit_date", TypeName = "date")]
+        [Display(Name = "Visit Date")]
+        public DateTime VisitDate { get; set; } = DateTime.Today;
+
+        [Column("engineer_name")]
+        [StringLength(255)]
+        [Display(Name = "Service Engineer Name")]
+        public string? EngineerName { get; set; }
+
+        [Column("engineer_phone")]
+        [StringLength(100)]
+        [Display(Name = "Engineer Phone / Contact")]
+        public string? EngineerPhone { get; set; }
+
+        [Column("service_report_number")]
+        [StringLength(100)]
+        [Display(Name = "Service Report #")]
+        public string? ServiceReportNumber { get; set; }
+
+        [Column("notes")]
+        [Display(Name = "Maintenance Notes")]
+        public string? Notes { get; set; }
+
+        [Column("status")]
+        [StringLength(50)]
+        [Display(Name = "Status")]
+        public string Status { get; set; } = "Completed";
+
+        [Column("recorded_by_user_id")]
+        public int? RecordedByUserId { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        [ForeignKey("AssetId")]
+        public virtual Asset? Asset { get; set; }
+
+        [ForeignKey("SupplierId")]
+        public virtual Supplier? Supplier { get; set; }
+
+        [ForeignKey("RecordedByUserId")]
+        public virtual User? RecordedByUser { get; set; }
     }
 }

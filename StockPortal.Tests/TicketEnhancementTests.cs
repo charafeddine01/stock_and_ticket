@@ -626,6 +626,7 @@ namespace StockPortal.Tests
             var mockUserService = new Mock<ICurrentUserService>();
             mockUserService.Setup(s => s.GetUserId()).Returns(1);
             mockUserService.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
+            mockUserService.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(true);
 
             var controller = new AssetsController(context, mockUserService.Object);
             controller.TempData = new Microsoft.AspNetCore.Mvc.ViewFeatures.TempDataDictionary(

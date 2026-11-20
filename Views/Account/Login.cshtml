@@ -144,6 +144,11 @@
 
         <!-- Body -->
         <div class="auth-body">
+            @{
+                bool canAccessPassword = ViewBag.CanAccessUsingUsernameAndPassword ?? true;
+                bool canAccessWindowsAuth = ViewBag.CanAccessUsingWindowsAuth ?? true;
+            }
+
             @if (!ViewData.ModelState.IsValid)
             {
                 <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3" role="alert">
@@ -154,72 +159,90 @@
                 </div>
             }
 
-            <form asp-action="Login" asp-controller="Account" method="post" autocomplete="on">
-                @Html.AntiForgeryToken()
-                <input type="hidden" asp-for="ReturnUrl" />
+            @if (canAccessPassword)
+            {
+                <form asp-action="Login" asp-controller="Account" method="post" autocomplete="on">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="ReturnUrl" />
 
-                <!-- Username -->
-                <div class="mb-3">
-                    <label asp-for="Username" class="form-label fw-semibold small text-muted">
-                        @(isArabic ? "اسم المستخدم أو النطاق" : "Username / Domain")
-                    </label>
-                    <div class="input-group">
-                        <span class="input-group-text bg-light text-muted border-end-0">
-                            <i class="fa-solid fa-user"></i>
-                        </span>
-                        <input asp-for="Username" class="form-control" placeholder="@(isArabic ? "مثال: abbas أو hOuta" : "e.g. abbas or hOuta")" required autofocus />
-                    </div>
-                    <span asp-validation-for="Username" class="text-danger small"></span>
-                </div>
-
-                <!-- Password -->
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <label asp-for="Password" class="form-label fw-semibold small text-muted mb-0">
-                            @(isArabic ? "كلمة المرور" : "Password")
+                    <!-- Username -->
+                    <div class="mb-3">
+                        <label asp-for="Username" class="form-label fw-semibold small text-muted">
+                            @(isArabic ? "اسم المستخدم أو النطاق" : "Username / Domain")
                         </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light text-muted border-end-0">
+                                <i class="fa-solid fa-user"></i>
+                            </span>
+                            <input asp-for="Username" class="form-control" placeholder="@(isArabic ? "مثال: abbas أو hOuta" : "e.g. abbas or hOuta")" required autofocus />
+                        </div>
+                        <span asp-validation-for="Username" class="text-danger small"></span>
                     </div>
-                    <div class="input-group mt-1">
-                        <span class="input-group-text bg-light text-muted border-end-0">
-                            <i class="fa-solid fa-lock"></i>
-                        </span>
-                        <input asp-for="Password" type="password" id="passwordInput" class="form-control" placeholder="••••••••" required />
-                        <button class="btn btn-outline-secondary border-start-0" type="button" onclick="togglePasswordVisibility()">
-                            <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
-                        </button>
+
+                    <!-- Password -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label asp-for="Password" class="form-label fw-semibold small text-muted mb-0">
+                                @(isArabic ? "كلمة المرور" : "Password")
+                            </label>
+                        </div>
+                        <div class="input-group mt-1">
+                            <span class="input-group-text bg-light text-muted border-end-0">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                            <input asp-for="Password" type="password" id="passwordInput" class="form-control" placeholder="••••••••" required />
+                            <button class="btn btn-outline-secondary border-start-0" type="button" onclick="togglePasswordVisibility()">
+                                <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
+                            </button>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
                     </div>
-                    <span asp-validation-for="Password" class="text-danger small"></span>
+
+                    <!-- Remember Me -->
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check">
+                            <input asp-for="RememberMe" class="form-check-input" type="checkbox" id="rememberMeCheck" />
+                            <label class="form-check-label small text-muted" for="rememberMeCheck">
+                                @(isArabic ? "تذكرني على هذا الجهاز" : "Remember me on this device")
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-right-to-bracket"></i>
+                        <span>@(isArabic ? "تسجيل الدخول" : "Log In")</span>
+                    </button>
+                </form>
+            }
+            else
+            {
+                <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
+                    <i class="fa-solid fa-circle-info me-2 fs-5 flex-shrink-0"></i>
+                    <div>
+                        @(isArabic ? "تسجيل الدخول باستخدام كلمة المرور معطل حالياً من قبل مسؤول النظام." : "Username & password login is currently disabled by system administrator.")
+                    </div>
                 </div>
+            }
 
-                <!-- Remember Me -->
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div class="form-check">
-                        <input asp-for="RememberMe" class="form-check-input" type="checkbox" id="rememberMeCheck" />
-                        <label class="form-check-label small text-muted" for="rememberMeCheck">
-                            @(isArabic ? "تذكرني على هذا الجهاز" : "Remember me on this device")
-                        </label>
-                    </div>
+            @if (canAccessPassword && canAccessWindowsAuth)
+            {
+                <div class="divider">@(isArabic ? "أو الدخول عبر النطاق" : "or Windows SSO")</div>
+            }
+
+            @if (canAccessWindowsAuth)
+            {
+                <!-- Windows SSO One-Click Auto-Login -->
+                <a asp-action="AutoLogin" asp-controller="Account" asp-route-returnUrl="@returnUrl" class="btn btn-light border w-100 py-2 d-flex align-items-center justify-content-center gap-2 text-dark">
+                    <i class="fa-brands fa-windows text-primary fs-5"></i>
+                    <span class="fw-semibold">@(isArabic ? "الدخول التلقائي بحساب ويندوز (SSO)" : "Sign In with Windows Domain (Auto-Login)")</span>
+                </a>
+                <div class="text-center mt-2">
+                    <small class="text-muted">
+                        @(isArabic ? "متاح للأجهزة والحواسيب المرتبطة بنطاق المستشفى المحلي" : "Available for domain workstations on hospital LAN")
+                    </small>
                 </div>
-
-                <!-- Submit Button -->
-                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm">
-                    <i class="fa-solid fa-right-to-bracket"></i>
-                    <span>@(isArabic ? "تسجيل الدخول" : "Log In")</span>
-                </button>
-            </form>
-
-            <div class="divider">@(isArabic ? "أو الدخول عبر النطاق" : "or Windows SSO")</div>
-
-            <!-- Windows SSO One-Click Auto-Login -->
-            <a asp-action="AutoLogin" asp-controller="Account" asp-route-returnUrl="@returnUrl" class="btn btn-light border w-100 py-2 d-flex align-items-center justify-content-center gap-2 text-dark">
-                <i class="fa-brands fa-windows text-primary fs-5"></i>
-                <span class="fw-semibold">@(isArabic ? "الدخول التلقائي بحساب ويندوز (SSO)" : "Sign In with Windows Domain (Auto-Login)")</span>
-            </a>
-            <div class="text-center mt-2">
-                <small class="text-muted">
-                    @(isArabic ? "متاح للأجهزة والحواسيب المرتبطة بنطاق المستشفى المحلي" : "Available for domain workstations on hospital LAN")
-                </small>
-            </div>
+            }
         </div>
 
         <!-- Telemetry & Support Footer -->

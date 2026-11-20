@@ -21,12 +21,33 @@ namespace StockPortal.Controllers
         private readonly StockDbContext _context;
         private readonly ICurrentUserService _currentUserService;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly Microsoft.Extensions.Configuration.IConfiguration? _configuration;
 
-        public AccountController(StockDbContext context, ICurrentUserService currentUserService, IPasswordHasher<User>? passwordHasher = null)
+        public AccountController(StockDbContext context, ICurrentUserService currentUserService, Microsoft.Extensions.Configuration.IConfiguration? configuration = null, IPasswordHasher<User>? passwordHasher = null)
         {
             _context = context;
             _currentUserService = currentUserService;
+            _configuration = configuration;
             _passwordHasher = passwordHasher ?? new PasswordHasher<User>();
+        }
+
+        private bool CanAccessWindowsAuth() => SafeGetBool(_configuration, "Authentication:CanAccessUsingWindowsAuth", true);
+        private bool CanAccessPassword() => SafeGetBool(_configuration, "Authentication:CanAccessUsingUsernameAndPassword", true);
+        private bool CanUserChangePassword() => SafeGetBool(_configuration, "Authentication:CanUserChangePassword", true);
+
+        private static bool SafeGetBool(Microsoft.Extensions.Configuration.IConfiguration? config, string key, bool defaultValue = true)
+        {
+            if (config == null) return defaultValue;
+            try
+            {
+                var section = config.GetSection(key);
+                if (section == null || string.IsNullOrWhiteSpace(section.Value)) return defaultValue;
+                return bool.TryParse(section.Value, out bool val) ? val : defaultValue;
+            }
+            catch
+            {
+                return defaultValue;
+            }
         }
 
         // POST: Account/SwitchUser (Only allowed for Admin users via POST with Anti-Forgery Token, URL GET tampering blocked)
@@ -126,6 +147,9 @@ namespace StockPortal.Controllers
             ViewBag.CanSwitchProfile = canSwitchProfile;
             ViewBag.IsViewingSelf = (targetUser.Id == currentUser.Id);
             ViewBag.AuthMethod = _currentUserService.GetAuthMethod();
+            ViewBag.CanAccessUsingWindowsAuth = CanAccessWindowsAuth();
+            ViewBag.CanAccessUsingUsernameAndPassword = CanAccessPassword();
+            ViewBag.CanUserChangePassword = CanUserChangePassword();
 
             if (canSwitchProfile)
             {
@@ -309,6 +333,8 @@ namespace StockPortal.Controllers
 
             ViewBag.ClientDevice = NetworkInfoHelper.GetClientDeviceName(HttpContext);
             ViewBag.ClientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            ViewBag.CanAccessUsingWindowsAuth = CanAccessWindowsAuth();
+            ViewBag.CanAccessUsingUsernameAndPassword = CanAccessPassword();
 
             return View(model);
         }
@@ -320,6 +346,14 @@ namespace StockPortal.Controllers
         {
             ViewBag.ClientDevice = NetworkInfoHelper.GetClientDeviceName(HttpContext);
             ViewBag.ClientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            ViewBag.CanAccessUsingWindowsAuth = CanAccessWindowsAuth();
+            ViewBag.CanAccessUsingUsernameAndPassword = CanAccessPassword();
+
+            if (!CanAccessPassword())
+            {
+                ModelState.AddModelError(string.Empty, "Username and password authentication is disabled by administrator.");
+                return View(model);
+            }
 
             if (!ModelState.IsValid)
             {
@@ -413,6 +447,12 @@ namespace StockPortal.Controllers
         // GET/POST: Account/AutoLogin (Resumes Windows SSO auto-login by clearing signed out flag)
         public IActionResult AutoLogin(string? returnUrl = null)
         {
+            if (!CanAccessWindowsAuth())
+            {
+                TempData["ErrorMessage"] = "Windows authentication is disabled by administrator.";
+                return RedirectToAction(nameof(Login));
+            }
+
             Response.Cookies.Delete("SOLVIS.SignedOut");
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
@@ -449,6 +489,18 @@ namespace StockPortal.Controllers
             if (currentUser == null)
             {
                 return RedirectToAction(nameof(Login));
+            }
+
+            if (!CanAccessPassword())
+            {
+                TempData["ErrorMessage"] = "Password authentication is disabled by system administrator.";
+                return RedirectToAction(nameof(Profile));
+            }
+
+            if (!CanUserChangePassword() && !_currentUserService.IsAdmin())
+            {
+                TempData["ErrorMessage"] = "Password modification for standard users is disabled by system administrator.";
+                return RedirectToAction(nameof(Profile));
             }
 
             if (!ModelState.IsValid)

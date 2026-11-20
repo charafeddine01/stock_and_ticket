@@ -111,6 +111,10 @@
                     <span>@(isArabic ? (isFiltered ? $"طباعة ملصقات QR المصفاة ({Model.Count()})" : "طباعة ملصقات QR") : (isFiltered ? $"Print Filtered QR Tags ({Model.Count()})" : "Print QR Tags"))</span>
                 </a>
             }
+            <a href="@Url.Action("VendorMaintenanceLogs")" class="btn btn-outline-info btn-sm shadow-sm" title="@(isArabic ? "سجل زيارات صيانة الموردين المجانية" : "Vendor After-Sale Maintenance Logs")">
+                <i class="fa-solid fa-clipboard-check me-1"></i>
+                <span>@(isArabic ? "سجل صيانة الموردين" : "Vendor Maintenance Logs")</span>
+            </a>
             <a href="@Url.Action("ExportCsv", new { 
                 search = ViewBag.Search, 
                 status = ViewBag.SelectedStatus, 

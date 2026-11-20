@@ -75,11 +75,18 @@
 
                     @if (ViewBag.IsViewingSelf == true)
                     {
+                        var canAccessPassword = (bool)(ViewBag.CanAccessUsingUsernameAndPassword ?? true);
+                        var canUserChangePassword = (bool)(ViewBag.CanUserChangePassword ?? true);
+                        var showChangePassword = canAccessPassword && (canUserChangePassword || CurrentUser.IsAdmin());
+
                         <div class="pt-3 border-top mt-3 d-flex flex-column gap-2">
-                            <button type="button" class="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
-                                <i class="fa-solid fa-key"></i>
-                                <span>@Loc["Change Password"]</span>
-                            </button>
+                            @if (showChangePassword)
+                            {
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100 d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#changePasswordModal">
+                                    <i class="fa-solid fa-key"></i>
+                                    <span>@Loc["Change Password"]</span>
+                                </button>
+                            }
                             <a asp-action="Logout" asp-controller="Account" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center gap-2">
                                 <i class="fa-solid fa-arrow-right-from-bracket"></i>
                                 <span>@Loc["Log Out"]</span>
@@ -244,6 +251,13 @@
     </div>
 </div>
 
+@{
+    var canAccessPasswordForModal = (bool)(ViewBag.CanAccessUsingUsernameAndPassword ?? true);
+    var canUserChangePasswordForModal = (bool)(ViewBag.CanUserChangePassword ?? true);
+    var showChangePasswordModal = canAccessPasswordForModal && (canUserChangePasswordForModal || CurrentUser.IsAdmin());
+}
+@if (showChangePasswordModal)
+{
 <!-- Modal: Change Password -->
 <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -282,3 +296,4 @@
         </div>
     </div>
 </div>
+}

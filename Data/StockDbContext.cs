@@ -33,6 +33,7 @@ namespace StockPortal.Data
         public DbSet<AssetCompatibleSparePart> AssetCompatibleSpareParts { get; set; } = null!;
         public DbSet<CalibrationForm> CalibrationForms { get; set; } = null!;
         public DbSet<ChecklistForm> ChecklistForms { get; set; } = null!;
+        public DbSet<VendorMaintenanceLog> VendorMaintenanceLogs { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

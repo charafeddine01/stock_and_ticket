@@ -1,6 +1,32 @@
 @model IEnumerable<StockPortal.Models.Asset>
+@inject StockPortal.Services.ICurrentUserService CurrentUser
 @{
     Layout = null;
+    var currentDept = (ViewBag.Department as string ?? CurrentUser.GetMaintenanceTeam() ?? Model.FirstOrDefault()?.MaintenanceTeam ?? "IT").Trim().ToUpperInvariant();
+    var deptDisplayName = Loc.TargetTeam(currentDept);
+
+    string defaultTopLine1, defaultTopLine2, defaultBottomText, defaultBottomSub;
+    if (currentDept == "BIOMEDICAL")
+    {
+        defaultTopLine1 = Loc.IsArabic ? "مستشفى الزهراء الجامعي - الهندسة الطبية" : "AL-ZAHRAA HOSPITAL - BIOMEDICAL DEPT";
+        defaultTopLine2 = Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "BIOMEDICAL ASSET & MEDICAL DEVICE TAG";
+        defaultBottomText = Loc.IsArabic ? "جهاز طبي خاضع للمعايير السريرية • يمنع نزع الملصق" : "CLINICAL EQUIPMENT • BIOMEDICAL ENGINEERING PROPERTY";
+        defaultBottomSub = Loc.IsArabic ? "الهندسة الطبية والسريرية • تحويلة: 2000 / 2001" : "Biomedical Engineering • Ext: 2000 / 2001";
+    }
+    else if (currentDept == "GENERAL")
+    {
+        defaultTopLine1 = Loc.IsArabic ? "مستشفى الزهراء الجامعي - الصيانة العامة والمرافق" : "AL-ZAHRAA HOSPITAL - FACILITIES & GENERAL MAINTENANCE";
+        defaultTopLine2 = Loc.IsArabic ? "بطاقة تعريف المعدات ومرافق المنشأة" : "FACILITY & GENERAL MAINTENANCE TAG";
+        defaultBottomText = Loc.IsArabic ? "أصل مرفقي عام • يمنع نزع أو تشويه الملصق" : "FACILITY EQUIPMENT • GENERAL MAINTENANCE PROPERTY";
+        defaultBottomSub = Loc.IsArabic ? "قسم الصيانة العامة والتشغيل • تحويلة: 3000 / 3001" : "Facilities & Operations • Ext: 3000 / 3001";
+    }
+    else
+    {
+        defaultTopLine1 = Loc.IsArabic ? "مستشفى الزهراء الجامعي - تقنية المعلومات" : "AL-ZAHRAA HOSPITAL - INFORMATION TECHNOLOGY";
+        defaultTopLine2 = Loc.IsArabic ? "بطاقة تعريف محطة عمل وشبكات (IT Tag)" : "IT ASSET & WORKSTATION TAG";
+        defaultBottomText = Loc.IsArabic ? "ملكية رسمية لقسم تقنية المعلومات • يمنع نزع الملصق" : "DO NOT REMOVE OR DEFACE • IT INFRASTRUCTURE ASSET";
+        defaultBottomSub = Loc.IsArabic ? "دعم تقنية المعلومات • تحويلة: 1000 / 1001" : "IT Helpdesk & Systems • Ext: 1000 / 1001";
+    }
 }
 <!DOCTYPE html>
 <html lang="@Loc.CurrentCulture" dir="@Loc.Direction">
@@ -190,7 +216,7 @@
 
     <div id="saveToast" class="toast-saved">
         <i class="fa-solid fa-circle-check me-2"></i>
-        <span>@(Loc.IsArabic ? "تم حفظ التنسيق لجميع البطاقات!" : "Template saved for all cards!")</span>
+        <span>@(Loc.IsArabic ? $"تم حفظ التنسيق كافتراضي لقسم ({deptDisplayName}) بنجاح!" : $"Tag layout saved as default for {currentDept} department!")</span>
     </div>
 
     <!-- Customizer Toolbar -->
@@ -199,14 +225,14 @@
             <div>
                 <h6 class="mb-0 fw-bold">
                     <i class="fa-solid fa-tags text-primary me-2"></i>
-                    @(Loc.IsArabic ? $"طباعة ملصقات الأصول ({Model.Count()} بطاقة)" : $"Bulk Asset Tag Printing ({Model.Count()} Cards)")
+                    @(Loc.IsArabic ? $"طباعة ملصقات أصول قسم ({deptDisplayName}) - ({Model.Count()} بطاقة)" : $"Bulk Asset Tag Printing - {currentDept} Dept ({Model.Count()} Cards)")
                 </h6>
-                <small class="text-muted">@(Loc.IsArabic ? "التنسيق المحفوظ يطبق تلقائياً على كافة الملصقات" : "Customized header, footer, columns & QR code apply across all tags")</small>
+                <small class="text-muted">@(Loc.IsArabic ? $"التنسيق المحفوظ يطبق تلقائياً كافتراضي على كافة ملصقات قسم ({deptDisplayName})" : $"Customized layout applies exclusively as default for {currentDept} tags")</small>
             </div>
             <div class="d-flex gap-2">
-                <button type="button" onclick="saveTagDefaults()" class="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm">
+                <button type="button" onclick="saveTagDefaults()" class="btn btn-success btn-sm d-flex align-items-center gap-1 shadow-sm" title="@(Loc.IsArabic ? $"حفظ التنسيق كافتراضي لقسم ({deptDisplayName})" : $"Save layout as default for {currentDept} Department")">
                     <i class="fa-solid fa-floppy-disk"></i>
-                    <span>@(Loc.IsArabic ? "حفظ التنسيق كافتراضي" : "Save as Default")</span>
+                    <span>@(Loc.IsArabic ? $"حفظ كافتراضي لقسم ({deptDisplayName})" : $"Save as Default ({currentDept})")</span>
                 </button>
                 <button type="button" onclick="window.print()" class="btn btn-primary btn-sm d-flex align-items-center gap-1 shadow-sm">
                     <i class="fa-solid fa-print"></i>
@@ -223,22 +249,22 @@
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي (اسم المنشأة)" : "Top Header Line 1")</label>
                     <input type="text" id="cfgTopLine1" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
-                           value="@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")" />
+                           value="@defaultTopLine1" />
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص العلوي 2 (عنوان البطاقة)" : "Top Header Line 2")</label>
                     <input type="text" id="cfgTopLine2" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
-                           value="@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")" />
+                           value="@defaultTopLine2" />
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي (التحذير)" : "Bottom Warning Text")</label>
                     <input type="text" id="cfgBottomText" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
-                           value="@(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")" />
+                           value="@defaultBottomText" />
                 </div>
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold mb-1">@(Loc.IsArabic ? "النص السفلي الثانوي" : "Bottom Secondary Text")</label>
                     <input type="text" id="cfgBottomSub" class="form-control form-control-sm" oninput="updateAllCardsLive()" 
-                           value="@(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")" />
+                           value="@defaultBottomSub" />
                 </div>
                 <div class="col-md-6 d-flex align-items-center">
                     <div class="form-check form-switch">
@@ -270,8 +296,8 @@
                 
                 <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-2 mb-2">
                     <div>
-                        <div class="tag-top-facility lbl-bulk-top1">@(Loc.IsArabic ? "نظام سولفيس (SOLVIS) للعمليات والعهد" : "SOLVIS - Hospital Operations & Assets")</div>
-                        <div class="tag-top-title lbl-bulk-top2">@(Loc.IsArabic ? "بطاقة تعريف العهدة والأصل الطبي" : "ASSET IDENTIFICATION TAG")</div>
+                        <div class="tag-top-facility lbl-bulk-top1">@defaultTopLine1</div>
+                        <div class="tag-top-title lbl-bulk-top2">@defaultTopLine2</div>
                     </div>
                     <div class="text-primary text-center">
                         <i class="fa-solid fa-shield-heart fa-lg"></i>
@@ -333,10 +359,10 @@
 
                 <div class="mt-2 pt-1 border-top border-dark text-center">
                     <div class="tag-footer-text lbl-bulk-bot">
-                        @(Loc.IsArabic ? "يمنع نزع أو إتلاف الملصق • عهدة رسمية للمنشأة الطبية" : "DO NOT REMOVE OR DEFACE • PROPERTY OF HEALTHCARE FACILITY")
+                        @defaultBottomText
                     </div>
                     <div class="tag-footer-sub lbl-bulk-botsub">
-                        @(Loc.IsArabic ? "الهندسة الطبية وتقنية المعلومات • تحويلة: 4400 / 4401" : "Biomedical & IT Dept • Helpdesk Ext: 4400 / 4401")
+                        @defaultBottomSub
                     </div>
                 </div>
 
@@ -346,7 +372,8 @@
 
     <script src="~/lib/qrcode.min.js"></script>
     <script>
-        const STORAGE_KEY = 'SOLVIS_AssetTagConfig';
+        const CURRENT_DEPT = '@currentDept';
+        const STORAGE_KEY = 'SOLVIS_AssetTagConfig_' + CURRENT_DEPT;
 
         document.addEventListener('DOMContentLoaded', function () {
             loadBulkDefaults();
@@ -416,7 +443,10 @@
         }
 
         function loadBulkDefaults() {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            let saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) {
+                saved = localStorage.getItem('SOLVIS_AssetTagConfig');
+            }
             if (!saved) return;
             try {
                 const config = JSON.parse(saved);

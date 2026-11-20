@@ -58,21 +58,24 @@
                     <i class="fa-solid fa-truck-ramp-box me-1"></i> @Loc["Send to Vendor"]
                 </a>
             }
-            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
-                <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
-            </button>
             @if (CurrentUser.CanEditAsset(asset))
             {
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
+                    <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
+                </button>
                 <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
                     <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
                 </a>
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
+                    <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
+                </button>
             }
-            <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
-                <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
-            </button>
-            <a href="@Url.Action("Delete", new { id = asset.Id })" class="btn btn-outline-danger">
-                <i class="fa-solid fa-trash-can me-1"></i> @Loc["Delete"]
-            </a>
+            @if (CurrentUser.IsAdmin())
+            {
+                <a href="@Url.Action("Delete", new { id = asset.Id })" class="btn btn-outline-danger">
+                    <i class="fa-solid fa-trash-can me-1"></i> @Loc["Delete"]
+                </a>
+            }
         }
     </div>
 </div>
@@ -331,6 +334,9 @@
                 <div class="d-flex gap-2">
                     @if (asset.HasVendorMaintenance)
                     {
+                        <a href="@Url.Action("VendorMaintenanceLogs", "Assets")" class="btn btn-outline-secondary btn-sm" title="@(Loc.IsArabic ? "عرض سجل صيانة الموردين لكافة الأجهزة" : "All Vendor Logs")">
+                            <i class="fa-solid fa-clipboard-list me-1"></i> @(Loc.IsArabic ? "السجل العام" : "Full Logs")
+                        </a>
                         <a href="@Url.Action("VendorMaintenanceSticker", new { id = asset.Id })" class="btn btn-outline-primary btn-sm" target="_blank">
                             <i class="fa-solid fa-print me-1"></i> @(Loc.IsArabic ? "طباعة ملصق الصيانة" : "Print Sticker")
                         </a>
@@ -364,6 +370,8 @@
                     int totalTargetVisits = asset.VendorMaintenanceCount ?? 4;
                     int completedVisits = asset.VendorMaintenanceCompletedCount;
                     int progressPercent = totalTargetVisits > 0 ? (int)Math.Min(100, Math.Round((double)completedVisits / totalTargetVisits * 100)) : 0;
+                    var vLogs = asset.VendorMaintenanceLogs?.OrderBy(l => l.VisitNumber).ToList() ?? new List<StockPortal.Models.VendorMaintenanceLog>();
+                    var vList = asset.VendorVisitsList.OrderBy(v => v.VisitNumber).ToList();
 
                     <div class="row g-3 mb-3">
                         <div class="col-sm-4">
@@ -396,7 +404,56 @@
                         </div>
                     </div>
 
-                    @if (asset.VendorVisitsList.Any())
+                    @if (vLogs.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 10%;">@(Loc.IsArabic ? "الزيارة" : "Visit #")</th>
+                                        <th style="width: 15%;">@(Loc.IsArabic ? "تاريخ الزيارة" : "Date")</th>
+                                        <th style="width: 25%;">@(Loc.IsArabic ? "مهندس الصيانة" : "Engineer / Phone")</th>
+                                        <th style="width: 15%;">@(Loc.IsArabic ? "تقرير الزيارة" : "Report #")</th>
+                                        <th style="width: 25%;">@(Loc.IsArabic ? "الملاحظات" : "Notes")</th>
+                                        <th style="width: 10%;">@(Loc.IsArabic ? "الحالة" : "Status")</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var v in vLogs)
+                                    {
+                                        <tr>
+                                            <td class="text-center fw-bold">#@v.VisitNumber</td>
+                                            <td class="font-monospace small">@v.VisitDate.ToString("yyyy-MM-dd")</td>
+                                            <td>
+                                                <div><i class="fa-solid fa-user-gear text-primary me-1"></i> @v.EngineerName</div>
+                                                @if (!string.IsNullOrWhiteSpace(v.EngineerPhone))
+                                                {
+                                                    <small class="text-muted"><i class="fa-solid fa-phone me-1"></i> @v.EngineerPhone</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrWhiteSpace(v.ServiceReportNumber))
+                                                {
+                                                    <span class="badge bg-light text-dark border font-monospace">@v.ServiceReportNumber</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">-</span>
+                                                }
+                                            </td>
+                                            <td><small class="text-muted">@(v.Notes ?? "-")</small></td>
+                                            <td>
+                                                <span class="badge @(v.Status == "Completed" ? "bg-success" : "bg-info")">
+                                                    @v.Status
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else if (vList.Any())
                     {
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle mb-0">
@@ -409,7 +466,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var v in asset.VendorVisitsList.OrderBy(v => v.VisitNumber))
+                                    @foreach (var v in vList)
                                     {
                                         <tr>
                                             <td class="text-center fw-bold">#@v.VisitNumber</td>
@@ -429,6 +486,16 @@
                             @(Loc.IsArabic ? "لم يتم تدوين أي زيارة صيانة حتى الآن على التطبيق. انقر على 'تدوين زيارة مورد' لإثبات الزيارة، أو اطبع الملصق لتوقيعه ورقياً." : "No visits recorded in app yet. Click 'Record Vendor Visit' to log a completed visit or print the physical sticker.")
                         </div>
                     }
+
+                    <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <small class="text-muted">
+                            <i class="fa-solid fa-database me-1"></i>
+                            @(Loc.IsArabic ? "يتم حفظ كافة الزيارات رسمياً في قاعدة بيانات صيانة الموردين." : "All visits are permanently recorded in the vendor maintenance database.")
+                        </small>
+                        <a href="@Url.Action("VendorMaintenanceLogs", "Assets", new { search = asset.HospitalNo })" class="btn btn-sm btn-outline-info">
+                            <i class="fa-solid fa-list-check me-1"></i> @(Loc.IsArabic ? "عرض سجل صيانة الموردين لجميع الأجهزة" : "View Full Vendor Logs")
+                        </a>
+                    </div>
                 }
             </div>
         </div>
@@ -848,7 +915,7 @@
     </div>
 </div>
 
-@if (canManage)
+@if (CurrentUser.CanEditAsset(asset))
 {
     <!-- Transfer Custody Modal -->
     <div class="modal fade" id="transferModal" tabindex="-1" aria-labelledby="transferModalLabel" aria-hidden="true">
@@ -938,6 +1005,10 @@
             </div>
         </div>
     </div>
+}
+
+@if (canManage)
+{
 
     <!-- Log / Renew Calibration Modal (Task 7) -->
     <div class="modal fade" id="logCalibrationModal" tabindex="-1" aria-labelledby="logCalibrationModalLabel" aria-hidden="true">
@@ -1051,9 +1122,30 @@
                             <input type="date" name="visitDate" class="form-control" value="@DateTime.Now.ToString("yyyy-MM-dd")" required />
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">@(Loc.IsArabic ? "اسم مهندس صيانة المورد" : "Vendor Service Engineer Name") <span class="text-danger">*</span></label>
-                            <input type="text" name="engineerName" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: م. أحمد رضوان - شركة فيليبس" : "e.g. Eng. John Miller - GE Healthcare")" required />
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-7">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "اسم مهندس صيانة المورد" : "Vendor Service Engineer Name") <span class="text-danger">*</span></label>
+                                <input type="text" name="engineerName" class="form-control" placeholder="@(Loc.IsArabic ? "مثال: م. أحمد رضوان - شركة فيليبس" : "e.g. Eng. John Miller - GE Healthcare")" required />
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "هاتف المهندس" : "Engineer Phone")</label>
+                                <input type="text" name="engineerPhone" class="form-control" placeholder="@(Loc.IsArabic ? "رقم الهاتف" : "e.g. +961 70 123456")" />
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "رقم تقرير الزيارة / الخدمة" : "Service Report #")</label>
+                                <input type="text" name="serviceReportNumber" class="form-control font-monospace" placeholder="e.g. SR-2026-904" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold">@(Loc.IsArabic ? "حالة الزيارة" : "Visit Status")</label>
+                                <select name="status" class="form-select">
+                                    <option value="Completed" selected>@(Loc.IsArabic ? "مكتملة وناجحة" : "Completed / Satisfactory")</option>
+                                    <option value="Pending Parts">@(Loc.IsArabic ? "بانتظار قطع غيار" : "Pending Parts")</option>
+                                    <option value="Follow-up Required">@(Loc.IsArabic ? "تحتاج متابعة" : "Follow-up Required")</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="mb-3">

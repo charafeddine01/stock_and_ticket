@@ -267,7 +267,7 @@ namespace StockPortal.Services
 
         public bool CanManageAssets()
         {
-            return IsAdmin() || IsMaintenance();
+            return IsAdmin() || (IsMaintenance() && CanEditAssetTags());
         }
 
         public bool CanManageAsset(Asset asset)
@@ -287,7 +287,7 @@ namespace StockPortal.Services
         public bool CanCreateAssetInDepartment(string department)
         {
             if (IsAdmin()) return true;
-            if (IsMaintenance())
+            if (IsMaintenance() && CanEditAssetTags())
             {
                 var myTeam = GetMaintenanceTeam();
                 return string.Equals(department, myTeam, StringComparison.OrdinalIgnoreCase);
@@ -297,14 +297,14 @@ namespace StockPortal.Services
 
         public bool CanManageDeviceForms()
         {
-            return IsAdmin() || IsMaintenance();
+            return IsAdmin() || (IsMaintenance() && CanEditAssetTags());
         }
 
         public bool CanManageDeviceForm(DeviceForm form)
         {
             if (form == null) return false;
             if (IsAdmin()) return true;
-            if (IsMaintenance())
+            if (IsMaintenance() && CanEditAssetTags())
             {
                 var myTeam = GetMaintenanceTeam();
                 return string.Equals(form.Department, myTeam, StringComparison.OrdinalIgnoreCase);
@@ -330,7 +330,7 @@ namespace StockPortal.Services
             if (user != null) return user.CanPrintAssetTags;
             var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanPrintAssetTags");
             if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
-            return true;
+            return false;
         }
 
         public bool CanPrintAssetTag(Asset? asset)
@@ -351,7 +351,7 @@ namespace StockPortal.Services
             if (user != null) return user.CanEditAssetTags;
             var claim = _httpContextAccessor.HttpContext?.User.FindFirst("CanEditAssetTags");
             if (claim != null && bool.TryParse(claim.Value, out bool val)) return val;
-            return true;
+            return false;
         }
 
         public bool CanEditAsset(Asset? asset)

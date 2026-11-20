@@ -225,6 +225,7 @@
                                                                         <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
                                                                     </label>
                                                                     <div class="form-check form-switch mb-2">
+                                                                        <input type="hidden" name="canPrintAssetTags" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canPrintAssetTags" id="printTags-@u.Id" value="true" @(u.CanPrintAssetTags ? "checked" : "") />
                                                                         <label class="form-check-label fw-semibold" for="printTags-@u.Id">
                                                                             <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
@@ -232,6 +233,7 @@
                                                                         <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-2">
+                                                                        <input type="hidden" name="canEditAssetTags" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canEditAssetTags" id="editTags-@u.Id" value="true" @(u.CanEditAssetTags ? "checked" : "") />
                                                                         <label class="form-check-label fw-semibold" for="editTags-@u.Id">
                                                                             <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
@@ -239,6 +241,7 @@
                                                                         <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-2">
+                                                                        <input type="hidden" name="canAccessTeamAnalytics" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canAccessTeamAnalytics" id="teamAnalytics-@u.Id" value="true" @(u.CanAccessTeamAnalytics ? "checked" : "") />
                                                                         <label class="form-check-label fw-semibold" for="teamAnalytics-@u.Id">
                                                                             <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
@@ -246,6 +249,7 @@
                                                                         <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-1">
+                                                                        <input type="hidden" name="canViewOwnAnalytics" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canViewOwnAnalytics" id="ownAnalytics-@u.Id" value="true" @(u.CanViewOwnAnalytics ? "checked" : "") />
                                                                         <label class="form-check-label fw-semibold" for="ownAnalytics-@u.Id">
                                                                             <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
@@ -363,6 +367,7 @@
                             <tr>
                                 <th>#</th>
                                 <th>@Loc["Vendor / Company Name"]</th>
+                                <th>@Loc["Focal Point / Contact"]</th>
                                 <th>@Loc["Service Scope"]</th>
                                 <th>@Loc["Authorized Maintenance Departments"]</th>
                                 <th>@Loc["Status"]</th>
@@ -379,11 +384,51 @@
                                     data-name="@s.Name"
                                     data-type="@(s.Type ?? 3)"
                                     data-departments='@deptsAttr'
-                                    data-isactive="@(s.IsActive == true ? "true" : "false")">
+                                    data-isactive="@(s.IsActive == true ? "true" : "false")"
+                                    data-fp-name="@s.FocalPointName"
+                                    data-fp-pos="@s.FocalPointPosition"
+                                    data-fp-phone1="@s.FocalPointPhone1"
+                                    data-fp-phone2="@s.FocalPointPhone2"
+                                    data-fp-email="@s.FocalPointEmail">
                                     <td>@s.Id</td>
                                     <td class="fw-semibold">
                                         <i class="fa-solid fa-truck text-muted me-2"></i>
                                         <span class="supplier-name-cell">@s.DisplayName</span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(s.FocalPointName) || !string.IsNullOrWhiteSpace(s.FocalPointPhone1) || !string.IsNullOrWhiteSpace(s.FocalPointPhone2) || !string.IsNullOrWhiteSpace(s.FocalPointEmail))
+                                        {
+                                            <div class="d-flex flex-column gap-1">
+                                                @if (!string.IsNullOrWhiteSpace(s.FocalPointName))
+                                                {
+                                                    <div class="fw-semibold text-dark">
+                                                        <i class="fa-solid fa-user-tie text-primary me-1"></i> @s.FocalPointName
+                                                        @if (!string.IsNullOrWhiteSpace(s.FocalPointPosition))
+                                                        {
+                                                            <span class="badge bg-light text-secondary border ms-1 font-monospace" style="font-size: 0.72rem;">@s.FocalPointPosition</span>
+                                                        }
+                                                    </div>
+                                                }
+                                                <div class="small text-muted d-flex flex-wrap gap-2">
+                                                    @if (!string.IsNullOrWhiteSpace(s.FocalPointPhone1))
+                                                    {
+                                                        <span title="@Loc["Phone 1 (with Ext)"]"><i class="fa-solid fa-phone text-secondary me-1"></i> @s.FocalPointPhone1</span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(s.FocalPointPhone2))
+                                                    {
+                                                        <span title="@Loc["Phone 2 (Mobile)"]"><i class="fa-solid fa-mobile-screen text-success me-1"></i> <a href="tel:@s.FocalPointPhone2" class="text-decoration-none text-success">@s.FocalPointPhone2</a></span>
+                                                    }
+                                                    @if (!string.IsNullOrWhiteSpace(s.FocalPointEmail))
+                                                    {
+                                                        <span title="@Loc["Email Address"]"><i class="fa-solid fa-envelope text-info me-1"></i> <a href="mailto:@s.FocalPointEmail" class="text-decoration-none text-info">@s.FocalPointEmail</a></span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small"><em>@Loc["No focal point recorded"]</em></span>
+                                        }
                                     </td>
                                     <td><span class="badge bg-light text-dark border">@s.DisplayTypeName</span></td>
                                     <td>
@@ -430,6 +475,11 @@
                                                     data-type="@(s.Type ?? 3)"
                                                     data-departments="@deptsAttr"
                                                     data-isactive="@(s.IsActive == true ? "true" : "false")"
+                                                    data-fp-name="@s.FocalPointName"
+                                                    data-fp-pos="@s.FocalPointPosition"
+                                                    data-fp-phone1="@s.FocalPointPhone1"
+                                                    data-fp-phone2="@s.FocalPointPhone2"
+                                                    data-fp-email="@s.FocalPointEmail"
                                                     title="@Loc["Edit"]">
                                                 <i class="fa-solid fa-pen-to-square me-1"></i> @Loc["Edit"]
                                             </button>
@@ -539,6 +589,7 @@
                                 <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
                             </label>
                             <div class="form-check form-switch mb-2">
+                                <input type="hidden" name="CanPrintAssetTags" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanPrintAssetTags" id="newPrintTags" value="true" checked />
                                 <label class="form-check-label fw-semibold" for="newPrintTags">
                                     <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
@@ -546,6 +597,7 @@
                                 <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
                             </div>
                             <div class="form-check form-switch mb-2">
+                                <input type="hidden" name="CanEditAssetTags" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanEditAssetTags" id="newEditTags" value="true" checked />
                                 <label class="form-check-label fw-semibold" for="newEditTags">
                                     <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
@@ -553,6 +605,7 @@
                                 <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
                             </div>
                             <div class="form-check form-switch mb-2">
+                                <input type="hidden" name="CanAccessTeamAnalytics" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanAccessTeamAnalytics" id="newTeamAnalytics" value="true" checked />
                                 <label class="form-check-label fw-semibold" for="newTeamAnalytics">
                                     <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
@@ -560,6 +613,7 @@
                                 <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
                             </div>
                             <div class="form-check form-switch mb-1">
+                                <input type="hidden" name="CanViewOwnAnalytics" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanViewOwnAnalytics" id="newOwnAnalytics" value="true" checked />
                                 <label class="form-check-label fw-semibold" for="newOwnAnalytics">
                                     <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
@@ -673,6 +727,33 @@
                             </div>
                         </div>
                     </div>
+
+                    <hr class="my-3" />
+                    <h6 class="fw-bold mb-3 text-primary"><i class="fa-solid fa-address-card me-2"></i> @Loc["Vendor Focal Point (Contact Person)"]</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Contact Person Name"]</label>
+                            <input type="text" name="FocalPointName" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "اسم مسؤول التواصل" : "e.g. John Smith")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Position / Title"]</label>
+                            <input type="text" name="FocalPointPosition" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "المسمى الوظيفي" : "e.g. Service Manager")" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Phone 1 (with Ext)"]</label>
+                            <input type="text" name="FocalPointPhone1" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "الهاتف الأرضي مع التحويلة" : "e.g. +961 1 234567 Ext 104")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Phone 2 (Mobile)"]</label>
+                            <input type="text" name="FocalPointPhone2" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "رقم الهاتف المحمول" : "e.g. +961 70 123456")" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">@Loc["Email Address"]</label>
+                        <input type="email" name="FocalPointEmail" class="form-control form-control-sm" placeholder="contact@vendor.com" />
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
@@ -737,6 +818,33 @@
                             <option value="false">@Loc["Inactive"]</option>
                         </select>
                     </div>
+
+                    <hr class="my-3" />
+                    <h6 class="fw-bold mb-3 text-primary"><i class="fa-solid fa-address-card me-2"></i> @Loc["Vendor Focal Point (Contact Person)"]</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Contact Person Name"]</label>
+                            <input type="text" name="focalPointName" id="editFocalPointName" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "اسم مسؤول التواصل" : "e.g. John Smith")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Position / Title"]</label>
+                            <input type="text" name="focalPointPosition" id="editFocalPointPosition" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "المسمى الوظيفي" : "e.g. Service Manager")" />
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Phone 1 (with Ext)"]</label>
+                            <input type="text" name="focalPointPhone1" id="editFocalPointPhone1" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "الهاتف الأرضي مع التحويلة" : "e.g. +961 1 234567 Ext 104")" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">@Loc["Phone 2 (Mobile)"]</label>
+                            <input type="text" name="focalPointPhone2" id="editFocalPointPhone2" class="form-control form-control-sm" placeholder="@(Loc.IsArabic ? "رقم الهاتف المحمول" : "e.g. +961 70 123456")" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">@Loc["Email Address"]</label>
+                        <input type="email" name="focalPointEmail" id="editFocalPointEmail" class="form-control form-control-sm" placeholder="contact@vendor.com" />
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Loc["Cancel"]</button>
@@ -791,11 +899,18 @@
     }
 
     // Modal Edit Supplier form population
-    function populateEditSupplierForm(id, name, type, deptsJson, isActive) {
+    function populateEditSupplierForm(id, name, type, deptsJson, isActive, fpName, fpPos, fpPhone1, fpPhone2, fpEmail) {
         document.getElementById('editSupplierId').value = id;
         document.getElementById('editSupplierName').value = name || '';
         document.getElementById('editSupplierType').value = type || '3';
         document.getElementById('editSupplierActive').value = (isActive === true || isActive === 'true') ? 'true' : 'false';
+
+        // Focal Point fields
+        document.getElementById('editFocalPointName').value = fpName || '';
+        document.getElementById('editFocalPointPosition').value = fpPos || '';
+        document.getElementById('editFocalPointPhone1').value = fpPhone1 || '';
+        document.getElementById('editFocalPointPhone2').value = fpPhone2 || '';
+        document.getElementById('editFocalPointEmail').value = fpEmail || '';
 
         // Reset checkboxes
         document.getElementById('editDeptIT').checked = false;
@@ -828,8 +943,13 @@
             var type = button.getAttribute('data-type');
             var depts = button.getAttribute('data-departments');
             var isActive = button.getAttribute('data-isactive') === 'true';
+            var fpName = button.getAttribute('data-fp-name') || '';
+            var fpPos = button.getAttribute('data-fp-pos') || '';
+            var fpPhone1 = button.getAttribute('data-fp-phone1') || '';
+            var fpPhone2 = button.getAttribute('data-fp-phone2') || '';
+            var fpEmail = button.getAttribute('data-fp-email') || '';
 
-            populateEditSupplierForm(id, name, type, depts, isActive);
+            populateEditSupplierForm(id, name, type, depts, isActive, fpName, fpPos, fpPhone1, fpPhone2, fpEmail);
         });
     }
 
@@ -841,15 +961,20 @@
             var type = btn.getAttribute('data-type');
             var depts = btn.getAttribute('data-departments');
             var isActive = btn.getAttribute('data-isactive') === 'true';
+            var fpName = btn.getAttribute('data-fp-name') || '';
+            var fpPos = btn.getAttribute('data-fp-pos') || '';
+            var fpPhone1 = btn.getAttribute('data-fp-phone1') || '';
+            var fpPhone2 = btn.getAttribute('data-fp-phone2') || '';
+            var fpEmail = btn.getAttribute('data-fp-email') || '';
 
-            populateEditSupplierForm(id, name, type, depts, isActive);
+            populateEditSupplierForm(id, name, type, depts, isActive, fpName, fpPos, fpPhone1, fpPhone2, fpEmail);
             var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSupplierModal'));
             modal.show();
         }
     });
 
-    window.openEditSupplierModal = function(id, name, type, deptsJson, isActive) {
-        populateEditSupplierForm(id, name, type, deptsJson, isActive);
+    window.openEditSupplierModal = function(id, name, type, deptsJson, isActive, fpName, fpPos, fpPhone1, fpPhone2, fpEmail) {
+        populateEditSupplierForm(id, name, type, deptsJson, isActive, fpName, fpPos, fpPhone1, fpPhone2, fpEmail);
         var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('editSupplierModal'));
         modal.show();
     };

@@ -349,7 +349,17 @@ namespace StockPortal.Controllers
         // POST: Directory/EditSupplier
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditSupplier(int id, string name, int? type, string[]? selectedDepartments, bool? isActive)
+        public async Task<IActionResult> EditSupplier(
+            int id, 
+            string name, 
+            int? type, 
+            string[]? selectedDepartments, 
+            bool? isActive,
+            string? focalPointName = null,
+            string? focalPointPosition = null,
+            string? focalPointPhone1 = null,
+            string? focalPointPhone2 = null,
+            string? focalPointEmail = null)
         {
             if (!await ValidateRbacHandshakeAsync()) return Forbid();
 
@@ -371,6 +381,12 @@ namespace StockPortal.Controllers
                 supplier.DepartmentList = (selectedDepartments != null && selectedDepartments.Length > 0)
                     ? selectedDepartments.Distinct().ToList()
                     : new List<string>();
+
+                supplier.FocalPointName = focalPointName?.Trim();
+                supplier.FocalPointPosition = focalPointPosition?.Trim();
+                supplier.FocalPointPhone1 = focalPointPhone1?.Trim();
+                supplier.FocalPointPhone2 = focalPointPhone2?.Trim();
+                supplier.FocalPointEmail = focalPointEmail?.Trim();
 
                 _context.Update(supplier);
                 await _context.SaveChangesAsync();
@@ -411,7 +427,12 @@ namespace StockPortal.Controllers
                 name = s.Name,
                 type = s.Type,
                 typeName = s.TypeName,
-                departments = s.DepartmentList
+                departments = s.DepartmentList,
+                focalPointName = s.FocalPointName,
+                focalPointPosition = s.FocalPointPosition,
+                focalPointPhone1 = s.FocalPointPhone1,
+                focalPointPhone2 = s.FocalPointPhone2,
+                focalPointEmail = s.FocalPointEmail
             }));
         }
 

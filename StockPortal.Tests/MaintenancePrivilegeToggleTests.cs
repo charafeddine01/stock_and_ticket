@@ -326,6 +326,10 @@ namespace StockPortal.Tests
             var maintService = new CurrentUserService(mockAccessor.Object);
             Assert.False(maintService.IsAdmin());
             Assert.True(maintService.IsMaintenance());
+            Assert.True(maintService.CanManageAssets());
+            Assert.True(maintService.CanCreateAssetInDepartment("IT"));
+            Assert.False(maintService.CanCreateAssetInDepartment("BIOMEDICAL"));
+            Assert.True(maintService.CanManageDeviceForms());
             Assert.False(maintService.CanPrintAssetTags());
             Assert.False(maintService.CanPrintAssetTag(itAsset)); // Print tags toggle is false
             Assert.True(maintService.CanEditAssetTags());
@@ -333,6 +337,75 @@ namespace StockPortal.Tests
             Assert.False(maintService.CanEditAsset(bioAsset)); // Cross-team blocked even if edit toggle is true!
             Assert.False(maintService.CanAccessTeamAnalytics());
             Assert.True(maintService.CanViewOwnAnalytics());
+
+            // Case C: Maintenance user with CanEditAssetTags = false
+            var restrictedMaintUser = new User
+            {
+                Id = 11,
+                Role = SystemRoles.Maintenance,
+                MaintenanceTeam = "IT",
+                CanPrintAssetTags = true,
+                CanEditAssetTags = false, // Disabled
+                CanAccessTeamAnalytics = true,
+                CanViewOwnAnalytics = true,
+                IsActive = true
+            };
+            httpContext.Items["CurrentUser"] = restrictedMaintUser;
+
+            var restrictedMaintService = new CurrentUserService(mockAccessor.Object);
+            Assert.False(restrictedMaintService.CanEditAssetTags());
+            Assert.False(restrictedMaintService.CanManageAssets()); // Cannot manage/create assets
+            Assert.False(restrictedMaintService.CanCreateAssetInDepartment("IT"));
+            Assert.False(restrictedMaintService.CanManageDeviceForms());
+            Assert.False(restrictedMaintService.CanEditAsset(itAsset)); // Cannot edit asset tags
+            Assert.True(restrictedMaintService.CanManageAsset(itAsset)); // Can still perform maintenance logs for their team
+            Assert.True(restrictedMaintService.CanPrintAssetTags());
+            Assert.True(restrictedMaintService.CanPrintAssetTag(itAsset));
+        }
+
+        [Fact]
+        public async Task AssetsController_Create_WhenEditAssetTagsDisabled_ReturnsForbid()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_Create_WhenEditAssetTagsDisabled_ReturnsForbid));
+
+            var mockUser = new Mock<ICurrentUserService>();
+            mockUser.Setup(s => s.IsAdmin()).Returns(false);
+            mockUser.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUser.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUser.Setup(s => s.CanManageAssets()).Returns(false);
+            mockUser.Setup(s => s.CanEditAssetTags()).Returns(false);
+
+            var controller = new AssetsController(db, mockUser.Object);
+
+            var getResult = await controller.Create();
+            Assert.IsType<ForbidResult>(getResult);
+
+            var newAsset = new Asset { HospitalNo = "IT-NEW", MaintenanceTeam = "IT" };
+            var postResult = await controller.Create(newAsset, deviceFormId: 1);
+            Assert.IsType<ForbidResult>(postResult);
+        }
+
+        [Fact]
+        public async Task AssetsController_TransferCustodyAndRetire_WhenEditAssetDisabled_ReturnsForbid()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_TransferCustodyAndRetire_WhenEditAssetDisabled_ReturnsForbid));
+            var asset = new Asset { Id = 701, HospitalNo = "IT-701", MaintenanceTeam = "IT", Status = "In Service" };
+            db.Assets.Add(asset);
+            await db.SaveChangesAsync();
+
+            var mockUser = new Mock<ICurrentUserService>();
+            mockUser.Setup(s => s.IsAdmin()).Returns(false);
+            mockUser.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUser.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUser.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(false);
+
+            var controller = new AssetsController(db, mockUser.Object);
+
+            var transferResult = await controller.TransferCustody(701, newUserId: 1, newRoomId: 1, newCustodyTypeId: 1, notes: "Transfer test");
+            Assert.IsType<ForbidResult>(transferResult);
+
+            var retireResult = await controller.Retire(701, reason: "Retire test");
+            Assert.IsType<ForbidResult>(retireResult);
         }
     }
 }

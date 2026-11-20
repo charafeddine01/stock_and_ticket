@@ -729,6 +729,9 @@ namespace StockPortal.Data
 
             // Seed Categories, Spare Part Forms, Calibration Protocols & Checklists (Tasks 1, 2, 5, 6, 7, 8)
             EnsureNewFeaturesSeedData(context);
+
+            // Backfill and ensure Vendor Maintenance Logs (Task 3)
+            EnsureVendorMaintenanceLogsMigrated(context);
         }
 
         private static void EnsureArabicSchema(StockDbContext context)
@@ -742,6 +745,11 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE ticket_status ADD COLUMN status_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE custody_type ADD COLUMN type_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN name_ar TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN focal_point_name TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN focal_point_position TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN focal_point_phone1 TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN focal_point_phone2 TEXT NULL;");
+                    TryExecuteSql(context, "ALTER TABLE suppliers ADD COLUMN focal_point_email TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE users ADD COLUMN full_name_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE users ADD COLUMN role_ar TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE users ADD COLUMN maintenance_team TEXT NULL;");
@@ -856,6 +864,22 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE spare_parts ADD COLUMN specs TEXT NULL DEFAULT '{}';");
 
                     TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS vendor_maintenance_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            asset_id INTEGER NOT NULL,
+                            supplier_id INTEGER NULL,
+                            visit_number INTEGER NOT NULL,
+                            visit_date TEXT NOT NULL,
+                            engineer_name TEXT NULL,
+                            engineer_phone TEXT NULL,
+                            service_report_number TEXT NULL,
+                            notes TEXT NULL,
+                            status TEXT NOT NULL DEFAULT 'Completed',
+                            recorded_by_user_id INTEGER NULL,
+                            created_at TEXT NOT NULL
+                        );");
+
+                    TryExecuteSql(context, @"
                         CREATE TABLE IF NOT EXISTS asset_categories (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             name TEXT NOT NULL,
@@ -912,6 +936,11 @@ namespace StockPortal.Data
                     TryExecuteSql(context, "ALTER TABLE `ticket_status` ADD COLUMN IF NOT EXISTS `status_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `custody_type` ADD COLUMN IF NOT EXISTS `type_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `name_ar` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `focal_point_name` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `focal_point_position` varchar(255) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `focal_point_phone1` varchar(100) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `focal_point_phone2` varchar(100) NULL;");
+                    TryExecuteSql(context, "ALTER TABLE `suppliers` ADD COLUMN IF NOT EXISTS `focal_point_email` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `full_name_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `role_ar` varchar(255) NULL;");
                     TryExecuteSql(context, "ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `maintenance_team` varchar(50) NULL;");
@@ -1083,6 +1112,25 @@ namespace StockPortal.Data
                             `is_active` tinyint(1) NOT NULL DEFAULT 1,
                             `created_at` datetime NOT NULL,
                             PRIMARY KEY (`id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+                    TryExecuteSql(context, @"
+                        CREATE TABLE IF NOT EXISTS `vendor_maintenance_logs` (
+                            `id` int NOT NULL AUTO_INCREMENT,
+                            `asset_id` int NOT NULL,
+                            `supplier_id` int NULL,
+                            `visit_number` int NOT NULL,
+                            `visit_date` date NOT NULL,
+                            `engineer_name` varchar(255) NULL,
+                            `engineer_phone` varchar(100) NULL,
+                            `service_report_number` varchar(100) NULL,
+                            `notes` text NULL,
+                            `status` varchar(50) NOT NULL DEFAULT 'Completed',
+                            `recorded_by_user_id` int NULL,
+                            `created_at` datetime NOT NULL,
+                            PRIMARY KEY (`id`),
+                            KEY `IX_vendor_maintenance_logs_asset_id` (`asset_id`),
+                            KEY `IX_vendor_maintenance_logs_supplier_id` (`supplier_id`)
                         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
                 }
             }
@@ -1957,6 +2005,44 @@ namespace StockPortal.Data
                     }
 
                     context.SaveChanges();
+                }
+            }
+            catch {}
+        }
+
+        private static void EnsureVendorMaintenanceLogsMigrated(StockDbContext context)
+        {
+            try
+            {
+                if (!context.VendorMaintenanceLogs.Any())
+                {
+                    var assetsWithVisits = context.Assets
+                        .Where(a => a.VendorMaintenanceVisits != null && a.VendorMaintenanceVisits != "" && a.VendorMaintenanceVisits != "[]")
+                        .ToList();
+
+                    foreach (var asset in assetsWithVisits)
+                    {
+                        var visits = asset.VendorVisitsList;
+                        foreach (var v in visits)
+                        {
+                            context.VendorMaintenanceLogs.Add(new VendorMaintenanceLog
+                            {
+                                AssetId = asset.Id,
+                                SupplierId = asset.SupplierId,
+                                VisitNumber = v.VisitNumber,
+                                VisitDate = v.VisitDate,
+                                EngineerName = v.EngineerName,
+                                Notes = v.Notes,
+                                Status = "Completed",
+                                CreatedAt = v.RecordedAt
+                            });
+                        }
+                    }
+
+                    if (assetsWithVisits.Any())
+                    {
+                        context.SaveChanges();
+                    }
                 }
             }
             catch {}
