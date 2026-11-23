@@ -621,7 +621,7 @@
                     <i class="fa-solid fa-plus"></i>
                     <span class="top-navbar-btn-text d-none d-sm-inline">@Loc["New Ticket"]</span>
                 </a>
-                @if (CurrentUser.CanManageAssets())
+                @if (CurrentUser.CanManageAssets() || CurrentUser.CanAddAsset())
                 {
                     <a href="@Url.Action("Create", "Assets")" class="btn btn-primary btn-sm d-flex align-items-center gap-1" title="@Loc["Add Asset"]">
                         <i class="fa-solid fa-plus"></i>

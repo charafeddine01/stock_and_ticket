@@ -382,7 +382,15 @@
                         </div>
                         <div class="col-sm-4">
                             <div class="text-muted small">@(Loc.IsArabic ? "المورد الملتزم بالصيانة:" : "Responsible Vendor:")</div>
-                            <div class="fw-bold text-dark small">@(asset.Supplier?.DisplayName ?? (Loc.IsArabic ? "مورد خارجي" : "Vendor"))</div>
+                            <div class="fw-bold text-dark small">
+                                @(asset.EffectiveMaintenanceSupplier?.DisplayName ?? (Loc.IsArabic ? "مورد خارجي" : "Vendor"))
+                                @if (asset.VendorMaintenanceSupplierId.HasValue && asset.VendorMaintenanceSupplierId != asset.SupplierId && asset.Supplier != null)
+                                {
+                                    <span class="text-muted d-block small" style="font-size:0.8rem;">
+                                        (@(Loc.IsArabic ? "مورد الشراء:" : "Source:") @asset.Supplier.DisplayName)
+                                    </span>
+                                }
+                            </div>
                         </div>
                         <div class="col-sm-4">
                             <div class="text-muted small">@(Loc.IsArabic ? "الزيارات المنجزة:" : "Completed Visits:")</div>
@@ -1115,6 +1123,28 @@
                             @(Loc.IsArabic 
                                 ? $"تدوين الزيارة رقم ({(asset.VendorMaintenanceCompletedCount + 1)}) من إجمالي ({asset.VendorMaintenanceCount ?? 4}) زيارة متفق عليها." 
                                 : $"Recording Visit #{(asset.VendorMaintenanceCompletedCount + 1)} of {asset.VendorMaintenanceCount ?? 4} agreed free visits.")
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-truck-field text-secondary me-1"></i>
+                                @(Loc.IsArabic ? "المورد / شركة الصيانة المنفذة للزيارة" : "Servicing Vendor / Maintenance Provider") <span class="text-danger">*</span>
+                            </label>
+                            <select name="supplierId" class="form-select" id="recordVendorVisitSupplierSelect">
+                                @{
+                                    var supList = (ViewBag.AvailableSuppliers as List<StockPortal.Models.Supplier>) 
+                                                  ?? Model.AvailableSuppliers 
+                                                  ?? new List<StockPortal.Models.Supplier>();
+                                }
+                                @foreach (var sup in supList)
+                                {
+                                    var isDefault = (asset.VendorMaintenanceSupplierId.HasValue && asset.VendorMaintenanceSupplierId.Value == sup.Id) 
+                                                    || (!asset.VendorMaintenanceSupplierId.HasValue && asset.SupplierId.HasValue && asset.SupplierId.Value == sup.Id);
+                                    <option value="@sup.Id" selected="@isDefault">
+                                        @sup.DisplayName @(sup.Id == asset.SupplierId ? (Loc.IsArabic ? "(مورد الشراء الأساسي)" : "(Source Vendor)") : "")
+                                    </option>
+                                }
+                            </select>
                         </div>
 
                         <div class="mb-3">

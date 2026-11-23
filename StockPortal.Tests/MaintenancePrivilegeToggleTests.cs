@@ -66,6 +66,7 @@ namespace StockPortal.Tests
             mockUser.Setup(s => s.CanPrintAssetTag(It.IsAny<Asset>())).Returns(false);
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
             var result = await controller.PrintTag(501);
 
             Assert.IsType<ForbidResult>(result);
@@ -85,6 +86,7 @@ namespace StockPortal.Tests
             mockUser.Setup(s => s.CanPrintAssetTags()).Returns(false);
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
             var result = await controller.PrintBulkTags();
 
             Assert.IsType<ForbidResult>(result);
@@ -109,6 +111,7 @@ namespace StockPortal.Tests
             mockUser.Setup(s => s.CanPrintAssetTag(bioAsset)).Returns(false);
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
             var result = await controller.PrintTag(503);
 
             Assert.IsType<ForbidResult>(result);
@@ -132,6 +135,7 @@ namespace StockPortal.Tests
             mockUser.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(false);
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
             var getResult = await controller.Edit(504);
             Assert.IsType<ForbidResult>(getResult);
 
@@ -280,6 +284,54 @@ namespace StockPortal.Tests
         }
 
         [Fact]
+        public async Task DirectoryController_UpdateUserRole_WithMultiValueFormCollection_PersistsCorrectBooleans()
+        {
+            var db = GetInMemoryDbContext(nameof(DirectoryController_UpdateUserRole_WithMultiValueFormCollection_PersistsCorrectBooleans));
+
+            var mockUser = new Mock<ICurrentUserService>();
+            mockUser.Setup(s => s.GetUserId()).Returns(1);
+            mockUser.Setup(s => s.GetDomainUser()).Returns("admin");
+            mockUser.Setup(s => s.IsAdmin()).Returns(true);
+            mockUser.Setup(s => s.CanManageUsers()).Returns(true);
+
+            var controller = new DirectoryController(db, mockUser.Object);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Request.ContentType = "application/x-www-form-urlencoded";
+            httpContext.Request.Form = new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+            {
+                { "canPrintAssetTags", new Microsoft.Extensions.Primitives.StringValues(new[] { "false", "true" }) },
+                { "canEditAssetTags", new Microsoft.Extensions.Primitives.StringValues(new[] { "true", "false" }) },
+                { "canAccessTeamAnalytics", new Microsoft.Extensions.Primitives.StringValues("false") },
+                { "canViewOwnAnalytics", new Microsoft.Extensions.Primitives.StringValues("on") }
+            });
+
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+            controller.TempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>());
+
+            var result = await controller.UpdateUserRole(
+                id: 10,
+                role: "MAINTENANCE",
+                maintenanceTeam: "GENERAL",
+                canPrintAssetTags: false,
+                canEditAssetTags: true,
+                canAccessTeamAnalytics: false,
+                canViewOwnAnalytics: false
+            );
+
+            var redirect = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal(nameof(DirectoryController.Index), redirect.ActionName);
+
+            var updatedUser = await db.Users.FindAsync(10);
+            Assert.NotNull(updatedUser);
+            Assert.Equal("MAINTENANCE", updatedUser.Role);
+            Assert.Equal("GENERAL", updatedUser.MaintenanceTeam);
+            Assert.True(updatedUser.CanPrintAssetTags);
+            Assert.True(updatedUser.CanEditAssetTags);
+            Assert.False(updatedUser.CanAccessTeamAnalytics);
+            Assert.True(updatedUser.CanViewOwnAnalytics);
+        }
+
+        [Fact]
         public void CurrentUserService_ImplementsPrivilegeChecksCorrectly()
         {
             var mockAccessor = new Mock<IHttpContextAccessor>();
@@ -354,9 +406,10 @@ namespace StockPortal.Tests
 
             var restrictedMaintService = new CurrentUserService(mockAccessor.Object);
             Assert.False(restrictedMaintService.CanEditAssetTags());
-            Assert.False(restrictedMaintService.CanManageAssets()); // Cannot manage/create assets
-            Assert.False(restrictedMaintService.CanCreateAssetInDepartment("IT"));
-            Assert.False(restrictedMaintService.CanManageDeviceForms());
+            Assert.True(restrictedMaintService.CanManageAssets()); // Can manage team assets
+            Assert.True(restrictedMaintService.CanAddAsset()); // All users can add assets
+            Assert.True(restrictedMaintService.CanCreateAssetInDepartment("IT")); // Allowed in their own team
+            Assert.False(restrictedMaintService.CanCreateAssetInDepartment("BIOMEDICAL")); // Cross-team blocked
             Assert.False(restrictedMaintService.CanEditAsset(itAsset)); // Cannot edit asset tags
             Assert.True(restrictedMaintService.CanManageAsset(itAsset)); // Can still perform maintenance logs for their team
             Assert.True(restrictedMaintService.CanPrintAssetTags());
@@ -364,24 +417,60 @@ namespace StockPortal.Tests
         }
 
         [Fact]
-        public async Task AssetsController_Create_WhenEditAssetTagsDisabled_ReturnsForbid()
+        public async Task AssetsController_Create_WhenEditAssetTagsDisabled_AllowsAddingAssets()
         {
-            var db = GetInMemoryDbContext(nameof(AssetsController_Create_WhenEditAssetTagsDisabled_ReturnsForbid));
+            var db = GetInMemoryDbContext(nameof(AssetsController_Create_WhenEditAssetTagsDisabled_AllowsAddingAssets));
+            db.DeviceForms.Add(new DeviceForm { Id = 1, Name = "PC Form", Department = "IT" });
+            await db.SaveChangesAsync();
 
             var mockUser = new Mock<ICurrentUserService>();
             mockUser.Setup(s => s.IsAdmin()).Returns(false);
             mockUser.Setup(s => s.IsMaintenance()).Returns(true);
             mockUser.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
-            mockUser.Setup(s => s.CanManageAssets()).Returns(false);
-            mockUser.Setup(s => s.CanEditAssetTags()).Returns(false);
+            mockUser.Setup(s => s.CanManageAssets()).Returns(true);
+            mockUser.Setup(s => s.CanAddAsset()).Returns(true);
+            mockUser.Setup(s => s.CanCreateAssetInDepartment("IT")).Returns(true);
+            mockUser.Setup(s => s.CanEditAssetTags()).Returns(false); // Edit tag permission disabled
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
 
+            // GET Create is permitted
             var getResult = await controller.Create();
+            Assert.IsType<ViewResult>(getResult);
+
+            // POST Create is permitted
+            var newAsset = new Asset { HospitalNo = "IT-NEW-01", MaintenanceTeam = "IT" };
+            var postResult = await controller.Create(newAsset, deviceFormId: 1);
+            Assert.IsType<RedirectToActionResult>(postResult);
+
+            var created = await db.Assets.FirstOrDefaultAsync(a => a.HospitalNo == "IT-NEW-01");
+            Assert.NotNull(created);
+        }
+
+        [Fact]
+        public async Task AssetsController_Edit_WhenEditAssetTagsDisabled_ReturnsForbid()
+        {
+            var db = GetInMemoryDbContext(nameof(AssetsController_Edit_WhenEditAssetTagsDisabled_ReturnsForbid));
+            var asset = new Asset { Id = 801, HospitalNo = "IT-801", MaintenanceTeam = "IT", Status = "In Service" };
+            db.Assets.Add(asset);
+            await db.SaveChangesAsync();
+
+            var mockUser = new Mock<ICurrentUserService>();
+            mockUser.Setup(s => s.IsAdmin()).Returns(false);
+            mockUser.Setup(s => s.IsMaintenance()).Returns(true);
+            mockUser.Setup(s => s.GetMaintenanceTeam()).Returns("IT");
+            mockUser.Setup(s => s.CanAccessAsset(It.IsAny<Asset>())).Returns(true);
+            mockUser.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
+            mockUser.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(false); // Cannot edit asset details
+
+            var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
+
+            var getResult = await controller.Edit(801);
             Assert.IsType<ForbidResult>(getResult);
 
-            var newAsset = new Asset { HospitalNo = "IT-NEW", MaintenanceTeam = "IT" };
-            var postResult = await controller.Create(newAsset, deviceFormId: 1);
+            var postResult = await controller.Edit(801, asset);
             Assert.IsType<ForbidResult>(postResult);
         }
 
@@ -400,6 +489,7 @@ namespace StockPortal.Tests
             mockUser.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(false);
 
             var controller = new AssetsController(db, mockUser.Object);
+            controller.TempData = new TempDataDictionary(new DefaultHttpContext(), Mock.Of<ITempDataProvider>());
 
             var transferResult = await controller.TransferCustody(701, newUserId: 1, newRoomId: 1, newCustodyTypeId: 1, notes: "Transfer test");
             Assert.IsType<ForbidResult>(transferResult);

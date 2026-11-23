@@ -26,6 +26,7 @@ namespace StockPortal.Services
         bool CanManageTicket(Ticket ticket);
         bool CanAccessAsset(Asset asset);
         bool CanManageAssets();
+        bool CanAddAsset();
         bool CanManageAsset(Asset asset);
         bool CanCreateAssetInDepartment(string department);
         bool CanManageDeviceForms();
@@ -267,7 +268,13 @@ namespace StockPortal.Services
 
         public bool CanManageAssets()
         {
-            return IsAdmin() || (IsMaintenance() && CanEditAssetTags());
+            return IsAdmin() || IsMaintenance();
+        }
+
+        public bool CanAddAsset()
+        {
+            // All authenticated users can add assets
+            return true;
         }
 
         public bool CanManageAsset(Asset asset)
@@ -287,12 +294,13 @@ namespace StockPortal.Services
         public bool CanCreateAssetInDepartment(string department)
         {
             if (IsAdmin()) return true;
-            if (IsMaintenance() && CanEditAssetTags())
+            if (IsMaintenance())
             {
                 var myTeam = GetMaintenanceTeam();
-                return string.Equals(department, myTeam, StringComparison.OrdinalIgnoreCase);
+                return string.IsNullOrEmpty(myTeam) || string.Equals(department, myTeam, StringComparison.OrdinalIgnoreCase);
             }
-            return false;
+            // End users can also add equipment across hospital departments
+            return true;
         }
 
         public bool CanManageDeviceForms()

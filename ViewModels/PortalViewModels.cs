@@ -154,6 +154,7 @@ namespace StockPortal.ViewModels
         public List<User> AvailableUsers { get; set; } = new();
         public List<Room> AvailableRooms { get; set; } = new();
         public List<CustodyType> AvailableCustodyTypes { get; set; } = new();
+        public List<Supplier> AvailableSuppliers { get; set; } = new();
 
         // Transfer Custody Form
         public int NewUserId { get; set; }

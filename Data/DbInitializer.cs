@@ -851,6 +851,7 @@ namespace StockPortal.Data
                     // Task 1, 2, 5, 6, 7, 8 Schema Additions for SQLite
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN categoryID INTEGER NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN has_vendor_maintenance INTEGER NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_supplier_id INTEGER NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_start TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_end TEXT NULL;");
                     TryExecuteSql(context, "ALTER TABLE assets ADD COLUMN vendor_maintenance_count INTEGER NULL;");
@@ -1047,6 +1048,7 @@ namespace StockPortal.Data
                     // Task 1, 2, 5, 6, 7, 8 Schema Additions for MySQL
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `categoryID` int NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `has_vendor_maintenance` tinyint(1) NOT NULL DEFAULT 0;");
+                    TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_supplier_id` int NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_start` date NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_end` date NULL;");
                     TryExecuteSql(context, "ALTER TABLE `assets` ADD COLUMN IF NOT EXISTS `vendor_maintenance_count` int NULL;");

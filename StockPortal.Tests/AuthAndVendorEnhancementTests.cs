@@ -223,11 +223,12 @@ namespace StockPortal.Tests
             var result = await controller.RecordVendorMaintenanceVisit(
                 asset.Id,
                 new DateTime(2026, 11, 20),
-                "Eng. Samir Kabbara",
-                "+961 3 445566",
-                "SR-2026-0089",
-                "Complete gantry and detector calibration completed successfully.",
-                "Completed"
+                supplierId: null,
+                engineerName: "Eng. Samir Kabbara",
+                engineerPhone: "+961 3 445566",
+                serviceReportNumber: "SR-2026-0089",
+                notes: "Complete gantry and detector calibration completed successfully.",
+                status: "Completed"
             );
 
             // Assert
@@ -288,6 +289,62 @@ namespace StockPortal.Tests
             var modelSearch = Assert.IsAssignableFrom<IEnumerable<VendorMaintenanceLog>>(viewSearch.Model);
             Assert.Single(modelSearch);
             Assert.Equal("Hadi IT", modelSearch.First().EngineerName);
+        }
+
+        [Fact]
+        public async Task AssetsController_RecordVendorMaintenanceVisit_WithCustomServicingVendor_Succeeds()
+        {
+            // Arrange
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var sourceSupplier = new Supplier { Id = 1, Name = "Source Vendor Corp", IsActive = true };
+            var servicingSupplier = new Supplier { Id = 2, Name = "Local Service Agent LLC", IsActive = true };
+            db.Suppliers.AddRange(sourceSupplier, servicingSupplier);
+
+            var asset = new Asset
+            {
+                Id = 202,
+                HospitalNo = "RAD-MRI-02",
+                MaintenanceTeam = "BIOMEDICAL",
+                SupplierId = 1,
+                HasVendorMaintenance = true,
+                VendorMaintenanceCount = 4
+            };
+            db.Assets.Add(asset);
+            await db.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            mockUserService.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
+            mockUserService.Setup(s => s.GetUserId()).Returns(1);
+
+            var controller = new AssetsController(db, mockUserService.Object);
+            var httpContext = new DefaultHttpContext();
+            var tempData = new TempDataDictionary(httpContext, Mock.Of<ITempDataProvider>());
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+            controller.TempData = tempData;
+
+            // Act: select custom vendor (Id = 2) instead of source vendor (Id = 1)
+            var result = await controller.RecordVendorMaintenanceVisit(
+                asset.Id,
+                new DateTime(2026, 11, 21),
+                supplierId: 2,
+                engineerName: "Eng. Rami",
+                engineerPhone: "+961 71 889900",
+                serviceReportNumber: "SR-CUSTOM-01",
+                notes: "Scheduled after-sale visit performed by local maintenance contractor.",
+                status: "Completed"
+            );
+
+            // Assert
+            Assert.IsType<RedirectToActionResult>(result);
+            var log = await db.VendorMaintenanceLogs.FirstOrDefaultAsync(l => l.AssetId == 202);
+            Assert.NotNull(log);
+            Assert.Equal(2, log.SupplierId);
+            Assert.Equal("Eng. Rami", log.EngineerName);
+
+            var updatedAsset = await db.Assets.FindAsync(202);
+            Assert.NotNull(updatedAsset);
+            Assert.Equal(2, updatedAsset.VendorMaintenanceSupplierId);
+            Assert.Equal(1, updatedAsset.VendorMaintenanceCompletedCount);
         }
     }
 }

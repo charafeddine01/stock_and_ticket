@@ -607,6 +607,16 @@ namespace StockPortal.Models
         [Display(Name = "Free Vendor Maintenance (After Sale)")]
         public bool HasVendorMaintenance { get; set; } = false;
 
+        [Column("vendor_maintenance_supplier_id")]
+        [Display(Name = "Maintenance Vendor / Service Provider")]
+        public int? VendorMaintenanceSupplierId { get; set; }
+
+        [ForeignKey("VendorMaintenanceSupplierId")]
+        public virtual Supplier? VendorMaintenanceSupplier { get; set; }
+
+        [NotMapped]
+        public Supplier? EffectiveMaintenanceSupplier => VendorMaintenanceSupplier ?? Supplier;
+
         [Column("vendor_maintenance_start", TypeName = "date")]
         [Display(Name = "Vendor Maintenance Start Date")]
         [DataType(DataType.Date)]

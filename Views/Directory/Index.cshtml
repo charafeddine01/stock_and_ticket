@@ -225,32 +225,32 @@
                                                                         <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
                                                                     </label>
                                                                     <div class="form-check form-switch mb-2">
-                                                                        <input type="hidden" name="canPrintAssetTags" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canPrintAssetTags" id="printTags-@u.Id" value="true" @(u.CanPrintAssetTags ? "checked" : "") />
+                                                                        <input type="hidden" name="canPrintAssetTags" value="false" />
                                                                         <label class="form-check-label fw-semibold" for="printTags-@u.Id">
                                                                             <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
                                                                         </label>
-                                                                        <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
+                                                                        <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags without changing parameters (headers, footers and data fields locked)."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-2">
-                                                                        <input type="hidden" name="canEditAssetTags" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canEditAssetTags" id="editTags-@u.Id" value="true" @(u.CanEditAssetTags ? "checked" : "") />
+                                                                        <input type="hidden" name="canEditAssetTags" value="false" />
                                                                         <label class="form-check-label fw-semibold" for="editTags-@u.Id">
                                                                             <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
                                                                         </label>
-                                                                        <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
+                                                                        <div class="form-text small text-muted">@Loc["Edit asset details & customize printable tag parameters (headers, footers, and data fields)."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-2">
-                                                                        <input type="hidden" name="canAccessTeamAnalytics" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canAccessTeamAnalytics" id="teamAnalytics-@u.Id" value="true" @(u.CanAccessTeamAnalytics ? "checked" : "") />
+                                                                        <input type="hidden" name="canAccessTeamAnalytics" value="false" />
                                                                         <label class="form-check-label fw-semibold" for="teamAnalytics-@u.Id">
                                                                             <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
                                                                         </label>
                                                                         <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
                                                                     </div>
                                                                     <div class="form-check form-switch mb-1">
-                                                                        <input type="hidden" name="canViewOwnAnalytics" value="false" />
                                                                         <input class="form-check-input" type="checkbox" role="switch" name="canViewOwnAnalytics" id="ownAnalytics-@u.Id" value="true" @(u.CanViewOwnAnalytics ? "checked" : "") />
+                                                                        <input type="hidden" name="canViewOwnAnalytics" value="false" />
                                                                         <label class="form-check-label fw-semibold" for="ownAnalytics-@u.Id">
                                                                             <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
                                                                         </label>
@@ -589,32 +589,32 @@
                                 <i class="fa-solid fa-user-shield me-1 text-primary"></i> @Loc["Maintenance Team Privileges"]
                             </label>
                             <div class="form-check form-switch mb-2">
-                                <input type="hidden" name="CanPrintAssetTags" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanPrintAssetTags" id="newPrintTags" value="true" checked />
+                                <input type="hidden" name="CanPrintAssetTags" value="false" />
                                 <label class="form-check-label fw-semibold" for="newPrintTags">
                                     <i class="fa-solid fa-print me-1 text-primary"></i> @Loc["Print Asset Tags"]
                                 </label>
-                                <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags for equipment belonging to this team."]</div>
+                                <div class="form-text small text-muted">@Loc["Print QR & thermal asset tags without changing parameters (headers, footers and data fields locked)."]</div>
                             </div>
                             <div class="form-check form-switch mb-2">
-                                <input type="hidden" name="CanEditAssetTags" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanEditAssetTags" id="newEditTags" value="true" checked />
+                                <input type="hidden" name="CanEditAssetTags" value="false" />
                                 <label class="form-check-label fw-semibold" for="newEditTags">
                                     <i class="fa-solid fa-pen-to-square me-1 text-success"></i> @Loc["Edit Asset Tags"]
                                 </label>
-                                <div class="form-text small text-muted">@Loc["Edit asset details, technical specifications and hardware fields."]</div>
+                                <div class="form-text small text-muted">@Loc["Edit asset details & customize printable tag parameters (headers, footers, and data fields)."]</div>
                             </div>
                             <div class="form-check form-switch mb-2">
-                                <input type="hidden" name="CanAccessTeamAnalytics" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanAccessTeamAnalytics" id="newTeamAnalytics" value="true" checked />
+                                <input type="hidden" name="CanAccessTeamAnalytics" value="false" />
                                 <label class="form-check-label fw-semibold" for="newTeamAnalytics">
                                     <i class="fa-solid fa-chart-line me-1 text-info"></i> @Loc["Maintenance Team Analytics Tab"]
                                 </label>
                                 <div class="form-text small text-muted">@Loc["Access the team-wide analytics dashboard for this maintenance discipline."]</div>
                             </div>
                             <div class="form-check form-switch mb-1">
-                                <input type="hidden" name="CanViewOwnAnalytics" value="false" />
                                 <input class="form-check-input" type="checkbox" role="switch" name="CanViewOwnAnalytics" id="newOwnAnalytics" value="true" checked />
+                                <input type="hidden" name="CanViewOwnAnalytics" value="false" />
                                 <label class="form-check-label fw-semibold" for="newOwnAnalytics">
                                     <i class="fa-solid fa-user-check me-1 text-warning"></i> @Loc["View Personal Analytics"]
                                 </label>

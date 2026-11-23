@@ -33,6 +33,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.CustodyType)
                 .Include(a => a.Category)
                 .AsQueryable();
@@ -154,6 +155,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.CustodyType)
                 .Include(a => a.Category)
                 .Include(a => a.CompatibleSpareParts).ThenInclude(cp => cp.SparePart)
@@ -196,12 +198,16 @@ namespace StockPortal.Controllers
                 .OrderBy(u => u.FullName)
                 .ToListAsync();
 
+            var availableSuppliers = await _context.Suppliers.Where(s => s.IsActive == true).OrderBy(s => s.Name).ToListAsync();
+            ViewBag.AvailableSuppliers = availableSuppliers;
+
             var vm = new AssetDetailsViewModel
             {
                 Asset = asset,
                 AvailableUsers = await _context.Users.Where(u => u.IsActive == true).OrderBy(u => u.FullName).ToListAsync(),
                 AvailableRooms = await _context.Rooms.OrderBy(r => r.Floor).ThenBy(r => r.RoomNo).ToListAsync(),
                 AvailableCustodyTypes = await _context.CustodyTypes.ToListAsync(),
+                AvailableSuppliers = availableSuppliers,
                 NewUserId = asset.UserId ?? 0,
                 NewRoomId = asset.RoomId ?? 0,
                 NewCustodyTypeId = asset.CustodyTypeId ?? 1,
@@ -217,13 +223,16 @@ namespace StockPortal.Controllers
         // GET: Assets/Create
         public async Task<IActionResult> Create(int? deviceFormId = null)
         {
-            if (!_currentUserService.CanManageAssets() || !_currentUserService.CanEditAssetTags()) return Forbid();
+            if (!_currentUserService.CanAddAsset() && !_currentUserService.CanManageAssets()) return Forbid();
 
             var formsQuery = _context.DeviceForms.AsQueryable();
             if (_currentUserService.IsMaintenance())
             {
                 var myTeam = _currentUserService.GetMaintenanceTeam();
-                formsQuery = formsQuery.Where(f => f.Department == myTeam);
+                if (!string.IsNullOrEmpty(myTeam))
+                {
+                    formsQuery = formsQuery.Where(f => f.Department == myTeam);
+                }
             }
 
             var availableForms = await formsQuery.OrderBy(f => f.Name).ToListAsync();
@@ -259,7 +268,7 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(Asset asset, int deviceFormId, IFormCollection? formCollection = null, int[]? compatibleSparePartIds = null)
         {
-            if (!_currentUserService.CanManageAssets() || !_currentUserService.CanEditAssetTags()) return Forbid();
+            if (!_currentUserService.CanAddAsset() && !_currentUserService.CanManageAssets()) return Forbid();
             formCollection ??= new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
 
             var selectedForm = await _context.DeviceForms.FindAsync(deviceFormId);
@@ -463,6 +472,8 @@ namespace StockPortal.Controllers
 
             // Task 9: Retain original purchase price from database (Cost is not editable/visible in Edit view)
             asset.Price = existing.Price;
+            asset.VendorMaintenanceCompletedCount = existing.VendorMaintenanceCompletedCount;
+            asset.VendorMaintenanceVisits = existing.VendorMaintenanceVisits;
 
             // Preserve maintenance team if not Admin
             if (_currentUserService.IsMaintenance())
@@ -723,6 +734,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.CustodyType)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
@@ -750,6 +762,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.CustodyType)
                 .AsQueryable();
 
@@ -906,6 +919,7 @@ namespace StockPortal.Controllers
                 .Include(a => a.User)
                 .Include(a => a.Room)
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.CustodyType)
                 .AsQueryable();
 
@@ -1039,6 +1053,7 @@ namespace StockPortal.Controllers
                 : allSuppliers;
 
             ViewBag.Suppliers = new SelectList(filteredSuppliers, "Id", "Name", asset?.SupplierId);
+            ViewBag.VendorMaintenanceSuppliers = new SelectList(filteredSuppliers, "Id", "Name", asset?.VendorMaintenanceSupplierId ?? asset?.SupplierId);
             ViewBag.CustodyTypes = new SelectList(await _context.CustodyTypes.ToListAsync(), "Id", "Type", asset?.CustodyTypeId);
             ViewBag.MaintenanceTeams = new SelectList(MaintenanceTeams.All, asset?.MaintenanceTeam ?? MaintenanceTeams.IT);
             ViewBag.SoftwareCatalog = await _context.SoftwareCatalog.Where(s => s.IsActive).OrderBy(s => s.Category).ThenBy(s => s.Name).ToListAsync();
@@ -1090,7 +1105,8 @@ namespace StockPortal.Controllers
         public async Task<IActionResult> RecordVendorMaintenanceVisit(
             int assetId, 
             DateTime visitDate, 
-            string? engineerName, 
+            int? supplierId = null,
+            string? engineerName = null, 
             string? engineerPhone = null,
             string? serviceReportNumber = null,
             string? notes = null,
@@ -1098,10 +1114,19 @@ namespace StockPortal.Controllers
         {
             var asset = await _context.Assets
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.VendorMaintenanceLogs)
                 .FirstOrDefaultAsync(a => a.Id == assetId);
             if (asset == null) return NotFound();
             if (!_currentUserService.CanManageAsset(asset)) return Forbid();
+
+            int? effectiveSupplierId = (supplierId.HasValue && supplierId.Value > 0)
+                ? supplierId.Value
+                : (asset.VendorMaintenanceSupplierId ?? asset.SupplierId);
+
+            var servicingSupplier = effectiveSupplierId.HasValue
+                ? await _context.Suppliers.FindAsync(effectiveSupplierId.Value)
+                : (asset.VendorMaintenanceSupplier ?? asset.Supplier);
 
             var currentLogs = asset.VendorMaintenanceLogs?.ToList() ?? new List<VendorMaintenanceLog>();
             int visitNo = currentLogs.Any()
@@ -1111,10 +1136,10 @@ namespace StockPortal.Controllers
             var vendorLog = new VendorMaintenanceLog
             {
                 AssetId = asset.Id,
-                SupplierId = asset.SupplierId,
+                SupplierId = effectiveSupplierId,
                 VisitNumber = visitNo,
                 VisitDate = visitDate,
-                EngineerName = string.IsNullOrWhiteSpace(engineerName) ? (asset.Supplier?.Name ?? "Vendor Service Engineer") : engineerName.Trim(),
+                EngineerName = string.IsNullOrWhiteSpace(engineerName) ? (servicingSupplier?.Name ?? "Vendor Service Engineer") : engineerName.Trim(),
                 EngineerPhone = engineerPhone?.Trim(),
                 ServiceReportNumber = serviceReportNumber?.Trim(),
                 Notes = notes?.Trim(),
@@ -1124,6 +1149,11 @@ namespace StockPortal.Controllers
             };
 
             _context.VendorMaintenanceLogs.Add(vendorLog);
+
+            if (asset.VendorMaintenanceSupplierId == null && effectiveSupplierId.HasValue)
+            {
+                asset.VendorMaintenanceSupplierId = effectiveSupplierId;
+            }
 
             // Backward compatibility with JSON column
             var visits = asset.VendorVisitsList;
@@ -1145,9 +1175,9 @@ namespace StockPortal.Controllers
                 MaintenanceType = 3, // Vendor Maintenance
                 TimStamp = DateTime.Now,
                 UserId = _currentUserService.GetUserId(),
-                SupplierId = asset.SupplierId,
+                SupplierId = effectiveSupplierId,
                 WorkOrderStatus = vendorLog.Status,
-                Description = $"Vendor Free After-Sale Maintenance Visit #{visitNo} conducted on {visitDate:yyyy-MM-dd} by {vendorLog.EngineerName}. Service Report: {serviceReportNumber ?? "N/A"}. Notes: {notes ?? "Periodic free checkup completed successfully."}"
+                Description = $"Vendor Free After-Sale Maintenance Visit #{visitNo} conducted on {visitDate:yyyy-MM-dd} by {vendorLog.EngineerName} ({servicingSupplier?.DisplayName ?? "Vendor"}). Service Report: {serviceReportNumber ?? "N/A"}. Notes: {notes ?? "Periodic free checkup completed successfully."}"
             });
 
             await _context.SaveChangesAsync();
@@ -1170,6 +1200,7 @@ namespace StockPortal.Controllers
             var query = _context.VendorMaintenanceLogs
                 .Include(l => l.Asset).ThenInclude(a => a!.Category)
                 .Include(l => l.Asset).ThenInclude(a => a!.Room)
+                .Include(l => l.Asset).ThenInclude(a => a!.VendorMaintenanceSupplier)
                 .Include(l => l.Supplier)
                 .Include(l => l.RecordedByUser)
                 .AsQueryable();
@@ -1187,7 +1218,7 @@ namespace StockPortal.Controllers
             // Vendor filter
             if (supplierId.HasValue && supplierId.Value > 0)
             {
-                query = query.Where(l => l.SupplierId == supplierId.Value || (l.Asset != null && l.Asset.SupplierId == supplierId.Value));
+                query = query.Where(l => l.SupplierId == supplierId.Value || (l.Asset != null && (l.Asset.SupplierId == supplierId.Value || l.Asset.VendorMaintenanceSupplierId == supplierId.Value)));
             }
 
             // Status filter
@@ -1275,6 +1306,7 @@ namespace StockPortal.Controllers
         {
             var asset = await _context.Assets
                 .Include(a => a.Supplier)
+                .Include(a => a.VendorMaintenanceSupplier)
                 .Include(a => a.Room)
                 .Include(a => a.Category)
                 .FirstOrDefaultAsync(a => a.Id == id);

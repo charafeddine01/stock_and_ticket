@@ -63,6 +63,7 @@ namespace StockPortal.Tests
             mock.Setup(s => s.CanManageDeviceForms()).Returns(true);
             mock.Setup(s => s.CanManageDeviceForm(It.IsAny<DeviceForm>())).Returns(true);
             mock.Setup(s => s.CanManageAssets()).Returns(true);
+            mock.Setup(s => s.CanAddAsset()).Returns(true);
             mock.Setup(s => s.CanManageAsset(It.IsAny<Asset>())).Returns(true);
             mock.Setup(s => s.CanAccessAsset(It.IsAny<Asset>())).Returns(true);
             mock.Setup(s => s.CanEditAsset(It.IsAny<Asset>())).Returns(true);

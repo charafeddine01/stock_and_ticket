@@ -155,7 +155,25 @@ namespace StockPortal.Controllers
                 user.Role = string.IsNullOrWhiteSpace(user.Role) ? SystemRoles.EndUser : user.Role.Trim().ToUpperInvariant();
                 if (user.Role == SystemRoles.Maintenance)
                 {
-                    // Keep submitted privilege toggles
+                    if (Request != null && Request.HasFormContentType)
+                    {
+                        bool ReadBool(string key, bool fallback)
+                        {
+                            if (Request.Form.TryGetValue(key, out var vals))
+                            {
+                                return vals.Any(v => 
+                                    string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) || 
+                                    string.Equals(v, "on", StringComparison.OrdinalIgnoreCase) || 
+                                    string.Equals(v, "1", StringComparison.OrdinalIgnoreCase));
+                            }
+                            return fallback;
+                        }
+
+                        user.CanPrintAssetTags = ReadBool("CanPrintAssetTags", user.CanPrintAssetTags);
+                        user.CanEditAssetTags = ReadBool("CanEditAssetTags", user.CanEditAssetTags);
+                        user.CanAccessTeamAnalytics = ReadBool("CanAccessTeamAnalytics", user.CanAccessTeamAnalytics);
+                        user.CanViewOwnAnalytics = ReadBool("CanViewOwnAnalytics", user.CanViewOwnAnalytics);
+                    }
                 }
                 else if (user.Role == SystemRoles.Admin)
                 {
@@ -231,6 +249,26 @@ namespace StockPortal.Controllers
             bool canViewOwnAnalytics = false)
         {
             if (!await ValidateRbacHandshakeAsync()) return Forbid();
+
+            if (Request != null && Request.HasFormContentType)
+            {
+                bool ReadBool(string key, bool fallback)
+                {
+                    if (Request.Form.TryGetValue(key, out var vals))
+                    {
+                        return vals.Any(v => 
+                            string.Equals(v, "true", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(v, "on", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(v, "1", StringComparison.OrdinalIgnoreCase));
+                    }
+                    return fallback;
+                }
+
+                canPrintAssetTags = ReadBool("canPrintAssetTags", canPrintAssetTags);
+                canEditAssetTags = ReadBool("canEditAssetTags", canEditAssetTags);
+                canAccessTeamAnalytics = ReadBool("canAccessTeamAnalytics", canAccessTeamAnalytics);
+                canViewOwnAnalytics = ReadBool("canViewOwnAnalytics", canViewOwnAnalytics);
+            }
 
             var user = await _context.Users.FindAsync(id);
             if (user != null)

@@ -322,6 +322,15 @@
 
                         <div id="vendorMaintenanceContainer" class="col-12" style="display: @(Model?.HasVendorMaintenance == true ? "block" : "none");">
                             <div class="row g-3 p-3 bg-light rounded border border-info border-opacity-25">
+                                <div class="col-md-12">
+                                    <label asp-for="VendorMaintenanceSupplierId" class="form-label small fw-semibold">
+                                        <i class="fa-solid fa-truck-field text-secondary me-1"></i>
+                                        @(Loc.IsArabic ? "شركة / مورد الصيانة المعتمد (اتركه فارغاً للاعتماد على مورد الشراء)" : "Designated Maintenance Vendor (Leave empty to use main purchasing supplier)")
+                                    </label>
+                                    <select asp-for="VendorMaintenanceSupplierId" class="form-select form-select-sm" asp-items="ViewBag.VendorMaintenanceSuppliers">
+                                        <option value="">-- @(Loc.IsArabic ? "نفس مورد شراء الجهاز (المورد الأساسي)" : "Same as Equipment Source Supplier") --</option>
+                                    </select>
+                                </div>
                                 <div class="col-md-4">
                                     <label asp-for="VendorMaintenanceCount" class="form-label small fw-semibold">@(Loc.IsArabic ? "عدد الزيارات المجانية المتفق عليها" : "Number of Free Visits")</label>
                                     <input asp-for="VendorMaintenanceCount" class="form-control form-control-sm" type="number" min="1" max="50" placeholder="e.g. 4 or 6" />

@@ -132,7 +132,7 @@
             </div>
             <div class="col-6 col-sm-6">
                 <span class="text-muted small d-block">@(isAr ? "المورد المسؤول:" : "Vendor / Supplier:")</span>
-                <strong>@(Model.Supplier?.DisplayName ?? (isAr ? "غير محدد" : "Unassigned"))</strong>
+                <strong>@(Model.EffectiveMaintenanceSupplier?.DisplayName ?? Model.Supplier?.DisplayName ?? (isAr ? "غير محدد" : "Unassigned"))</strong>
             </div>
             <div class="col-6 col-sm-6">
                 <span class="text-muted small d-block">@(isAr ? "فترة التغطية المجانية:" : "Free Coverage Period:")</span>

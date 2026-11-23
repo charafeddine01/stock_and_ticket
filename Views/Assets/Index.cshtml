@@ -127,7 +127,7 @@
             })" class="btn btn-outline-success btn-sm">
                 <i class="fa-solid fa-file-csv me-1"></i> @Loc["Export CSV"]
             </a>
-            @if (canManage)
+            @if (canManage || CurrentUser.CanAddAsset())
             {
                 <a href="@Url.Action("Create")" class="btn btn-primary btn-sm">
                     <i class="fa-solid fa-plus me-1"></i> @Loc["Register New Asset"]
