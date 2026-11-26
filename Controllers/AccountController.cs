@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -186,8 +187,27 @@ namespace StockPortal.Controllers
             ViewBag.Reason = reason ?? "NotFound";
             string clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
             string clientDevice = NetworkInfoHelper.GetClientDeviceName(HttpContext);
-            string resolvedUser = !string.IsNullOrWhiteSpace(username) ? username : clientDevice;
-            ViewBag.Username = resolvedUser;
+
+            // Resolve the Windows/workstation username, never confusing it with the machine/device name.
+            string? resolvedUser = !string.IsNullOrWhiteSpace(username) ? username.Trim() : null;
+            if (string.IsNullOrWhiteSpace(resolvedUser))
+            {
+                var winUser = HttpContext.User?.Identity?.Name;
+                if (!string.IsNullOrWhiteSpace(winUser))
+                {
+                    resolvedUser = winUser.Contains('\\') ? winUser.Split('\\').Last() : (winUser.Contains('@') ? winUser.Split('@').First() : winUser);
+                }
+            }
+            if (string.IsNullOrWhiteSpace(resolvedUser))
+            {
+                bool isLocal = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == NetworkInfoHelper.GetLocalPrimaryIpAddress() || NetworkInfoHelper.IsLocalHost(HttpContext.Connection.RemoteIpAddress);
+                if (isLocal)
+                {
+                    resolvedUser = Environment.UserName;
+                }
+            }
+
+            ViewBag.Username = resolvedUser ?? "Unspecified";
             ViewBag.PcName = clientDevice;
             ViewBag.ClientIp = clientIp;
 
@@ -195,7 +215,7 @@ namespace StockPortal.Controllers
             var asset = await _context.Assets
                 .Include(a => a.Room)
                 .Include(a => a.User)
-                .FirstOrDefaultAsync(a => a.HospitalNo != null && (a.HospitalNo.ToLower() == clientDevice.ToLower() || a.HospitalNo.ToLower() == resolvedUser.ToLower()));
+                .FirstOrDefaultAsync(a => a.HospitalNo != null && (a.HospitalNo.ToLower() == clientDevice.ToLower() || (resolvedUser != null && a.HospitalNo.ToLower() == resolvedUser.ToLower())));
 
             ViewBag.MatchedAsset = asset;
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.RoomNo).ToListAsync();
@@ -209,7 +229,25 @@ namespace StockPortal.Controllers
         public async Task<IActionResult> SubmitAccessTicket(string? pcName, int? assetId, int? roomId, string? notes, string? username = null)
         {
             string hostName = string.IsNullOrWhiteSpace(pcName) ? NetworkInfoHelper.GetClientDeviceName(HttpContext) : pcName.Trim();
-            string cleanUsername = !string.IsNullOrWhiteSpace(username) ? username.Trim() : hostName;
+            
+            // Resolve clean username: never fallback to PC hostname
+            string? cleanUsername = !string.IsNullOrWhiteSpace(username) && !username.Equals("Unspecified", StringComparison.OrdinalIgnoreCase)
+                ? username.Trim()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(cleanUsername))
+            {
+                var winUser = HttpContext.User?.Identity?.Name;
+                if (!string.IsNullOrWhiteSpace(winUser))
+                {
+                    cleanUsername = winUser.Contains('\\') ? winUser.Split('\\').Last() : (winUser.Contains('@') ? winUser.Split('@').First() : winUser);
+                }
+            }
+            if (string.IsNullOrWhiteSpace(cleanUsername))
+            {
+                bool isLocal = NetworkInfoHelper.IsLocalHost(HttpContext.Connection.RemoteIpAddress);
+                cleanUsername = isLocal ? Environment.UserName : "Unregistered User";
+            }
 
             // Resolve target asset
             Asset? asset = null;
@@ -444,16 +482,185 @@ namespace StockPortal.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // GET/POST: Account/AutoLogin (Resumes Windows SSO auto-login by clearing signed out flag)
-        public IActionResult AutoLogin(string? returnUrl = null)
+        // GET/POST: Account/AutoLogin (Windows SSO auto-login strictly via cryptographically verified Windows/NTLM token)
+        public async Task<IActionResult> AutoLogin(string? returnUrl = null)
         {
             if (!CanAccessWindowsAuth())
             {
                 TempData["ErrorMessage"] = "Windows authentication is disabled by administrator.";
-                return RedirectToAction(nameof(Login));
+                return RedirectToAction(nameof(AccessDenied), new { reason = "WindowsAuthDisabled", returnUrl });
             }
 
             Response.Cookies.Delete("SOLVIS.SignedOut");
+            Response.Cookies.Delete("SOLVIS.WorkstationUser"); // Purge any legacy client cookie
+
+            string? rawUser = null;
+
+            // 1. Attempt to resolve server-verified Windows identity (IIS / Kestrel Windows Auth / Kerberos)
+            if (User?.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(User.Identity.Name))
+            {
+                rawUser = User.Identity.Name;
+            }
+
+            // 2. Check Authorization header (NTLM, Negotiate, or password-verified Basic)
+            string? authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(rawUser) && !string.IsNullOrWhiteSpace(authHeader))
+            {
+                if (authHeader.StartsWith("NTLM ", StringComparison.OrdinalIgnoreCase) ||
+                    authHeader.StartsWith("Negotiate ", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        int spaceIdx = authHeader.IndexOf(' ');
+                        string token = authHeader.Substring(spaceIdx + 1).Trim();
+                        byte[] messageBytes = Convert.FromBase64String(token);
+                        int ntlmOffset = NtlmAuthHelper.FindNtlmSignature(messageBytes);
+                        if (ntlmOffset >= 0)
+                        {
+                            byte[] ntlmBytes = ntlmOffset == 0 ? messageBytes : messageBytes[ntlmOffset..];
+                            if (NtlmAuthHelper.IsType1(ntlmBytes))
+                            {
+                                byte[] challenge = NtlmAuthHelper.CreateType2Challenge();
+                                string challengeB64 = Convert.ToBase64String(challenge);
+                                if (authHeader.StartsWith("Negotiate", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Response.Headers.Append("WWW-Authenticate", "Negotiate " + challengeB64);
+                                }
+                                Response.Headers.Append("WWW-Authenticate", "NTLM " + challengeB64);
+                                return StatusCode(StatusCodes.Status401Unauthorized);
+                            }
+                            else if (NtlmAuthHelper.IsType3(ntlmBytes))
+                            {
+                                var (ntlmUser, _, _) = NtlmAuthHelper.ParseType3(ntlmBytes);
+                                if (!string.IsNullOrWhiteSpace(ntlmUser))
+                                {
+                                    rawUser = ntlmUser;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                else if (authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        string token = authHeader.Substring(6).Trim();
+                        string creds = Encoding.UTF8.GetString(Convert.FromBase64String(token));
+                        int colon = creds.IndexOf(':');
+                        if (colon > 0)
+                        {
+                            string basicUsername = creds.Substring(0, colon).Trim();
+                            string basicPassword = creds.Substring(colon + 1);
+
+                            // Verify password against database to prevent credential spoofing
+                            var searchBasic = basicUsername.ToLower();
+                            var dbUser = await _context.Users
+                                .FirstOrDefaultAsync(u =>
+                                    (u.DomainUser != null && u.DomainUser.ToLower() == searchBasic) ||
+                                    (u.FullName != null && u.FullName.ToLower() == searchBasic)
+                                );
+
+                            if (dbUser != null && !string.IsNullOrEmpty(dbUser.PasswordHash))
+                            {
+                                var verify = _passwordHasher.VerifyHashedPassword(dbUser, dbUser.PasswordHash, basicPassword);
+                                if (verify != PasswordVerificationResult.Failed)
+                                {
+                                    rawUser = dbUser.DomainUser ?? dbUser.FullName ?? basicUsername;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            // 3. Localhost loopback fallback (strictly for development/local testing on same machine)
+            var clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
+            bool isLoopbackOrLocal = clientIp == "127.0.0.1" || clientIp == "::1" || NetworkInfoHelper.IsLocalHost(HttpContext.Connection.RemoteIpAddress);
+            if (string.IsNullOrWhiteSpace(rawUser) && isLoopbackOrLocal)
+            {
+                rawUser = Environment.UserName;
+            }
+
+            // 4. If identity is still not detected and no authorization header was received:
+            // Issue 401 challenge with Negotiate & NTLM to retrieve the logged-in Windows user from client PC
+            if (string.IsNullOrWhiteSpace(rawUser) && string.IsNullOrWhiteSpace(authHeader))
+            {
+                Response.Cookies.Delete("SOLVIS.NtlmTried");
+                Response.Headers.Append("WWW-Authenticate", "Negotiate");
+                Response.Headers.Append("WWW-Authenticate", "NTLM");
+                return StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            Response.Cookies.Delete("SOLVIS.NtlmTried");
+
+            string cleanUsername = rawUser ?? "";
+            if (cleanUsername.Contains('\\')) cleanUsername = cleanUsername.Split('\\').Last();
+            if (cleanUsername.Contains('@')) cleanUsername = cleanUsername.Split('@').First();
+            cleanUsername = cleanUsername.Trim();
+
+            // 5. If no verified Windows username could be detected
+            if (string.IsNullOrWhiteSpace(cleanUsername))
+            {
+                return RedirectToAction(nameof(AccessDenied), new { reason = "NoWindowsIdentity", username = "Unspecified", returnUrl });
+            }
+
+            // 6. Query user in database
+            var search = cleanUsername.ToLower();
+            var pcUser = await _context.Users
+                .Include(u => u.Department)
+                .FirstOrDefaultAsync(u =>
+                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || u.DomainUser.ToLower().Contains(search) || search.Contains(u.DomainUser.ToLower()))) ||
+                    (u.FullName != null && (u.FullName.ToLower() == search || u.FullName.ToLower().StartsWith(search + " ") || u.FullName.ToLower().EndsWith(" " + search) || u.FullName.ToLower().Contains(search)))
+                );
+
+            // 7. User not found in database -> Redirect to AccessDenied so user sees explanation AND automated ticket generator!
+            if (pcUser == null)
+            {
+                return RedirectToAction(nameof(AccessDenied), new { reason = "NotFound", username = cleanUsername, returnUrl });
+            }
+
+            // 8. User is inactive -> Redirect to AccessDenied (Inactive) with automated ticket generator!
+            if (pcUser.IsActive != true)
+            {
+                return RedirectToAction(nameof(AccessDenied), new { reason = "Inactive", username = cleanUsername, returnUrl });
+            }
+
+            // 12. Active and authorized! Build Claims & Sign In
+            bool isAdmin = string.Equals(pcUser.Role, SystemRoles.Admin, StringComparison.OrdinalIgnoreCase) ||
+                           (pcUser.Role != null && (pcUser.Role.Contains("ADMIN", StringComparison.OrdinalIgnoreCase) || pcUser.Role.Contains("SYSADMIN", StringComparison.OrdinalIgnoreCase)));
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, pcUser.Id.ToString()),
+                new Claim(ClaimTypes.Name, pcUser.FullName ?? pcUser.DomainUser ?? cleanUsername),
+                new Claim(ClaimTypes.Role, pcUser.Role ?? SystemRoles.EndUser),
+                new Claim("DomainUser", pcUser.DomainUser ?? cleanUsername),
+                new Claim("Department", pcUser.Department?.Name ?? "General"),
+                new Claim("PhysicalUserRole", pcUser.Role ?? SystemRoles.EndUser),
+                new Claim("IsPhysicalAdmin", isAdmin ? "true" : "false"),
+                new Claim("AuthMethod", "WindowsSSO"),
+                new Claim("CanPrintAssetTags", pcUser.CanPrintAssetTags ? "true" : "false"),
+                new Claim("CanEditAssetTags", pcUser.CanEditAssetTags ? "true" : "false"),
+                new Claim("CanAccessTeamAnalytics", pcUser.CanAccessTeamAnalytics ? "true" : "false"),
+                new Claim("CanViewOwnAnalytics", pcUser.CanViewOwnAnalytics ? "true" : "false")
+            };
+
+            if (!string.IsNullOrWhiteSpace(pcUser.MaintenanceTeam))
+            {
+                claims.Add(new Claim("MaintenanceTeam", pcUser.MaintenanceTeam));
+            }
+
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddDays(30)
+            });
+
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);

@@ -229,8 +229,72 @@ namespace StockPortal.Services
             return "N/A";
         }
 
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _deviceCache = new();
+
         /// <summary>
-        /// Resolves a human-readable client device/phone name based on User-Agent, OS, and client IP.
+        /// Queries the NetBIOS Node Status (UDP 137, RFC 1002) of a LAN IP to retrieve the Windows computer name.
+        /// </summary>
+        public static string? ResolveNetBiosName(string ipAddress, int timeoutMs = 500)
+        {
+            try
+            {
+                if (!IPAddress.TryParse(ipAddress, out var ip) || IPAddress.IsLoopback(ip))
+                    return null;
+
+                using var client = new System.Net.Sockets.UdpClient();
+                client.Client.ReceiveTimeout = timeoutMs;
+                client.Client.SendTimeout = timeoutMs;
+
+                // RFC 1002 NetBIOS Node Status query for wildcard * (half-ASCII CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA)
+                byte[] query = new byte[50];
+                query[0] = 0x82; query[1] = 0x28; // Transaction ID
+                query[4] = 0x00; query[5] = 0x01; // Questions = 1
+                query[12] = 0x20; // Length = 32
+                System.Text.Encoding.ASCII.GetBytes("CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").CopyTo(query, 13);
+                query[45] = 0x00; // Null terminator
+                query[46] = 0x00; query[47] = 0x21; // Type = NBSTAT (0x0021)
+                query[48] = 0x00; query[49] = 0x01; // Class = IN (0x0001)
+
+                var endpoint = new IPEndPoint(ip, 137);
+                client.Send(query, query.Length, endpoint);
+
+                var remoteEp = new IPEndPoint(IPAddress.Any, 0);
+                byte[] response = client.Receive(ref remoteEp);
+
+                if (response.Length >= 57)
+                {
+                    int numNames = response[56];
+                    for (int i = 0; i < numNames; i++)
+                    {
+                        int offset = 57 + (i * 18);
+                        if (offset + 18 <= response.Length)
+                        {
+                            byte type = response[offset + 15];
+                            byte flags = response[offset + 16];
+                            bool isGroup = (flags & 0x80) != 0;
+                            // Type 0x00 or 0x20 with unique flag indicates workstation / computer name
+                            if (!isGroup && (type == 0x00 || type == 0x20))
+                            {
+                                string name = System.Text.Encoding.ASCII.GetString(response, offset, 15).Trim('\0', ' ');
+                                if (!string.IsNullOrWhiteSpace(name))
+                                {
+                                    return name;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // NetBIOS query timed out or firewall
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Resolves a human-readable client device/phone name based on User-Agent, OS, NetBIOS, and client IP.
         /// Used for non-Windows or mobile devices connecting over LAN without Windows Domain SSO.
         /// </summary>
         public static string GetClientDeviceName(HttpContext? httpContext)
@@ -245,7 +309,12 @@ namespace StockPortal.Services
                 return Environment.MachineName;
             }
 
-            // Attempt reverse DNS resolution on intranet LAN
+            if (_deviceCache.TryGetValue(clientIp, out var cachedName))
+            {
+                return cachedName;
+            }
+
+            // 1. Attempt reverse DNS resolution on intranet LAN
             try
             {
                 if (IPAddress.TryParse(clientIp, out var parsedIp) && !IPAddress.IsLoopback(parsedIp))
@@ -256,6 +325,7 @@ namespace StockPortal.Services
                         var shortName = hostEntry.HostName.Split('.').First().Trim();
                         if (!string.IsNullOrWhiteSpace(shortName) && shortName != clientIp)
                         {
+                            _deviceCache[clientIp] = shortName;
                             return shortName;
                         }
                     }
@@ -263,23 +333,35 @@ namespace StockPortal.Services
             }
             catch { }
 
+            // 2. Attempt NetBIOS Node Status query (UDP 137) for Windows workstations on LAN
+            try
+            {
+                var netBiosName = ResolveNetBiosName(clientIp, 600);
+                if (!string.IsNullOrWhiteSpace(netBiosName))
+                {
+                    _deviceCache[clientIp] = netBiosName;
+                    return netBiosName;
+                }
+            }
+            catch { }
+
             var lastOctet = clientIp.Split('.').Last();
+            string resolved;
 
             var userAgent = httpContext.Request.Headers["User-Agent"].ToString();
             if (string.IsNullOrWhiteSpace(userAgent))
             {
-                return $"Device-{lastOctet}";
+                resolved = $"Device-{lastOctet}";
             }
-
-            if (userAgent.Contains("iPhone", StringComparison.OrdinalIgnoreCase))
+            else if (userAgent.Contains("iPhone", StringComparison.OrdinalIgnoreCase))
             {
-                return $"iPhone-{lastOctet}";
+                resolved = $"iPhone-{lastOctet}";
             }
-            if (userAgent.Contains("iPad", StringComparison.OrdinalIgnoreCase))
+            else if (userAgent.Contains("iPad", StringComparison.OrdinalIgnoreCase))
             {
-                return $"iPad-{lastOctet}";
+                resolved = $"iPad-{lastOctet}";
             }
-            if (userAgent.Contains("Android", StringComparison.OrdinalIgnoreCase))
+            else if (userAgent.Contains("Android", StringComparison.OrdinalIgnoreCase))
             {
                 var match = System.Text.RegularExpressions.Regex.Match(userAgent, @"Android[^;]*;\s*([^;)]+)");
                 if (match.Success && !string.IsNullOrWhiteSpace(match.Groups[1].Value))
@@ -292,21 +374,33 @@ namespace StockPortal.Services
                     if (!string.IsNullOrWhiteSpace(model))
                     {
                         model = System.Text.RegularExpressions.Regex.Replace(model, @"[^\w\-\.]", "");
-                        return $"{model}-{lastOctet}";
+                        resolved = $"{model}-{lastOctet}";
+                    }
+                    else
+                    {
+                        resolved = $"Android-{lastOctet}";
                     }
                 }
-                return $"Android-{lastOctet}";
+                else
+                {
+                    resolved = $"Android-{lastOctet}";
+                }
             }
-            if (userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase))
+            else if (userAgent.Contains("Macintosh", StringComparison.OrdinalIgnoreCase))
             {
-                return $"Mac-{lastOctet}";
+                resolved = $"Mac-{lastOctet}";
             }
-            if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
+            else if (userAgent.Contains("Windows", StringComparison.OrdinalIgnoreCase))
             {
-                return $"PC-{lastOctet}";
+                resolved = $"PC-{lastOctet}";
+            }
+            else
+            {
+                resolved = $"Device-{lastOctet}";
             }
 
-            return $"Device-{lastOctet}";
+            _deviceCache[clientIp] = resolved;
+            return resolved;
         }
     }
 }

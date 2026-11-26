@@ -149,6 +149,21 @@
                 bool canAccessWindowsAuth = ViewBag.CanAccessUsingWindowsAuth ?? true;
             }
 
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3 shadow-xs" role="alert">
+                    <i class="fa-solid fa-circle-exclamation me-2 fs-5 flex-shrink-0 text-danger"></i>
+                    <div>@TempData["ErrorMessage"]</div>
+                </div>
+            }
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success py-2 px-3 small d-flex align-items-center mb-3 shadow-xs" role="alert">
+                    <i class="fa-solid fa-circle-check me-2 fs-5 flex-shrink-0 text-success"></i>
+                    <div>@TempData["SuccessMessage"]</div>
+                </div>
+            }
+
             @if (!ViewData.ModelState.IsValid)
             {
                 <div class="alert alert-danger py-2 px-3 small d-flex align-items-center mb-3" role="alert">
@@ -232,14 +247,14 @@
 
             @if (canAccessWindowsAuth)
             {
-                <!-- Windows SSO One-Click Auto-Login -->
-                <a asp-action="AutoLogin" asp-controller="Account" asp-route-returnUrl="@returnUrl" class="btn btn-light border w-100 py-2 d-flex align-items-center justify-content-center gap-2 text-dark">
+                <!-- Windows SSO Auto-Login: Automatically brings Windows identity and checks database -->
+                <a asp-action="AutoLogin" asp-controller="Account" asp-route-returnUrl="@returnUrl" class="btn btn-light border w-100 py-2 d-flex align-items-center justify-content-center gap-2 text-dark shadow-xs" id="btnAutoLogin">
                     <i class="fa-brands fa-windows text-primary fs-5"></i>
                     <span class="fw-semibold">@(isArabic ? "الدخول التلقائي بحساب ويندوز (SSO)" : "Sign In with Windows Domain (Auto-Login)")</span>
                 </a>
                 <div class="text-center mt-2">
-                    <small class="text-muted">
-                        @(isArabic ? "متاح للأجهزة والحواسيب المرتبطة بنطاق المستشفى المحلي" : "Available for domain workstations on hospital LAN")
+                    <small class="text-muted" style="font-size: 0.75rem;">
+                        @(isArabic ? "يجلب حساب ويندوز تلقائياً من جهازك ويفحص الصلاحية" : "Automatically detects your Windows user & checks directory")
                     </small>
                 </div>
             }
@@ -277,6 +292,12 @@
                 icon.classList.add("fa-eye");
             }
         }
+
+        // Purge any legacy client-side workstation user cache
+        try {
+            localStorage.removeItem("solvis_workstation_user");
+            document.cookie = "SOLVIS.WorkstationUser=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        } catch (e) {}
     </script>
 </body>
 </html>

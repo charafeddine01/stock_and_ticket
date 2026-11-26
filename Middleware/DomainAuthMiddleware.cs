@@ -171,7 +171,7 @@ namespace StockPortal.Middleware
             // Reverse-proxy identity headers are honored ONLY if explicitly trusted in config and from loopback/trusted proxy
             bool trustProxyHeaders = SafeGetBool(configuration, "Authentication:TrustProxyHeaders", false);
             var clientIp = NetworkInfoHelper.GetClientIpAddress(context);
-            bool isLoopbackOrLocal = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == NetworkInfoHelper.GetLocalPrimaryIpAddress();
+            bool isLoopbackOrLocal = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == NetworkInfoHelper.GetLocalPrimaryIpAddress() || NetworkInfoHelper.IsLocalHost(context.Connection.RemoteIpAddress);
 
             if (string.IsNullOrWhiteSpace(rawUser) && trustProxyHeaders)
             {
@@ -180,18 +180,14 @@ namespace StockPortal.Middleware
                     ?? context.Request.Headers["X-Remote-User"].FirstOrDefault();
             }
 
-            // In local development environment, allow fallback to host developer username ONLY for loopback (PC itself).
-            // Remote devices / phones connecting over LAN must never automatically inherit the developer/admin account!
+            // Fallback to current host Windows user identity ONLY for local workstation/loopback access.
+            // Remote devices / phones over LAN must NEVER automatically inherit the host user, and machine/device
+            // names must NEVER be used as user accounts.
             if (string.IsNullOrWhiteSpace(rawUser))
             {
-                if (env.IsDevelopment() && isLoopbackOrLocal)
+                if (isLoopbackOrLocal)
                 {
                     rawUser = Environment.UserName;
-                }
-                else
-                {
-                    // Phones and non-local network devices: resolve client device name
-                    rawUser = NetworkInfoHelper.GetClientDeviceName(context);
                 }
             }
 
@@ -226,11 +222,11 @@ namespace StockPortal.Middleware
                     (u.FullName != null && u.FullName.ToLower() == search)
                 );
 
-            // 6. REJECTION CHECK 1: Physical PC user not registered in database -> Redirect to Login
+            // 6. REJECTION CHECK 1: Physical PC user not registered in database -> Redirect to AccessDenied with automated ticket generator
             if (pcUser == null)
             {
                 await SafeSignOutAsync(context);
-                context.Response.Redirect($"/Account/Login?returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
+                context.Response.Redirect($"/Account/AccessDenied?reason=NotFound&username={Uri.EscapeDataString(cleanUsername)}&returnUrl={Uri.EscapeDataString(context.Request.Path + context.Request.QueryString)}");
                 return;
             }
 

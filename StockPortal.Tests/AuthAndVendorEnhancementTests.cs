@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -71,7 +72,7 @@ namespace StockPortal.Tests
         }
 
         [Fact]
-        public void AccountController_AutoLogin_RedirectsToLogin_WhenWindowsAuthIsDisabled()
+        public async Task AccountController_AutoLogin_RedirectsToAccessDenied_WhenWindowsAuthIsDisabled()
         {
             // Arrange
             using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
@@ -85,12 +86,68 @@ namespace StockPortal.Tests
             controller.TempData = tempData;
 
             // Act
-            var result = controller.AutoLogin();
+            var result = await controller.AutoLogin();
 
             // Assert
             var redirectResult = Assert.IsType<RedirectToActionResult>(result);
-            Assert.Equal("Login", redirectResult.ActionName);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("WindowsAuthDisabled", redirectResult.RouteValues?["reason"]?.ToString());
             Assert.Contains("Windows authentication is disabled", controller.TempData["ErrorMessage"]?.ToString() ?? "");
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_RedirectsToAccessDenied_WhenUserNotFoundInDb()
+        {
+            // Arrange
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true, canChangePassword: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "unregistered.pc.user") }, "Negotiate"));
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            // Act
+            var result = await controller.AutoLogin();
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("NotFound", redirectResult.RouteValues?["reason"]?.ToString());
+            Assert.Equal("unregistered.pc.user", redirectResult.RouteValues?["username"]?.ToString());
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_RedirectsToAccessDenied_WhenUserIsInactive()
+        {
+            // Arrange
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            db.Users.Add(new User
+            {
+                Id = 88,
+                DomainUser = "inactive.dev.user",
+                FullName = "Inactive User",
+                IsActive = false
+            });
+            await db.SaveChangesAsync();
+
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "inactive.dev.user") }, "Negotiate"));
+            httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Loopback;
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            // Act
+            var result = await controller.AutoLogin();
+
+            // Assert
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("Inactive", redirectResult.RouteValues?["reason"]?.ToString());
         }
 
         [Fact]
@@ -345,6 +402,160 @@ namespace StockPortal.Tests
             Assert.NotNull(updatedAsset);
             Assert.Equal(2, updatedAsset.VendorMaintenanceSupplierId);
             Assert.Equal(1, updatedAsset.VendorMaintenanceCompletedCount);
+        }
+
+        [Fact]
+        public void NtlmAuthHelper_CreateType2Challenge_ReturnsValidStructure()
+        {
+            var challenge = NtlmAuthHelper.CreateType2Challenge();
+            Assert.NotNull(challenge);
+            Assert.True(challenge.Length >= 48);
+            Assert.Equal("NTLMSSP", System.Text.Encoding.ASCII.GetString(challenge, 0, 7));
+            Assert.Equal(2, BitConverter.ToInt32(challenge, 8)); // MessageType = 2
+        }
+
+        [Fact]
+        public void NtlmAuthHelper_ParseType3_ExtractsUsernameAndWorkstation()
+        {
+            // Build synthetic NTLM Type 3 message
+            byte[] msg = new byte[120];
+            System.Text.Encoding.ASCII.GetBytes("NTLMSSP\0").CopyTo(msg, 0);
+            BitConverter.GetBytes(3).CopyTo(msg, 8); // MessageType = 3
+
+            string domain = "WORKGROUP";
+            string user = "abbas";
+            string ws = "MYPC";
+
+            byte[] domainBytes = System.Text.Encoding.Unicode.GetBytes(domain);
+            byte[] userBytes = System.Text.Encoding.Unicode.GetBytes(user);
+            byte[] wsBytes = System.Text.Encoding.Unicode.GetBytes(ws);
+
+            int currentOffset = 64;
+
+            // Domain
+            BitConverter.GetBytes((ushort)domainBytes.Length).CopyTo(msg, 28);
+            BitConverter.GetBytes((ushort)domainBytes.Length).CopyTo(msg, 30);
+            BitConverter.GetBytes(currentOffset).CopyTo(msg, 32);
+            domainBytes.CopyTo(msg, currentOffset);
+            currentOffset += domainBytes.Length;
+
+            // User
+            BitConverter.GetBytes((ushort)userBytes.Length).CopyTo(msg, 36);
+            BitConverter.GetBytes((ushort)userBytes.Length).CopyTo(msg, 38);
+            BitConverter.GetBytes(currentOffset).CopyTo(msg, 40);
+            userBytes.CopyTo(msg, currentOffset);
+            currentOffset += userBytes.Length;
+
+            // Workstation
+            BitConverter.GetBytes((ushort)wsBytes.Length).CopyTo(msg, 44);
+            BitConverter.GetBytes((ushort)wsBytes.Length).CopyTo(msg, 46);
+            BitConverter.GetBytes(currentOffset).CopyTo(msg, 48);
+            wsBytes.CopyTo(msg, currentOffset);
+
+            // Flags (Unicode = 0x01)
+            BitConverter.GetBytes((uint)0x00000001).CopyTo(msg, 60);
+
+            var (parsedUser, parsedWs, parsedDomain) = NtlmAuthHelper.ParseType3(msg);
+            Assert.Equal("abbas", parsedUser);
+            Assert.Equal("MYPC", parsedWs);
+            Assert.Equal("WORKGROUP", parsedDomain);
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_Returns401Challenge_WhenFirstHitWithoutIdentity()
+        {
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.100.50");
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            var result = await controller.AutoLogin();
+
+            var statusResult = Assert.IsType<StatusCodeResult>(result);
+            Assert.Equal(401, statusResult.StatusCode);
+            Assert.True(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_IgnoresUntrustedClientCookieAndIssues401Challenge()
+        {
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.100.50");
+            httpContext.Request.Headers["Cookie"] = "SOLVIS.WorkstationUser=fakeadmin";
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            var result = await controller.AutoLogin();
+
+            // Should challenge with 401 instead of trusting cookie
+            var statusResult = Assert.IsType<StatusCodeResult>(result);
+            Assert.Equal(401, statusResult.StatusCode);
+            Assert.True(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_AuthenticatesViaNtlmType3Message()
+        {
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.100.50");
+
+            // Build minimal NTLM Type 3 message containing user "john.doe"
+            byte[] msg = new byte[80];
+            System.Text.Encoding.ASCII.GetBytes("NTLMSSP\0").CopyTo(msg, 0);
+            BitConverter.GetBytes(3).CopyTo(msg, 8); // Type 3
+            byte[] userBytes = System.Text.Encoding.Unicode.GetBytes("john.doe");
+            ushort userLen = (ushort)userBytes.Length;
+            BitConverter.GetBytes(userLen).CopyTo(msg, 36);
+            BitConverter.GetBytes(userLen).CopyTo(msg, 38);
+            BitConverter.GetBytes(52).CopyTo(msg, 40); // User offset
+            userBytes.CopyTo(msg, 52);
+
+            string token = Convert.ToBase64String(msg);
+            httpContext.Request.Headers["Authorization"] = "NTLM " + token;
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            var result = await controller.AutoLogin();
+
+            // Extracts "john.doe" from NTLM token, finds not in DB -> NotFound AccessDenied
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("NotFound", redirectResult.RouteValues?["reason"]);
+            Assert.Equal("john.doe", redirectResult.RouteValues?["username"]);
+        }
+
+        [Fact]
+        public async Task AccountController_AutoLogin_RedirectsToNoWindowsIdentity_WhenNoIdentityDetected()
+        {
+            using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
+            var mockUserService = new Mock<ICurrentUserService>();
+            var config = CreateConfig(windowsAuth: true, passwordAuth: true);
+
+            var controller = new AccountController(db, mockUserService.Object, config);
+            var httpContext = new DefaultHttpContext();
+            httpContext.Connection.RemoteIpAddress = System.Net.IPAddress.Parse("192.168.100.50");
+            // Client sent an unrecognized authorization header that yielded no user
+            httpContext.Request.Headers["Authorization"] = "NTLM dW5yZWNvZ25pemVk";
+            controller.ControllerContext = new ControllerContext { HttpContext = httpContext };
+
+            var result = await controller.AutoLogin();
+
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("NoWindowsIdentity", redirectResult.RouteValues?["reason"]);
+            Assert.Equal("Unspecified", redirectResult.RouteValues?["username"]);
         }
     }
 }
