@@ -41,8 +41,9 @@
                             @if (deviceForm != null && deviceForm.Fields.Any())
                             {
                                 <div class="row g-3">
-                                    @foreach (var field in deviceForm.Fields)
+                                    @foreach (var field in (deviceForm.Fields ?? new List<StockPortal.Models.FormFieldDefinition>()))
                                     {
+                                        if (field == null || string.IsNullOrWhiteSpace(field.Name)) continue;
                                         specsDict.TryGetValue(field.Name, out var currentVal);
                                         <div class="@(field.Type == "textarea" ? "col-12" : "col-md-6")">
                                             <label class="form-label fw-semibold">
@@ -52,7 +53,7 @@
                                             {
                                                 <select name="spec_@field.Name" class="form-select" @(field.Required ? "required" : "")>
                                                     <option value="">@(Loc.IsArabic ? $"-- اختر {field.Label} --" : $"-- Select {field.Label} --")</option>
-                                                    @foreach (var opt in field.Options)
+                                                    @foreach (var opt in (field.Options ?? new List<string>()))
                                                     {
                                                         <option value="@opt" selected="@(currentVal == opt)">@opt</option>
                                                     }
@@ -303,11 +304,11 @@
 
                     <!-- 5. Installed Workstation Software Packages (Driven by Device Template) -->
                     @{
-                        var installedList = Model.InstalledSoftwaresList;
-                        var formSoftwares = (deviceForm != null && deviceForm.HasSoftware)
+                        var installedList = Model.InstalledSoftwaresList ?? new List<string>();
+                        var formSoftwares = (deviceForm != null && deviceForm.HasSoftware && deviceForm.InstallableSoftwaresList != null)
                             ? deviceForm.InstallableSoftwaresList
                             : new List<string>();
-                        var allAvailableSoftwares = formSoftwares.Union(installedList).Distinct().ToList();
+                        var allAvailableSoftwares = formSoftwares.Union(installedList).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToList();
                         bool hasSoftwareSupport = (deviceForm != null && deviceForm.HasSoftware) || installedList.Any();
                     }
                     @if (hasSoftwareSupport && allAvailableSoftwares.Any())

@@ -244,7 +244,7 @@ namespace StockPortal.Middleware
                 return;
             }
 
-            // 5. Query database strictly for the physical PC user first (prioritize exact DomainUser match, then Active status)
+            // 5. Query database strictly for the physical PC user first (exact DomainUser or exact FullName)
             var search = cleanUsername.ToLower();
             var rawSearch = rawUser?.ToLower();
 
@@ -253,8 +253,8 @@ namespace StockPortal.Middleware
                 .OrderByDescending(u => u.DomainUser != null && u.DomainUser.ToLower() == search)
                 .ThenByDescending(u => u.IsActive == true)
                 .FirstOrDefaultAsync(u =>
-                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || (rawSearch != null && u.DomainUser.ToLower() == rawSearch) || u.DomainUser.ToLower().Contains(search) || search.Contains(u.DomainUser.ToLower()))) ||
-                    (u.FullName != null && (u.FullName.ToLower() == search || u.FullName.ToLower().StartsWith(search + " ") || u.FullName.ToLower().EndsWith(" " + search) || u.FullName.ToLower().Contains(search)))
+                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || (rawSearch != null && u.DomainUser.ToLower() == rawSearch))) ||
+                    (u.FullName != null && u.FullName.ToLower() == search)
                 );
 
             // 6. REJECTION CHECK 1: Physical PC user not registered in database -> Redirect to AccessDenied with automated ticket generator

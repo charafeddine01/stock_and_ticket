@@ -457,7 +457,9 @@ namespace StockPortal.Controllers
             if (id != asset.Id) return NotFound();
             formCollection ??= new FormCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>());
 
-            var existing = await _context.Assets.AsNoTracking().FirstOrDefaultAsync(a => a.Id == id);
+            var existing = await _context.Assets
+                .Include(a => a.CompatibleSpareParts)
+                .FirstOrDefaultAsync(a => a.Id == id);
             if (existing == null) return NotFound();
 
             // RBAC Guard: URL tampering prevention
@@ -470,17 +472,6 @@ namespace StockPortal.Controllers
                 return Forbid();
             }
 
-            // Task 9: Retain original purchase price from database (Cost is not editable/visible in Edit view)
-            asset.Price = existing.Price;
-            asset.VendorMaintenanceCompletedCount = existing.VendorMaintenanceCompletedCount;
-            asset.VendorMaintenanceVisits = existing.VendorMaintenanceVisits;
-
-            // Preserve maintenance team if not Admin
-            if (_currentUserService.IsMaintenance())
-            {
-                asset.MaintenanceTeam = existing.MaintenanceTeam;
-            }
-
             // Process dynamic specification fields
             DeviceForm? selectedForm = null;
             if (deviceFormId.HasValue && deviceFormId.Value > 0)
@@ -490,14 +481,17 @@ namespace StockPortal.Controllers
             if (selectedForm == null)
             {
                 selectedForm = await _context.DeviceForms.FirstOrDefaultAsync(f => 
-                    f.Name.ToLower() == (asset.Type ?? "").ToLower() && f.Department == asset.MaintenanceTeam);
+                    f.Name.ToLower() == (existing.Type ?? "").ToLower() && f.Department == existing.MaintenanceTeam)
+                    ?? await _context.DeviceForms.FirstOrDefaultAsync(f => f.Department == existing.MaintenanceTeam);
             }
 
-            if (selectedForm != null)
+            string specsJson = existing.Specs ?? "{}";
+            if (selectedForm != null && selectedForm.Fields != null)
             {
                 var specsDict = new Dictionary<string, string>();
                 foreach (var field in selectedForm.Fields)
                 {
+                    if (field == null || string.IsNullOrWhiteSpace(field.Name)) continue;
                     var formVal = formCollection[$"spec_{field.Name}"].ToString();
                     if (string.IsNullOrWhiteSpace(formVal))
                     {
@@ -508,7 +502,15 @@ namespace StockPortal.Controllers
                         specsDict[field.Name] = formVal.Trim();
                     }
                 }
-                asset.Specs = JsonSerializer.Serialize(specsDict, new JsonSerializerOptions { WriteIndented = false });
+                specsJson = JsonSerializer.Serialize(specsDict, new JsonSerializerOptions { WriteIndented = false });
+            }
+
+            // Process installed softwares configuration
+            string installedSoftwaresJson = "[]";
+            var selectedSoftwares = formCollection["selectedSoftwares"].ToArray();
+            if (selectedSoftwares != null && selectedSoftwares.Length > 0)
+            {
+                installedSoftwaresJson = JsonSerializer.Serialize(selectedSoftwares.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().ToArray());
             }
 
             // Validate unique HospitalNo if changed
@@ -522,82 +524,109 @@ namespace StockPortal.Controllers
             {
                 try
                 {
-                    if (asset.NeedsPeriodic == true && asset.PeriodicInterval.HasValue && asset.PeriodicInterval.Value > 0)
+                    // Update editable fields onto tracked entity (preserves untouched/unmapped database columns)
+                    existing.HospitalNo = asset.HospitalNo;
+                    existing.SerialNo = asset.SerialNo;
+                    existing.CategoryId = asset.CategoryId;
+                    existing.Brand = asset.Brand;
+                    existing.ModelNo = asset.ModelNo;
+                    existing.SupplierId = asset.SupplierId;
+                    existing.Status = asset.Status;
+                    existing.UserId = asset.UserId;
+                    existing.RoomId = asset.RoomId;
+                    existing.BuyingDate = asset.BuyingDate;
+                    existing.WarrantyTill = asset.WarrantyTill;
+                    existing.NeedsPeriodic = asset.NeedsPeriodic;
+                    existing.PeriodicInterval = asset.PeriodicInterval;
+                    existing.NeedsCalibration = asset.NeedsCalibration;
+                    existing.CalibrationInterval = asset.CalibrationInterval;
+                    existing.LastCalibration = asset.LastCalibration;
+                    existing.CalibrationCertNo = asset.CalibrationCertNo;
+                    existing.CalibratedBy = asset.CalibratedBy;
+                    existing.CalibrationNotes = asset.CalibrationNotes;
+                    existing.HasVendorMaintenance = asset.HasVendorMaintenance;
+                    existing.VendorMaintenanceSupplierId = asset.VendorMaintenanceSupplierId;
+                    existing.VendorMaintenanceCount = asset.VendorMaintenanceCount;
+                    existing.VendorMaintenanceStartDate = asset.VendorMaintenanceStartDate;
+                    existing.VendorMaintenanceEndDate = asset.VendorMaintenanceEndDate;
+                    existing.Specs = specsJson;
+                    existing.InstalledSoftwares = installedSoftwaresJson;
+
+                    if (_currentUserService.IsAdmin() && !string.IsNullOrWhiteSpace(asset.MaintenanceTeam))
                     {
-                        if (asset.LastPeriodic.HasValue)
-                        {
-                            asset.NextPeriodic = asset.LastPeriodic.Value.AddDays(asset.PeriodicInterval.Value);
-                        }
+                        existing.MaintenanceTeam = asset.MaintenanceTeam;
+                    }
+
+                    // Periodic maintenance date calculation
+                    if (existing.NeedsPeriodic == true && existing.PeriodicInterval.HasValue && existing.PeriodicInterval.Value > 0)
+                    {
+                        existing.LastPeriodic ??= existing.BuyingDate ?? DateTime.Now;
+                        existing.NextPeriodic = existing.LastPeriodic.Value.AddDays(existing.PeriodicInterval.Value);
                     }
                     else
                     {
-                        asset.NextPeriodic = null;
+                        existing.NextPeriodic = null;
                     }
 
-                    // Calculate next calibration if needed (Task 2)
-                    if (asset.NeedsCalibration == true && asset.CalibrationInterval.HasValue && asset.CalibrationInterval.Value > 0)
+                    // Calibration date calculation
+                    if (existing.NeedsCalibration == true && existing.CalibrationInterval.HasValue && existing.CalibrationInterval.Value > 0)
                     {
-                        if (asset.LastCalibration.HasValue)
+                        if (asset.NextCalibration.HasValue)
                         {
-                            asset.NextCalibration = asset.LastCalibration.Value.AddDays(asset.CalibrationInterval.Value);
+                            existing.NextCalibration = asset.NextCalibration.Value;
+                        }
+                        else if (existing.LastCalibration.HasValue)
+                        {
+                            existing.NextCalibration = existing.LastCalibration.Value.AddDays(existing.CalibrationInterval.Value);
                         }
                     }
-                    else if (asset.NeedsCalibration != true)
+                    else if (existing.NeedsCalibration != true)
                     {
-                        asset.NextCalibration = null;
+                        existing.NextCalibration = null;
                     }
 
-                    // Process installed softwares configuration
-                    var selectedSoftwares = formCollection["selectedSoftwares"].ToArray();
-                    if (selectedSoftwares != null && selectedSoftwares.Length > 0)
-                    {
-                        asset.InstalledSoftwares = JsonSerializer.Serialize(selectedSoftwares);
-                    }
-                    else
-                    {
-                        asset.InstalledSoftwares = "[]";
-                    }
-
-                    _context.Update(asset);
-                    await _context.SaveChangesAsync();
-
-                    // Synchronize compatible spare parts (Task 2)
-                    var currentRelations = await _context.AssetCompatibleSpareParts.Where(cp => cp.AssetId == asset.Id).ToListAsync();
+                    // Synchronize compatible spare parts cleanly
                     var targetIds = (compatibleSparePartIds ?? Array.Empty<int>()).Distinct().ToHashSet();
-
-                    var toRemove = currentRelations.Where(r => !targetIds.Contains(r.SparePartId)).ToList();
-                    if (toRemove.Any())
+                    var toRemove = existing.CompatibleSpareParts.Where(cp => !targetIds.Contains(cp.SparePartId)).ToList();
+                    foreach (var item in toRemove)
                     {
-                        _context.AssetCompatibleSpareParts.RemoveRange(toRemove);
+                        _context.AssetCompatibleSpareParts.Remove(item);
                     }
 
-                    var currentIds = currentRelations.Select(r => r.SparePartId).ToHashSet();
-                    var toAdd = targetIds.Where(tid => !currentIds.Contains(tid)).Select(tid => new AssetCompatibleSparePart
+                    var currentIds = existing.CompatibleSpareParts.Select(cp => cp.SparePartId).ToHashSet();
+                    foreach (var tid in targetIds.Where(tid => !currentIds.Contains(tid)))
                     {
-                        AssetId = asset.Id,
-                        SparePartId = tid,
-                        AssignedAt = DateTime.Now
-                    }).ToList();
-
-                    if (toAdd.Any())
-                    {
-                        _context.AssetCompatibleSpareParts.AddRange(toAdd);
+                        _context.AssetCompatibleSpareParts.Add(new AssetCompatibleSparePart
+                        {
+                            AssetId = existing.Id,
+                            SparePartId = tid,
+                            AssignedAt = DateTime.Now
+                        });
                     }
 
                     await _context.SaveChangesAsync();
-
                     TempData["SuccessMessage"] = "Asset specifications & details updated successfully!";
+                    return RedirectToAction(nameof(Details), new { id = existing.Id });
                 }
-                catch (DbUpdateConcurrencyException)
+                catch (Exception ex)
                 {
-                    if (!_context.Assets.Any(e => e.Id == asset.Id)) return NotFound();
-                    throw;
+                    ModelState.AddModelError(string.Empty, "Could not update asset: " + ex.Message);
                 }
-                return RedirectToAction(nameof(Details), new { id = asset.Id });
             }
 
             ViewBag.DeviceForm = selectedForm;
-            await PopulateDropdowns(asset);
+            var fallbackSpecs = new Dictionary<string, string>();
+            if (!string.IsNullOrWhiteSpace(existing.Specs))
+            {
+                try
+                {
+                    fallbackSpecs = JsonSerializer.Deserialize<Dictionary<string, string>>(existing.Specs, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                }
+                catch { }
+            }
+            ViewBag.SpecsDictionary = fallbackSpecs;
+            ViewBag.SelectedSparePartIds = (compatibleSparePartIds ?? Array.Empty<int>()).ToList();
+            await PopulateDropdowns(existing);
             return View(asset);
         }
 

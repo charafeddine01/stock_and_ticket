@@ -236,6 +236,41 @@ namespace StockPortal.Controllers
             ViewBag.MatchedAsset = asset;
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.RoomNo).ToListAsync();
 
+            // Accurately determine the real reason based on database state:
+            // 1. If user is NOT in the database at all -> Reason is DEFINITELY "NotFound" (Unregistered)
+            // 2. If user IS in the database but IsActive == false -> Reason is "Inactive" (Deactivated)
+            // 3. Otherwise respect the passed reason (e.g. WindowsAuthDisabled, NoWindowsIdentity, TicketSubmitted)
+            if (reason != "TicketSubmitted" && reason != "WindowsAuthDisabled" && reason != "NoWindowsIdentity")
+            {
+                User? dbUser = null;
+                if (!string.IsNullOrWhiteSpace(resolvedUser))
+                {
+                    var search = resolvedUser.ToLower();
+                    dbUser = await _context.Users
+                        .FirstOrDefaultAsync(u =>
+                            (u.DomainUser != null && u.DomainUser.ToLower() == search) ||
+                            (u.FullName != null && u.FullName.ToLower() == search)
+                        );
+                }
+
+                if (dbUser == null)
+                {
+                    ViewBag.Reason = "NotFound";
+                }
+                else if (dbUser.IsActive != true)
+                {
+                    ViewBag.Reason = "Inactive";
+                }
+                else
+                {
+                    ViewBag.Reason = reason ?? "NotFound";
+                }
+            }
+            else
+            {
+                ViewBag.Reason = reason;
+            }
+
             return View();
         }
 
@@ -606,15 +641,15 @@ namespace StockPortal.Controllers
                 return RedirectToAction(nameof(AccessDenied), new { reason = "NoWindowsIdentity", username = "Unspecified", returnUrl });
             }
 
-            // 9. Query user in database (prioritize exact DomainUser match, then Active status)
+            // 9. Query user in database (exact DomainUser or exact FullName match, prioritizing exact DomainUser)
             var search = cleanUsername.ToLower();
             var pcUser = await _context.Users
                 .Include(u => u.Department)
                 .OrderByDescending(u => u.DomainUser != null && u.DomainUser.ToLower() == search)
                 .ThenByDescending(u => u.IsActive == true)
                 .FirstOrDefaultAsync(u =>
-                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || u.DomainUser.ToLower().Contains(search) || search.Contains(u.DomainUser.ToLower()))) ||
-                    (u.FullName != null && (u.FullName.ToLower() == search || u.FullName.ToLower().StartsWith(search + " ") || u.FullName.ToLower().EndsWith(" " + search) || u.FullName.ToLower().Contains(search)))
+                    (u.DomainUser != null && u.DomainUser.ToLower() == search) ||
+                    (u.FullName != null && u.FullName.ToLower() == search)
                 );
 
             // 7. User not found in database -> Redirect to AccessDenied so user sees explanation AND automated ticket generator!
