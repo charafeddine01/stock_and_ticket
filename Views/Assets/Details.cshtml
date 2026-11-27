@@ -60,15 +60,24 @@
             }
             @if (CurrentUser.CanEditAsset(asset))
             {
-                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
-                    <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
-                </button>
-                <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
-                    <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
-                </a>
-                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
-                    <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
-                </button>
+                if (asset.Status != "Retired")
+                {
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferModal">
+                        <i class="fa-solid fa-arrows-split-up-and-left me-1"></i> @Loc["Transfer Custody"]
+                    </button>
+                    <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
+                        <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
+                    </a>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#retireModal">
+                        <i class="fa-solid fa-ban me-1"></i> @Loc["Retire"]
+                    </button>
+                }
+                else
+                {
+                    <a href="@Url.Action("Edit", new { id = asset.Id })" class="btn btn-secondary">
+                        <i class="fa-solid fa-pen me-1"></i> @Loc["Edit"]
+                    </a>
+                }
             }
             @if (CurrentUser.IsAdmin())
             {
@@ -79,6 +88,24 @@
         }
     </div>
 </div>
+
+@if (asset.Status == "Retired")
+{
+    <div class="alert alert-secondary border-0 shadow-sm d-flex align-items-center gap-3 mb-4">
+        <i class="fa-solid fa-box-archive fs-2 text-danger"></i>
+        <div>
+            <h6 class="fw-bold text-danger mb-1">
+                <i class="fa-solid fa-ban me-1"></i>
+                @(Loc.IsArabic ? "أصل متقاعد / خارج الخدمة (Retired / Decommissioned)" : "Retired / Decommissioned Asset")
+            </h6>
+            <div class="small text-muted">
+                @(Loc.IsArabic 
+                    ? "هذا الأصل تم إسقاطه وتكهينه نهائياً وإخلاء طرف الموظف من عهدته، ومكانه الحالي في مستودع الرجيع والكهنة. تم حفظ سجلاته التاريخية وتذاكره في النظام لأغراض التدقيق والمراجعة ولا يمكن حذفه نهائياً." 
+                    : "This asset has been decommissioned and discharged from user custody into warehouse / scrap inventory. All historical logs, tickets, and maintenance audit trails are preserved in the database.")
+            </div>
+        </div>
+    </div>
+}
 
 <div class="row g-4 mb-4">
     <!-- Main Asset Profile Card -->
@@ -519,7 +546,12 @@
             <div class="card-body">
                 <div class="mb-3">
                     <div class="text-muted small">@Loc["Assigned Custodian"]:</div>
-                    @if (asset.User != null)
+                    @if (asset.Status == "Retired")
+                    {
+                        <div class="fw-bold text-danger"><i class="fa-solid fa-ban me-1"></i> @(Loc.IsArabic ? "متقاعد / تالف (مستودع الرجيع)" : "Retired / Scrap (In Warehouse)")</div>
+                        <div class="text-muted small">@(Loc.IsArabic ? "تم إسقاط العهدة بالكامل" : "No user custody (Discharged)")</div>
+                    }
+                    else if (asset.User != null)
                     {
                         <div class="fw-bold text-dark fs-5">@asset.User.DisplayFullName</div>
                         <div class="text-muted small">@asset.User.DisplayRole &bull; @(asset.User.Department?.DisplayName ?? Loc["General Staff"])</div>
@@ -543,9 +575,18 @@
                     }
                 </div>
 
-                <button type="button" class="btn btn-outline-primary w-100 btn-sm" data-bs-toggle="modal" data-bs-target="#transferModal">
-                    <i class="fa-solid fa-right-left me-1"></i> @Loc["Transfer Custody"]
-                </button>
+                @if (asset.Status == "Retired")
+                {
+                    <div class="alert alert-secondary py-2 px-3 small mb-0 text-center border-0">
+                        <i class="fa-solid fa-lock me-1"></i> @(Loc.IsArabic ? "العهدة مقفلة - الأصل متقاعد ومسقط" : "Custody locked - Asset retired")
+                    </div>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-outline-primary w-100 btn-sm" data-bs-toggle="modal" data-bs-target="#transferModal">
+                        <i class="fa-solid fa-right-left me-1"></i> @Loc["Transfer Custody"]
+                    </button>
+                }
             </div>
         </div>
 

@@ -1,19 +1,59 @@
 @model StockPortal.Models.Asset
 @{
     ViewData["Title"] = $"{Loc["Delete"]}: {Model.HospitalNo ?? ("#" + Model.Id)}";
+    bool canDelete = (ViewBag.CanDelete as bool?) ?? false;
+    string blockReason = (ViewBag.BlockReason as string) ?? "";
+    int ticketsCount = (ViewBag.TicketsCount as int?) ?? 0;
+    int maintenanceCount = (ViewBag.MaintenanceCount as int?) ?? 0;
+    int sparePartsCount = (ViewBag.SparePartsCount as int?) ?? 0;
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-6 col-md-8">
+    <div class="col-lg-7 col-md-9">
         <div class="card shadow-sm border-danger">
             <div class="card-header bg-danger text-white py-3">
                 <h5 class="mb-0 fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i> @Loc["Delete Asset Confirmation"]</h5>
             </div>
             <div class="card-body p-4">
-                <p class="text-danger fw-semibold">
-                    @(Loc.IsArabic ? "تحذير: سيؤدي حذف هذا الأصل إلى إزالته نهائياً من قاعدة بيانات المخزون." : "Warning: Deleting an asset removes it permanently from the inventory database.")
-                </p>
-                <div class="bg-light p-3 rounded mb-3">
+                @if (!canDelete)
+                {
+                    <div class="alert alert-danger border-0 shadow-sm mb-4">
+                        <div class="d-flex align-items-start gap-3">
+                            <i class="fa-solid fa-shield-halved fs-3 mt-1 text-danger"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1">@(Loc.IsArabic ? "لا يمكن حذف هذا الأصل من قاعدة البيانات نهائياً" : "Permanent Deletion Blocked: Historical Records Attached")</h6>
+                                <p class="small mb-2 text-dark">@blockReason</p>
+                                <div class="d-flex flex-wrap gap-2 small">
+                                    @if (ticketsCount > 0)
+                                    {
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25"><i class="fa-solid fa-ticket me-1"></i> @ticketsCount @Loc["Tickets"]</span>
+                                    }
+                                    @if (maintenanceCount > 0)
+                                    {
+                                        <span class="badge bg-warning bg-opacity-10 text-warning-emphasis border border-warning border-opacity-25"><i class="fa-solid fa-screwdriver-wrench me-1"></i> @maintenanceCount @Loc["Maintenance Logs"]</span>
+                                    }
+                                    @if (sparePartsCount > 0)
+                                    {
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25"><i class="fa-solid fa-gears me-1"></i> @sparePartsCount @Loc["Spare Part Transactions"]</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info border-0 shadow-sm mb-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-circle-check fs-4 text-info"></i>
+                            <div class="small">
+                                @(Loc.IsArabic ? "هذا الأصل جديد تماماً ولم يتم تشغيله أو استخدامه، وليس له أي تذاكر أو سجلات صيانة أو حركات استهلاك. يمكن حذفه بأمان إذا أُضيف بالخطأ." : "This asset is newly added with zero operational history, tickets, maintenance logs, or consumable transactions. It can be safely deleted if it was registered by mistake.")
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="bg-light p-3 rounded mb-3 border">
                     <div class="row g-2">
                         <div class="col-4 text-muted">@Loc["Asset Tag"]:</div>
                         <div class="col-8 fw-bold">@(Model.HospitalNo ?? "N/A")</div>
@@ -28,40 +68,47 @@
                         <div class="col-8">@(Model.Room?.DisplayName ?? Loc["Unassigned"])</div>
 
                         <div class="col-4 text-muted">@Loc["Custodian"]:</div>
-                        <div class="col-8">@(Model.User?.DisplayFullName ?? Loc["None assigned"])</div>
+                        <div class="col-8">@(Model.User?.DisplayFullName ?? (Loc.IsArabic ? "المخزن المركزي / الرجيع" : "Central Stock / Warehouse"))</div>
 
                         <div class="col-4 text-muted">@Loc["Status"]:</div>
                         <div class="col-8"><span class="badge bg-secondary">@(Model.DisplayStatus)</span></div>
                     </div>
                 </div>
 
-                @if (Model.Tickets.Any(t => t.StatusId != 5 && t.StatusId != 4))
-                {
-                    <div class="alert alert-warning d-flex align-items-center gap-2">
-                        <i class="fa-solid fa-circle-exclamation fs-4"></i>
-                        <div>
-                            @(Loc.IsArabic ? $"هذا الأصل مرتبط بـ {Model.Tickets.Count(t => t.StatusId != 5 && t.StatusId != 4)} تذكرة نشطة. يجب إغلاقها أولاً أو استخدام خيار الإسقاط / الإتلاف." : $"This asset has {Model.Tickets.Count(t => t.StatusId != 5 && t.StatusId != 4)} active ticket(s). You must resolve or close them first, or retire the asset instead.")
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <p class="text-muted small">
-                        @(Loc.IsArabic ? "تلميح: إذا كان هذا الجهاز خارج الخدمة فقط، يفضل استخدام خيار 'إسقاط / إتلاف' بدلاً من الحذف للحفاظ على سجلات وتاريخ الصيانة." : "Tip: If this hardware is merely decommissioned or broken beyond repair, consider using the Retire feature instead to preserve maintenance and custody audit history.")
-                    </p>
-                }
-
                 <div class="d-flex justify-content-between align-items-center mt-4">
                     <a href="@Url.Action("Details", new { id = Model.Id })" class="btn btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> @Loc["Cancel & Return"]
                     </a>
-                    <form asp-action="Delete" method="post">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="id" value="@Model.Id" />
-                        <button type="submit" class="btn btn-danger" @(Model.Tickets.Any(t => t.StatusId != 5 && t.StatusId != 4) ? "disabled" : "")>
-                            <i class="fa-solid fa-trash me-1"></i> @Loc["Permanently Delete"]
-                        </button>
-                    </form>
+                    <div class="d-flex gap-2">
+                        @if (!canDelete && Model.Status != "Retired")
+                        {
+                            <form asp-action="Retire" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <input type="hidden" name="reason" value="@(Loc.IsArabic ? "إسقاط وتكهين لحفظ سجلات الصيانة والتدقيق" : "Decommissioned to retain audit and maintenance logs")" />
+                                <button type="submit" class="btn btn-warning text-dark fw-bold">
+                                    <i class="fa-solid fa-ban me-1"></i> @(Loc.IsArabic ? "إسقاط وتكهين الأصل (Retire) بدلاً من الحذف" : "Retire Asset Instead")
+                                </button>
+                            </form>
+                        }
+
+                        @if (canDelete)
+                        {
+                            <form asp-action="Delete" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fa-solid fa-trash me-1"></i> @Loc["Permanently Delete"]
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-danger" disabled title="@(Loc.IsArabic ? "الحذف مقفل للحفاظ على سجلات وتاريخ الأصل" : "Deletion locked to protect historical audit trails")">
+                                <i class="fa-solid fa-lock me-1"></i> @Loc["Permanently Delete"]
+                            </button>
+                        }
+                    </div>
                 </div>
             </div>
         </div>

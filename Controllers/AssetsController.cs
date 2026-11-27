@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -19,6 +20,7 @@ namespace StockPortal.Controllers
     {
         private readonly StockDbContext _context;
         private readonly ICurrentUserService _currentUserService;
+        private static bool IsArabic => CultureInfo.CurrentUICulture.Name.StartsWith("ar", StringComparison.OrdinalIgnoreCase);
 
         public AssetsController(StockDbContext context, ICurrentUserService currentUserService)
         {
@@ -320,6 +322,18 @@ namespace StockPortal.Controllers
 
             if (ModelState.IsValid && selectedForm != null)
             {
+                // Ensure retired assets are not assigned to user custody and stored in warehouse
+                if (asset.Status == "Retired")
+                {
+                    asset.UserId = null;
+                    var warehouseRoom = await _context.Rooms
+                        .FirstOrDefaultAsync(r => r.RoomNo == 999 || (r.RoomNameAr != null && (r.RoomNameAr.Contains("المستودع") || r.RoomNameAr.Contains("الرجيع"))));
+                    if (warehouseRoom != null)
+                    {
+                        asset.RoomId = warehouseRoom.Id;
+                    }
+                }
+
                 // Calculate next periodic if needed
                 if (asset.NeedsPeriodic == true && asset.PeriodicInterval.HasValue && asset.PeriodicInterval.Value > 0)
                 {
@@ -531,9 +545,48 @@ namespace StockPortal.Controllers
                     existing.Brand = asset.Brand;
                     existing.ModelNo = asset.ModelNo;
                     existing.SupplierId = asset.SupplierId;
-                    existing.Status = asset.Status;
-                    existing.UserId = asset.UserId;
-                    existing.RoomId = asset.RoomId;
+
+                    // Handle Retired status & user custody rules
+                    if (asset.Status == "Retired")
+                    {
+                        if (existing.UserId.HasValue)
+                        {
+                            var prevUser = await _context.Users.FindAsync(existing.UserId.Value);
+                            _context.AssetHistories.Add(new AssetHistory
+                            {
+                                AssetId = existing.Id,
+                                UserId = existing.UserId.Value,
+                                RoomId = existing.RoomId ?? 1,
+                                CustodyTypeId = existing.CustodyTypeId ?? 1,
+                                AssignedOn = DateTime.Now,
+                                ReturnedOn = DateTime.Now,
+                                Notes = IsArabic 
+                                    ? $"إخلاء طرف من العهدة: تحويل حالة الأصل إلى متقاعد/تالف (Retired) ونقله إلى مستودع الرجيع/الكهنة (الموظف السابق: {prevUser?.FullName ?? "موظف"})."
+                                    : $"Custody released: Asset marked as Retired and returned to Central Warehouse / Scrap (Previous Custodian: {prevUser?.FullName ?? "Staff"})."
+                            });
+                        }
+
+                        existing.Status = "Retired";
+                        existing.UserId = null; // Retired assets MUST NOT be in user custody!
+
+                        var warehouseRoom = await _context.Rooms
+                            .FirstOrDefaultAsync(r => r.RoomNo == 999 || (r.RoomNameAr != null && (r.RoomNameAr.Contains("المستودع") || r.RoomNameAr.Contains("الرجيع"))));
+                        if (warehouseRoom != null && (asset.RoomId == null || asset.RoomId == existing.RoomId))
+                        {
+                            existing.RoomId = warehouseRoom.Id;
+                        }
+                        else
+                        {
+                            existing.RoomId = asset.RoomId ?? existing.RoomId;
+                        }
+                    }
+                    else
+                    {
+                        existing.Status = asset.Status;
+                        existing.UserId = asset.UserId;
+                        existing.RoomId = asset.RoomId;
+                    }
+
                     existing.BuyingDate = asset.BuyingDate;
                     existing.WarrantyTill = asset.WarrantyTill;
                     existing.NeedsPeriodic = asset.NeedsPeriodic;
@@ -640,6 +693,15 @@ namespace StockPortal.Controllers
 
             if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
+            // Retired assets MUST NOT be assigned to user custody!
+            if (asset.Status == "Retired")
+            {
+                TempData["ErrorMessage"] = IsArabic
+                    ? "لا يمكن تسليم عهدة أصل متقاعد أو خارج الخدمة (Retired) لموظف. الأصول المتقاعدة تظل في مستودع الرجيع والكهنة بدون عهدة شخصية."
+                    : "Cannot transfer custody of a retired / decommissioned asset to a user. Retired assets must remain in warehouse / scrap inventory without personal custody.";
+                return RedirectToAction(nameof(Details), new { id = assetId });
+            }
+
             // Close existing history record if open
             var previousHistory = await _context.AssetHistories
                 .Where(h => h.AssetId == assetId && h.ReturnedOn == null)
@@ -679,29 +741,109 @@ namespace StockPortal.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Retire(int id, string? reason)
         {
-            var asset = await _context.Assets.FindAsync(id);
+            var asset = await _context.Assets.Include(a => a.User).FirstOrDefaultAsync(a => a.Id == id);
             if (asset == null) return NotFound();
 
             if (!_currentUserService.CanEditAsset(asset)) return Forbid();
 
+            var previousUser = asset.User;
+            var previousUserId = asset.UserId;
+
+            // Retired assets MUST NOT be in user custody - discharged to central warehouse / scrap
             asset.Status = "Retired";
-            _context.Update(asset);
+            asset.UserId = null;
+
+            var warehouseRoom = await _context.Rooms
+                .FirstOrDefaultAsync(r => r.RoomNo == 999 || (r.RoomNameAr != null && (r.RoomNameAr.Contains("المستودع") || r.RoomNameAr.Contains("الرجيع"))));
+            if (warehouseRoom != null)
+            {
+                asset.RoomId = warehouseRoom.Id;
+            }
+
+            // Close existing open history record if present
+            var previousHistory = await _context.AssetHistories
+                .Where(h => h.AssetId == id && h.ReturnedOn == null)
+                .OrderByDescending(h => h.AssignedOn)
+                .FirstOrDefaultAsync();
+            if (previousHistory != null)
+            {
+                previousHistory.ReturnedOn = DateTime.Now;
+            }
 
             // Record history notes
             _context.AssetHistories.Add(new AssetHistory
             {
                 AssetId = asset.Id,
-                UserId = asset.UserId ?? 1,
+                UserId = previousUserId ?? 0,
                 RoomId = asset.RoomId ?? 1,
                 CustodyTypeId = asset.CustodyTypeId ?? 1,
                 AssignedOn = DateTime.Now,
                 ReturnedOn = DateTime.Now,
-                Notes = $"Asset retired / decommissioned. Reason: {reason ?? "End of life cycle"}"
+                Notes = IsArabic 
+                    ? $"إسقاط وتكهين الأصل: تم تحويل الحالة إلى متقاعد (Retired) وإخلاء عهدة ({previousUser?.FullName ?? "غير مسند"}) ونقله إلى المستودع/الرجيع. السبب: {reason ?? "انتهاء العمر الافتراضي أو تلف غير قابل للإصلاح"}"
+                    : $"Asset retired / decommissioned. Custody released for {previousUser?.FullName ?? "Unassigned"} and transferred to Warehouse/Scrap. Reason: {reason ?? "End of life cycle / scrap"}"
             });
 
             await _context.SaveChangesAsync();
-            TempData["SuccessMessage"] = $"Asset {asset.HospitalNo ?? ("#" + asset.Id)} was marked as Retired.";
+            TempData["SuccessMessage"] = IsArabic
+                ? $"تم وسم الأصل {asset.HospitalNo ?? ("#" + asset.Id)} كمتقاعد/تالف وإخلاء عهدته ونقله إلى المستودع بنجاح."
+                : $"Asset {asset.HospitalNo ?? ("#" + asset.Id)} was marked as Retired, discharged from user custody, and transferred to warehouse.";
             return RedirectToAction(nameof(Details), new { id });
+        }
+
+        private async Task<(bool CanDelete, string Reason, int TicketsCount, int MaintenanceCount, int SparePartsCount)> CheckCanDeleteAssetAsync(int assetId)
+        {
+            var asset = await _context.Assets.FindAsync(assetId);
+            if (asset == null) return (false, "Asset not found", 0, 0, 0);
+
+            int ticketsCount = await _context.Tickets.CountAsync(t => t.AssetId == assetId);
+            int maintenanceCount = await _context.AssetMaintenances.CountAsync(m => m.AssetId == assetId);
+            int sparePartsCount = await _context.SparePartTransactions.CountAsync(t => t.AssetId == assetId);
+            int vendorLogsCount = await _context.VendorMaintenanceLogs.CountAsync(v => v.AssetId == assetId);
+            int historyCount = await _context.AssetHistories.CountAsync(h => h.AssetId == assetId);
+
+            var reasons = new List<string>();
+            if (ticketsCount > 0)
+            {
+                reasons.Add(IsArabic 
+                    ? $"{ticketsCount} تذكرة دعم فني (سواء كانت مفتوحة أو مغلقة)" 
+                    : $"{ticketsCount} ticket(s) (open or closed)");
+            }
+            if (maintenanceCount > 0)
+            {
+                reasons.Add(IsArabic 
+                    ? $"{maintenanceCount} تقرير صيانة وفحص دوري" 
+                    : $"{maintenanceCount} maintenance/inspection record(s)");
+            }
+            if (sparePartsCount > 0)
+            {
+                reasons.Add(IsArabic 
+                    ? $"{sparePartsCount} حركة استهلاك قطع غيار ومستهلكات" 
+                    : $"{sparePartsCount} spare part transaction(s)");
+            }
+            if (vendorLogsCount > 0)
+            {
+                reasons.Add(IsArabic 
+                    ? $"{vendorLogsCount} سجل زيارات صيانة مورد" 
+                    : $"{vendorLogsCount} vendor maintenance log(s)");
+            }
+            if (historyCount > 1)
+            {
+                reasons.Add(IsArabic 
+                    ? $"{historyCount} حركات عهدة واستخدام سابقة" 
+                    : $"{historyCount} past custody assignment log(s)");
+            }
+
+            if (reasons.Any())
+            {
+                string blockReason = IsArabic
+                    ? $"لا يمكن حذف هذا الأصل من قاعدة البيانات نهائياً لأنه أصل كان قيد التشغيل في المستشفى وله سجلات تدقيق نظامية لا يجوز حذفها ({string.Join("، ", reasons)}). بدلاً من الحذف، يُرجى استخدام خيار 'إسقاط وتكهين (Retire)' ليتم إخراجه من الخدمة ونقله إلى مستودع الرجيع مع الاحتفاظ بسجلاته التاريخية."
+                    : $"This asset cannot be deleted from the database because it was previously operational and possesses audit records that must be preserved ({string.Join(", ", reasons)}). Instead of deletion, please use the 'Retire' action to mark it as retired and move it to warehouse storage while preserving audit trails.";
+
+                return (false, blockReason, ticketsCount, maintenanceCount, sparePartsCount);
+            }
+
+            return (true, string.Empty, 0, 0, 0);
         }
 
         // GET: Assets/Delete/5
@@ -719,6 +861,13 @@ namespace StockPortal.Controllers
 
             if (asset == null) return NotFound();
 
+            var (canDelete, blockReason, tCount, mCount, spCount) = await CheckCanDeleteAssetAsync(asset.Id);
+            ViewBag.CanDelete = canDelete;
+            ViewBag.BlockReason = blockReason;
+            ViewBag.TicketsCount = tCount;
+            ViewBag.MaintenanceCount = mCount;
+            ViewBag.SparePartsCount = spCount;
+
             return View(asset);
         }
 
@@ -730,26 +879,37 @@ namespace StockPortal.Controllers
             if (!_currentUserService.IsAdmin()) return Forbid();
 
             var asset = await _context.Assets
-                .Include(a => a.Tickets)
-                .Include(a => a.MaintenanceRecords)
+                .Include(a => a.CompatibleSpareParts)
                 .Include(a => a.History)
                 .FirstOrDefaultAsync(a => a.Id == id);
 
-            if (asset != null)
+            if (asset == null) return NotFound();
+
+            var (canDelete, blockReason, _, _, _) = await CheckCanDeleteAssetAsync(id);
+            if (!canDelete)
             {
-                var tag = asset.HospitalNo ?? ("#" + asset.Id);
-
-                // If asset has active tickets, prevent deletion
-                if (asset.Tickets.Any(t => t.StatusId != 5 && t.StatusId != 4))
-                {
-                    TempData["ErrorMessage"] = $"Cannot delete asset {tag} because it has open or pending tickets. Close or reassign tickets first, or retire the asset.";
-                    return RedirectToAction(nameof(Details), new { id });
-                }
-
-                _context.Assets.Remove(asset);
-                await _context.SaveChangesAsync();
-                TempData["SuccessMessage"] = $"Asset {tag} was deleted from inventory.";
+                TempData["ErrorMessage"] = blockReason;
+                return RedirectToAction(nameof(Details), new { id });
             }
+
+            var tag = asset.HospitalNo ?? ("#" + asset.Id);
+
+            // Clean up any initial history or compatible parts for this mistakenly added asset
+            if (asset.CompatibleSpareParts.Any())
+            {
+                _context.AssetCompatibleSpareParts.RemoveRange(asset.CompatibleSpareParts);
+            }
+            if (asset.History.Any())
+            {
+                _context.AssetHistories.RemoveRange(asset.History);
+            }
+
+            _context.Assets.Remove(asset);
+            await _context.SaveChangesAsync();
+
+            TempData["SuccessMessage"] = IsArabic
+                ? $"تم حذف الأصل الجديد {tag} (المضاف بالخطأ) من قاعدة البيانات بنجاح."
+                : $"Newly added asset {tag} (added by mistake) was deleted from database successfully.";
 
             return RedirectToAction(nameof(Index));
         }

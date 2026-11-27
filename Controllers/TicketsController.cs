@@ -297,17 +297,23 @@ namespace StockPortal.Controllers
                 }
 
                 // Target team routing: honor explicitly specified target team; fall back to asset's team or IT
-                if (string.IsNullOrWhiteSpace(ticket.TargetTeam))
+                if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
                 {
-                    if (ticket.AssetId.HasValue && ticket.AssetId.Value > 0)
+                    var targetAsset = await _context.Assets.FindAsync(ticket.AssetId.Value);
+                    if (targetAsset != null && targetAsset.Status == "Retired" && !_currentUserService.IsAdmin() && !_currentUserService.IsMaintenance())
                     {
-                        var targetAsset = await _context.Assets.FindAsync(ticket.AssetId.Value);
+                        ModelState.AddModelError("AssetId", CultureInfo.CurrentUICulture.Name.StartsWith("ar", StringComparison.OrdinalIgnoreCase) 
+                            ? "هذا الأصل متقاعد / خارج الخدمة وموجود في المستودع، ولا يمكن فتح تذاكر تشغيلية جديدة عليه." 
+                            : "This asset is retired / decommissioned and cannot receive new operational tickets.");
+                    }
+                    else if (string.IsNullOrWhiteSpace(ticket.TargetTeam))
+                    {
                         ticket.TargetTeam = targetAsset?.MaintenanceTeam ?? MaintenanceTeams.IT;
                     }
-                    else
-                    {
-                        ticket.TargetTeam = MaintenanceTeams.IT;
-                    }
+                }
+                else if (string.IsNullOrWhiteSpace(ticket.TargetTeam))
+                {
+                    ticket.TargetTeam = MaintenanceTeams.IT;
                 }
 
                 // Task 1: Capture client IP and MAC address where the ticket is created
@@ -1360,7 +1366,7 @@ namespace StockPortal.Controllers
             var rawAssets = await _context.Assets
                 .Include(a => a.Room)
                 .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
-                .Where(a => a.UserId == targetUserId)
+                .Where(a => a.UserId == targetUserId && a.Status != "Retired")
                 .OrderBy(a => a.HospitalNo)
                 .ToListAsync();
 
@@ -1375,7 +1381,7 @@ namespace StockPortal.Controllers
                 rawAssets = await _context.Assets
                     .Include(a => a.Room)
                     .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
-                    .Where(a => a.UserId.HasValue && deptUserIds.Contains(a.UserId.Value))
+                    .Where(a => a.UserId.HasValue && deptUserIds.Contains(a.UserId.Value) && a.Status != "Retired")
                     .OrderBy(a => a.HospitalNo)
                     .ToListAsync();
             }
@@ -1386,6 +1392,7 @@ namespace StockPortal.Controllers
                 rawAssets = await _context.Assets
                     .Include(a => a.Room)
                     .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                    .Where(a => a.Status != "Retired")
                     .OrderBy(a => a.HospitalNo)
                     .ToListAsync();
             }
@@ -1646,6 +1653,7 @@ namespace StockPortal.Controllers
             var userAssetsQuery = _context.Assets
                 .Include(a => a.Room)
                 .Include(a => a.Category).ThenInclude(c => c!.IssueCategories)
+                .Where(a => a.Status != "Retired")
                 .AsQueryable();
 
             if (_currentUserService.IsAdmin() || _currentUserService.IsMaintenance())

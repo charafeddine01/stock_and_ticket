@@ -179,9 +179,15 @@ namespace StockPortal.Data
                     new Room { RoomNo = 102, Floor = 1 },
                     new Room { RoomNo = 105, Floor = 1 }, // Server Room
                     new Room { RoomNo = 201, Floor = 2 }, // ICU
-                    new Room { RoomNo = 301, Floor = 3 }  // Radiology
+                    new Room { RoomNo = 301, Floor = 3 }, // Radiology
+                    new Room { RoomNo = 999, Floor = 0, RoomNameAr = "مستودع الكهنة والرجيع (Scrap & Warehouse)" }
                 };
                 context.Rooms.AddRange(rooms);
+                context.SaveChanges();
+            }
+            else if (!context.Rooms.Any(r => r.RoomNo == 999))
+            {
+                context.Rooms.Add(new Room { RoomNo = 999, Floor = 0, RoomNameAr = "مستودع الكهنة والرجيع (Scrap & Warehouse)" });
                 context.SaveChanges();
             }
 
@@ -1239,7 +1245,8 @@ namespace StockPortal.Data
                     [102] = "عيادة الفحص العام 2",
                     [105] = "غرفة الخوادم الرئيسية (Data Center)",
                     [201] = "وحدة العناية المركزة (ICU)",
-                    [301] = "مختبر الأشعة المقطعية (CT Scan)"
+                    [301] = "مختبر الأشعة المقطعية (CT Scan)",
+                    [999] = "مستودع الكهنة والرجيع (Scrap & Warehouse)"
                 };
                 foreach (var r in context.Rooms.ToList())
                 {

@@ -133,16 +133,20 @@
                     <div class="row g-3 mb-4">
                         <div class="col-md-4">
                             <label asp-for="Status" class="form-label fw-semibold">@Loc["Operational Status"]</label>
-                            <select asp-for="Status" class="form-select">
+                            <select asp-for="Status" class="form-select" id="assetStatusSelect">
                                 <option value="In Service" selected="@(Model.Status == "In Service")">@Loc.Status("In Service")</option>
                                 <option value="In Stock" selected="@(Model.Status == "In Stock")">@Loc.Status("In Stock")</option>
                                 <option value="Under Maintenance" selected="@(Model.Status == "Under Maintenance")">@Loc.Status("Under Maintenance")</option>
                                 <option value="Retired" selected="@(Model.Status == "Retired")">@Loc.Status("Retired")</option>
                             </select>
+                            <div id="retiredStatusNotice" class="text-danger small mt-1" style="display: @(Model.Status == "Retired" ? "block" : "none");">
+                                <i class="fa-solid fa-triangle-exclamation me-1"></i>
+                                @(Loc.IsArabic ? "الأصول المتقاعدة (الرجيع) لا تسند لأي موظف، ويتم إخلاء العهدة ونقلها للمستودع." : "Retired assets are decommissioned from user custody and moved to warehouse/scrap.")
+                            </div>
                         </div>
                         <div class="col-md-4">
                             <label asp-for="UserId" class="form-label fw-semibold">@Loc["Assigned Staff / Custodian"]</label>
-                            <select asp-for="UserId" class="form-select" asp-items="ViewBag.Users">
+                            <select asp-for="UserId" class="form-select" id="assetUserSelect" asp-items="ViewBag.Users">
                                 <option value="">@(Loc.IsArabic ? "-- المخزن المركزي للقسم --" : "-- Central Department Stock --")</option>
                             </select>
                         </div>
@@ -406,6 +410,25 @@
             btnClearSw.addEventListener("click", function () {
                 document.querySelectorAll(".sw-checkbox").forEach(cb => cb.checked = false);
             });
+        }
+
+        const statusSelect = document.getElementById("assetStatusSelect");
+        const userSelect = document.getElementById("assetUserSelect");
+        const retiredNotice = document.getElementById("retiredStatusNotice");
+
+        if (statusSelect && userSelect) {
+            function handleStatusChange() {
+                if (statusSelect.value === "Retired") {
+                    userSelect.value = "";
+                    userSelect.disabled = true;
+                    if (retiredNotice) retiredNotice.style.display = "block";
+                } else {
+                    userSelect.disabled = false;
+                    if (retiredNotice) retiredNotice.style.display = "none";
+                }
+            }
+            statusSelect.addEventListener("change", handleStatusChange);
+            handleStatusChange();
         }
     });
 </script>
