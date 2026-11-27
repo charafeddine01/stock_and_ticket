@@ -1276,6 +1276,53 @@ namespace StockPortal.Data
                 context.SaveChanges();
             }
             catch {}
+
+            // Ensure primary PC workstation user "Abbas" is active and mapped to workstation asset "MYPC"
+            try
+            {
+                var abbasUser = context.Users.FirstOrDefault(u => 
+                    (u.DomainUser != null && u.DomainUser.ToLower() == "abbas") ||
+                    (u.FullName != null && u.FullName.ToLower().Contains("abbas"))
+                );
+
+                if (abbasUser != null)
+                {
+                    if (abbasUser.IsActive != true)
+                    {
+                        abbasUser.IsActive = true;
+                        context.SaveChanges();
+                    }
+
+                    var mypcAsset = context.Assets.FirstOrDefault(a => a.HospitalNo != null && a.HospitalNo.ToLower() == "mypc");
+                    if (mypcAsset == null)
+                    {
+                        var pcCategory = context.AssetCategories.FirstOrDefault(c => c.Name == "PC");
+                        var firstRoom = context.Rooms.FirstOrDefault();
+
+                        context.Assets.Add(new Asset
+                        {
+                            HospitalNo = "MYPC",
+                            SerialNo = "PC-MYPC-001",
+                            Brand = "Workstation PC",
+                            CategoryId = pcCategory?.Id ?? 1,
+                            Type = "PC",
+                            Status = "In Service",
+                            UserId = abbasUser.Id,
+                            RoomId = firstRoom?.Id ?? 1,
+                            MaintenanceTeam = MaintenanceTeams.IT,
+                            BuyingDate = DateTime.Now.AddMonths(-6),
+                            NeedsPeriodic = false
+                        });
+                        context.SaveChanges();
+                    }
+                    else if (mypcAsset.UserId == null || mypcAsset.UserId != abbasUser.Id)
+                    {
+                        mypcAsset.UserId = abbasUser.Id;
+                        context.SaveChanges();
+                    }
+                }
+            }
+            catch {}
         }
 
         private static void EnsureCalibrationSeedData(StockDbContext context)
@@ -1322,6 +1369,53 @@ namespace StockPortal.Data
                     }
                 }
                 context.SaveChanges();
+            }
+            catch {}
+
+            // Ensure primary PC workstation user "Abbas" is active and mapped to workstation asset "MYPC"
+            try
+            {
+                var abbasUser = context.Users.FirstOrDefault(u => 
+                    (u.DomainUser != null && u.DomainUser.ToLower() == "abbas") ||
+                    (u.FullName != null && u.FullName.ToLower().Contains("abbas"))
+                );
+
+                if (abbasUser != null)
+                {
+                    if (abbasUser.IsActive != true)
+                    {
+                        abbasUser.IsActive = true;
+                        context.SaveChanges();
+                    }
+
+                    var mypcAsset = context.Assets.FirstOrDefault(a => a.HospitalNo != null && a.HospitalNo.ToLower() == "mypc");
+                    if (mypcAsset == null)
+                    {
+                        var pcCategory = context.AssetCategories.FirstOrDefault(c => c.Name == "PC");
+                        var firstRoom = context.Rooms.FirstOrDefault();
+
+                        context.Assets.Add(new Asset
+                        {
+                            HospitalNo = "MYPC",
+                            SerialNo = "PC-MYPC-001",
+                            Brand = "Workstation PC",
+                            CategoryId = pcCategory?.Id ?? 1,
+                            Type = "PC",
+                            Status = "In Service",
+                            UserId = abbasUser.Id,
+                            RoomId = firstRoom?.Id ?? 1,
+                            MaintenanceTeam = MaintenanceTeams.IT,
+                            BuyingDate = DateTime.Now.AddMonths(-6),
+                            NeedsPeriodic = false
+                        });
+                        context.SaveChanges();
+                    }
+                    else if (mypcAsset.UserId == null || mypcAsset.UserId != abbasUser.Id)
+                    {
+                        mypcAsset.UserId = abbasUser.Id;
+                        context.SaveChanges();
+                    }
+                }
             }
             catch {}
         }

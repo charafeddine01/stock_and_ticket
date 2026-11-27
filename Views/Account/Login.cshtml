@@ -16,21 +16,20 @@
     <link rel="icon" type="image/png" href="~/images/solvis-icon-transparent.png" />
     <link rel="shortcut icon" href="~/favicon.ico" />
     
-    <!-- Google Fonts: Cairo (Arabic) & Inter (English) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Cairo (Arabic) & Inter (English) Local -->
+    <link rel="stylesheet" href="~/lib/fonts/cairo-inter.css" asp-append-version="true" />
     
-    <!-- Bootstrap 5 (RTL / LTR) & FontAwesome 6 CDN -->
+    <!-- Bootstrap 5 (RTL / LTR) & FontAwesome 6 Local -->
     @if (isArabic)
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.rtl.min.css" asp-append-version="true" />
     }
     else
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
     }
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     
     <style>
         body {
@@ -111,31 +110,68 @@
             font-size: 0.8rem;
             color: #64748b;
         }
+
+        .brand-header-banner {
+            background: radial-gradient(ellipse at 50% 120%, rgba(37, 99, 235, 0.35) 0%, rgba(15, 23, 42, 0.98) 65%, #080d1a 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.25);
+            padding: 1.5rem 1.5rem 1.15rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-glow-backdrop {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 70px;
+            background: radial-gradient(ellipse, rgba(56, 189, 248, 0.28) 0%, rgba(37, 99, 235, 0.12) 50%, transparent 75%);
+            filter: blur(14px);
+            pointer-events: none;
+        }
+
+        .solvis-brand-video, .solvis-brand-img {
+            height: 98px;
+            width: 100%;
+            max-width: 310px;
+            object-fit: contain;
+            mix-blend-mode: screen;
+            background: transparent;
+            filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.35)) contrast(1.12);
+            position: relative;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
     <div class="auth-card">
-        <!-- Top bar with Language Switcher -->
-        <div class="d-flex justify-content-between align-items-center px-4 pt-3">
-            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 py-1 px-2">
-                <i class="fa-solid fa-hospital me-1"></i> SOLVIS
-            </span>
-            <div class="dropdown">
-                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fa-solid fa-globe me-1"></i> @(isArabic ? "العربية" : "English")
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
-                    <li><a class="dropdown-item @(isArabic ? "active" : "")" href="?culture=ar"><i class="fa-solid fa-check me-2 @(isArabic ? "" : "invisible")"></i> العربية</a></li>
-                    <li><a class="dropdown-item @(!isArabic ? "active" : "")" href="?culture=en"><i class="fa-solid fa-check me-2 @(!isArabic ? "" : "invisible")"></i> English</a></li>
-                </ul>
+        <!-- SOLVIS Brand Header -->
+        <div class="brand-header-banner text-center position-relative">
+            <div class="brand-glow-backdrop"></div>
+            <!-- Language switcher in top-right corner -->
+            <div class="position-absolute top-0 end-0 p-2" style="z-index: 10;">
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-light py-1 px-2 dropdown-toggle bg-white bg-opacity-10 border-white border-opacity-25" type="button" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.75rem; backdrop-filter: blur(4px);">
+                        <i class="fa-solid fa-globe me-1"></i> @(isArabic ? "العربية" : "English")
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <li><a class="dropdown-item @(isArabic ? "active" : "")" href="?culture=ar"><i class="fa-solid fa-check me-2 @(isArabic ? "" : "invisible")"></i> العربية</a></li>
+                        <li><a class="dropdown-item @(!isArabic ? "active" : "")" href="?culture=en"><i class="fa-solid fa-check me-2 @(!isArabic ? "" : "invisible")"></i> English</a></li>
+                    </ul>
+                </div>
             </div>
+
+            <video autoplay loop muted playsinline preload="metadata" poster="~/images/solvis-logo-transparent.png" 
+                   class="solvis-brand-video">
+                <source src="~/images/solvis-logo.mp4" type="video/mp4" />
+                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" class="solvis-brand-img" />
+            </video>
         </div>
 
         <!-- Header -->
-        <div class="auth-header">
-            <div class="brand-icon">
-                <i class="fa-solid fa-shield-halved"></i>
-            </div>
+        <div class="auth-header py-3">
             <h4 class="fw-bold mb-1 text-dark">@(isArabic ? "تسجيل الدخول إلى النظام" : "Sign In to SOLVIS")</h4>
             <p class="text-muted small mb-0">
                 @(isArabic ? "أدخل اسم المستخدم وكلمة المرور للدخول إلى البوابة" : "Enter your username and password to access the portal")
@@ -276,8 +312,8 @@
         </div>
     </div>
 
-    <!-- Bootstrap 5 JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap 5 JS Bundle Local -->
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
     <script>
         function togglePasswordVisibility() {
             var passInput = document.getElementById("passwordInput");

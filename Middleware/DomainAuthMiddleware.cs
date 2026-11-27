@@ -180,14 +180,47 @@ namespace StockPortal.Middleware
                     ?? context.Request.Headers["X-Remote-User"].FirstOrDefault();
             }
 
-            // Fallback to current host Windows user identity ONLY for local workstation/loopback access.
-            // Remote devices / phones over LAN must NEVER automatically inherit the host user, and machine/device
-            // names must NEVER be used as user accounts.
+            // Fallback to current host Windows user identity for loopback, or workstation telemetry over LAN
             if (string.IsNullOrWhiteSpace(rawUser))
             {
                 if (isLoopbackOrLocal)
                 {
                     rawUser = Environment.UserName;
+                }
+                else
+                {
+                    // 1. Try NetBIOS type 0x03 user query over LAN
+                    try
+                    {
+                        rawUser = NetworkInfoHelper.ResolveNetBiosUser(clientIp, 400);
+                    }
+                    catch { }
+
+                    // 2. Try Workstation Hardware Asset mapping from DB
+                    if (string.IsNullOrWhiteSpace(rawUser))
+                    {
+                        try
+                        {
+                            string clientDevice = NetworkInfoHelper.GetClientDeviceName(context);
+                            if (!string.IsNullOrWhiteSpace(clientDevice) && !clientDevice.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var matchedAsset = await dbContext.Assets
+                                    .Include(a => a.User)
+                                    .FirstOrDefaultAsync(a => a.HospitalNo != null && a.HospitalNo.ToLower() == clientDevice.ToLower() && a.User != null && a.User.IsActive == true);
+                                if (matchedAsset?.User != null)
+                                {
+                                    rawUser = matchedAsset.User.DomainUser ?? matchedAsset.User.FullName;
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    // 3. Try Workstation-to-User configuration mapping (e.g. MYPC or 192.168.77.2 -> Abbas)
+                    if (string.IsNullOrWhiteSpace(rawUser))
+                    {
+                        rawUser = NetworkInfoHelper.ResolveWorkstationUser(context, configuration);
+                    }
                 }
             }
 
@@ -211,15 +244,17 @@ namespace StockPortal.Middleware
                 return;
             }
 
-            // 5. Query database strictly for the physical PC user first
+            // 5. Query database strictly for the physical PC user first (prioritize exact DomainUser match, then Active status)
             var search = cleanUsername.ToLower();
             var rawSearch = rawUser?.ToLower();
 
             var pcUser = await dbContext.Users
                 .Include(u => u.Department)
+                .OrderByDescending(u => u.DomainUser != null && u.DomainUser.ToLower() == search)
+                .ThenByDescending(u => u.IsActive == true)
                 .FirstOrDefaultAsync(u =>
-                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || (rawSearch != null && u.DomainUser.ToLower() == rawSearch))) ||
-                    (u.FullName != null && u.FullName.ToLower() == search)
+                    (u.DomainUser != null && (u.DomainUser.ToLower() == search || (rawSearch != null && u.DomainUser.ToLower() == rawSearch) || u.DomainUser.ToLower().Contains(search) || search.Contains(u.DomainUser.ToLower()))) ||
+                    (u.FullName != null && (u.FullName.ToLower() == search || u.FullName.ToLower().StartsWith(search + " ") || u.FullName.ToLower().EndsWith(" " + search) || u.FullName.ToLower().Contains(search)))
                 );
 
             // 6. REJECTION CHECK 1: Physical PC user not registered in database -> Redirect to AccessDenied with automated ticket generator

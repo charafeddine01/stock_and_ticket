@@ -19,21 +19,19 @@
     <link rel="icon" type="image/png" href="~/images/solvis-icon-transparent.png" />
     <link rel="shortcut icon" href="~/favicon.ico" />
     
-    <!-- Google Fonts: Inter & Cairo (for Arabic) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Inter & Cairo (for Arabic) Local -->
+    <link rel="stylesheet" href="~/lib/fonts/cairo-inter.css" asp-append-version="true" />
     
-    <!-- Bootstrap 5 CDN (RTL when Arabic, LTR when English) & FontAwesome 6 -->
+    <!-- Bootstrap 5 (RTL when Arabic, LTR when English) & FontAwesome 6 Local -->
     @if (isArabic)
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.rtl.min.css" asp-append-version="true" />
     }
     else
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
     }
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" asp-append-version="true" />
     
     <!-- Custom Site Styles, Animations, RTL & Autohide Layout -->
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
@@ -674,8 +672,8 @@
     <!-- Modern Top Center Floating Notification Container (Task 1) -->
     <div id="modernNotifContainer" class="modern-notif-container" aria-live="polite"></div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Scripts Local -->
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

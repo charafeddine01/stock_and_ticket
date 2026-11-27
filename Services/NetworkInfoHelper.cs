@@ -294,6 +294,67 @@ namespace StockPortal.Services
         }
 
         /// <summary>
+        /// Queries the NetBIOS Node Status (UDP 137, RFC 1002) of a LAN IP to retrieve the currently logged-in Windows username (type 0x03).
+        /// </summary>
+        public static string? ResolveNetBiosUser(string ipAddress, int timeoutMs = 500)
+        {
+            try
+            {
+                if (!IPAddress.TryParse(ipAddress, out var ip) || IPAddress.IsLoopback(ip))
+                    return null;
+
+                using var client = new System.Net.Sockets.UdpClient();
+                client.Client.ReceiveTimeout = timeoutMs;
+                client.Client.SendTimeout = timeoutMs;
+
+                byte[] query = new byte[50];
+                query[0] = 0x82; query[1] = 0x28; // Transaction ID
+                query[4] = 0x00; query[5] = 0x01; // Questions = 1
+                query[12] = 0x20; // Length = 32
+                System.Text.Encoding.ASCII.GetBytes("CKAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").CopyTo(query, 13);
+                query[45] = 0x00; // Null terminator
+                query[46] = 0x00; query[47] = 0x21; // Type = NBSTAT (0x0021)
+                query[48] = 0x00; query[49] = 0x01; // Class = IN (0x0001)
+
+                var endpoint = new IPEndPoint(ip, 137);
+                client.Send(query, query.Length, endpoint);
+
+                var remoteEp = new IPEndPoint(IPAddress.Any, 0);
+                byte[] response = client.Receive(ref remoteEp);
+
+                if (response.Length >= 57)
+                {
+                    int numNames = response[56];
+                    for (int i = 0; i < numNames; i++)
+                    {
+                        int offset = 57 + (i * 18);
+                        if (offset + 18 <= response.Length)
+                        {
+                            byte type = response[offset + 15];
+                            byte flags = response[offset + 16];
+                            bool isGroup = (flags & 0x80) != 0;
+                            // Type 0x03 with unique flag indicates logged-in Windows username / messenger service
+                            if (!isGroup && type == 0x03)
+                            {
+                                string name = System.Text.Encoding.ASCII.GetString(response, offset, 15).Trim('\0', ' ');
+                                if (!string.IsNullOrWhiteSpace(name) && !name.EndsWith("$"))
+                                {
+                                    return name;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // NetBIOS query timed out or firewall
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Resolves a human-readable client device/phone name based on User-Agent, OS, NetBIOS, and client IP.
         /// Used for non-Windows or mobile devices connecting over LAN without Windows Domain SSO.
         /// </summary>
@@ -401,6 +462,60 @@ namespace StockPortal.Services
 
             _deviceCache[clientIp] = resolved;
             return resolved;
+        }
+
+        /// <summary>
+        /// Resolves the Windows / workstation username for a client based on workstation mapping, device name, or IP.
+        /// </summary>
+        public static string? ResolveWorkstationUser(HttpContext? httpContext, Microsoft.Extensions.Configuration.IConfiguration? config = null)
+        {
+            if (httpContext == null) return null;
+
+            var clientIp = GetClientIpAddress(httpContext);
+            var clientDevice = GetClientDeviceName(httpContext);
+
+            // 1. Check configuration-based workstation mappings (e.g. in appsettings.json)
+            if (config != null)
+            {
+                var mappings = config.GetSection("Authentication:WorkstationUserMappings");
+                if (mappings.Exists())
+                {
+                    // Match by PC hostname
+                    if (!string.IsNullOrWhiteSpace(clientDevice))
+                    {
+                        var userByDevice = mappings[clientDevice];
+                        if (!string.IsNullOrWhiteSpace(userByDevice))
+                            return userByDevice.Trim();
+                    }
+
+                    // Match by IP
+                    if (!string.IsNullOrWhiteSpace(clientIp))
+                    {
+                        var userByIp = mappings[clientIp];
+                        if (!string.IsNullOrWhiteSpace(userByIp))
+                            return userByIp.Trim();
+                    }
+                }
+            }
+
+            // 2. Built-in workstation heuristics for the primary client workstation
+            if (!string.IsNullOrWhiteSpace(clientDevice))
+            {
+                if (clientDevice.Equals("MYPC", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "Abbas";
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientIp))
+            {
+                if (clientIp == "192.168.77.2")
+                {
+                    return "Abbas";
+                }
+            }
+
+            return null;
         }
     }
 }

@@ -462,7 +462,7 @@ namespace StockPortal.Tests
         }
 
         [Fact]
-        public async Task AccountController_AutoLogin_Returns401Challenge_WhenFirstHitWithoutIdentity()
+        public async Task AccountController_AutoLogin_RedirectsToNoWindowsIdentity_WhenFirstHitWithoutIdentity()
         {
             using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
             var mockUserService = new Mock<ICurrentUserService>();
@@ -475,13 +475,15 @@ namespace StockPortal.Tests
 
             var result = await controller.AutoLogin();
 
-            var statusResult = Assert.IsType<StatusCodeResult>(result);
-            Assert.Equal(401, statusResult.StatusCode);
-            Assert.True(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
+            // Zero 401 popup dialogs: Redirects directly to AccessDenied NoWindowsIdentity
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("NoWindowsIdentity", redirectResult.RouteValues?["reason"]);
+            Assert.False(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
         }
 
         [Fact]
-        public async Task AccountController_AutoLogin_IgnoresUntrustedClientCookieAndIssues401Challenge()
+        public async Task AccountController_AutoLogin_IgnoresUntrustedClientCookieAndPurgesIt()
         {
             using var db = GetInMemoryDbContext(Guid.NewGuid().ToString());
             var mockUserService = new Mock<ICurrentUserService>();
@@ -495,10 +497,11 @@ namespace StockPortal.Tests
 
             var result = await controller.AutoLogin();
 
-            // Should challenge with 401 instead of trusting cookie
-            var statusResult = Assert.IsType<StatusCodeResult>(result);
-            Assert.Equal(401, statusResult.StatusCode);
-            Assert.True(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
+            // Should redirect to AccessDenied instead of issuing a 401 prompt
+            var redirectResult = Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("AccessDenied", redirectResult.ActionName);
+            Assert.Equal("NoWindowsIdentity", redirectResult.RouteValues?["reason"]);
+            Assert.False(httpContext.Response.Headers.ContainsKey("WWW-Authenticate"));
         }
 
         [Fact]

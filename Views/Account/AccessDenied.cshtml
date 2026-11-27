@@ -23,21 +23,20 @@
     <link rel="icon" type="image/png" href="~/images/solvis-icon-transparent.png" />
     <link rel="shortcut icon" href="~/favicon.ico" />
     
-    <!-- Google Fonts: Cairo (Arabic) & Inter (English) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Google Fonts: Cairo (Arabic) & Inter (English) Local -->
+    <link rel="stylesheet" href="~/lib/fonts/cairo-inter.css" asp-append-version="true" />
     
-    <!-- Bootstrap 5 (RTL / LTR) & FontAwesome 6 CDN -->
+    <!-- Bootstrap 5 (RTL / LTR) & FontAwesome 6 Local -->
     @if (Loc.IsArabic)
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.rtl.min.css" asp-append-version="true" />
     }
     else
     {
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" asp-append-version="true" />
     }
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     
     <style>
         body {
@@ -109,17 +108,50 @@
             border-radius: 0.85rem;
             padding: 1.35rem;
         }
+
+        .brand-header-banner {
+            background: radial-gradient(ellipse at 50% 120%, rgba(37, 99, 235, 0.35) 0%, rgba(15, 23, 42, 0.98) 65%, #080d1a 100%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.06), 0 4px 20px rgba(0, 0, 0, 0.25);
+            padding: 1.5rem 1.5rem 1.15rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-glow-backdrop {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 240px;
+            height: 70px;
+            background: radial-gradient(ellipse, rgba(56, 189, 248, 0.28) 0%, rgba(37, 99, 235, 0.12) 50%, transparent 75%);
+            filter: blur(14px);
+            pointer-events: none;
+        }
+
+        .solvis-brand-video, .solvis-brand-img {
+            height: 98px;
+            width: 100%;
+            max-width: 310px;
+            object-fit: contain;
+            mix-blend-mode: screen;
+            background: transparent;
+            filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.35)) contrast(1.12);
+            position: relative;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
     <div class="auth-card">
         <!-- SOLVIS Brand Header -->
-        <div class="text-center pt-3 pb-2 border-bottom" style="background: #080d1a;">
-            <video autoplay loop muted playsinline poster="~/images/solvis-logo-transparent.png" 
-                   class="solvis-brand-video"
-                   style="height: 104px; width: 100%; max-width: 320px; object-fit: contain; mix-blend-mode: screen; background: transparent; filter: contrast(1.15) brightness(1.08);">
+        <div class="brand-header-banner text-center position-relative">
+            <div class="brand-glow-backdrop"></div>
+            <video autoplay loop muted playsinline preload="metadata" poster="~/images/solvis-logo-transparent.png" 
+                   class="solvis-brand-video">
                 <source src="~/images/solvis-logo.mp4" type="video/mp4" />
-                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" style="height: 104px; max-width: 320px; object-fit: contain;" />
+                <img src="~/images/solvis-logo-transparent.png" alt="SOLVIS" class="solvis-brand-img" />
             </video>
         </div>
         @if (reason.Equals("ForbiddenResource", StringComparison.OrdinalIgnoreCase))
@@ -248,10 +280,10 @@
                     <div class="row g-2">
                         <div class="col-6">
                             <span class="text-muted small">@Loc["PC / Windows Username"]:</span>
-                            <span class="font-monospace fw-bold text-dark d-block">@(isKnownUser ? username : (Loc.IsArabic ? "غير محدد" : "Unspecified"))</span>
+                            <span class="font-monospace fw-bold text-dark d-block">@(isKnownUser ? username : (Loc.IsArabic ? "غير محدد" : "Not Detected"))</span>
                         </div>
                         <div class="col-6">
-                            <span class="text-muted small">@Loc["Machine / Host:"]:</span>
+                            <span class="text-muted small">@Loc["Machine / Host:"]</span>
                             <span class="font-monospace text-primary fw-semibold d-block">@pcName</span>
                         </div>
                         <div class="col-6">
@@ -309,7 +341,7 @@
                                     🔑 @(Loc.IsArabic ? "طلب تفعيل الحساب" : "Request Activation")
                                 </button>
                                 <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 quick-chip" style="font-size: 0.72rem;"
-                                        data-msg="@(Loc.IsArabic ? $"تم نقل الجهاز {pcName} لي مؤخراً. يرجى تسجيل مستخدم الحاسوب '{username}' في الدليل." : $"Workstation {pcName} recently reassigned. Please register PC username '{username}' in the directory.")">
+                                        data-msg="@(isKnownUser ? (Loc.IsArabic ? $"تم نقل الجهاز {pcName} لي مؤخراً. يرجى تسجيل مستخدم الحاسوب '{username}' في الدليل." : $"Workstation {pcName} recently reassigned. Please register PC username '{username}' in the directory.") : (Loc.IsArabic ? $"تم نقل الجهاز {pcName} لي مؤخراً. يرجى تسجيل هذا الجهاز في الدليل." : $"Workstation {pcName} recently reassigned. Please register this workstation in the directory."))">
                                     🖥️ @(Loc.IsArabic ? "جهاز جديد" : "New Workstation")
                                 </button>
                                 <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2 quick-chip" style="font-size: 0.72rem;"
@@ -325,7 +357,7 @@
                                 <i class="fa-solid fa-pen me-1 text-primary"></i> @(Loc.IsArabic ? "ملاحظات / وصف المشكلة (قابل للتعديل):" : "Notes / Issue Description (Editable):")
                             </label>
                             <textarea name="notes" id="ticketNotes" class="form-control form-control-sm" rows="3"
-                                      placeholder="@(Loc.IsArabic ? "اشرح طلبك أو المشكلة التي تمنعك من الدخول..." : "Explain your access request or describe the issue preventing you from logging in...")" required>@(Loc.IsArabic ? $"يرجى مراجعة صلاحيات الحساب '{username}' على الجهاز '{pcName}'." : $"Please review access for PC username '{username}' on workstation '{pcName}'. Account is currently rejected.")</textarea>
+                                      placeholder="@(Loc.IsArabic ? "اشرح طلبك أو المشكلة التي تمنعك من الدخول..." : "Explain your access request or describe the issue preventing you from logging in...")" required>@(isKnownUser ? (Loc.IsArabic ? $"يرجى مراجعة صلاحيات الحساب '{username}' على الجهاز '{pcName}'." : $"Please review access for PC username '{username}' on workstation '{pcName}'. Account is currently rejected.") : (Loc.IsArabic ? $"يرجى مراجعة الصلاحيات لجهاز الكمبيوتر '{pcName}' (العنوان: {clientIp})." : $"Please review access for workstation '{pcName}' (IP: {clientIp}). Account is currently rejected."))</textarea>
                             <div class="form-text small" style="font-size: 0.7rem;">
                                 @(Loc.IsArabic ? "سيتم إرسال هذه الملاحظات مباشرة إلى قسم الدعم الفني." : "These notes will be sent directly to the IT helpdesk queue.")
                             </div>
@@ -357,8 +389,8 @@
         }
     </div>
 
-    <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Scripts Local -->
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js" asp-append-version="true"></script>
     <script>
         document.querySelectorAll('.quick-chip').forEach(btn => {
             btn.addEventListener('click', function () {

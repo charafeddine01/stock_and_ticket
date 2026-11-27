@@ -188,8 +188,17 @@ namespace StockPortal.Controllers
             string clientIp = NetworkInfoHelper.GetClientIpAddress(HttpContext);
             string clientDevice = NetworkInfoHelper.GetClientDeviceName(HttpContext);
 
+            // Resolve hardware asset matching PC or mobile device name (hospitalNo in database)
+            var asset = await _context.Assets
+                .Include(a => a.Room)
+                .Include(a => a.User)
+                .FirstOrDefaultAsync(a => a.HospitalNo != null && a.HospitalNo.ToLower() == clientDevice.ToLower());
+
             // Resolve the Windows/workstation username, never confusing it with the machine/device name.
-            string? resolvedUser = !string.IsNullOrWhiteSpace(username) ? username.Trim() : null;
+            string? resolvedUser = !string.IsNullOrWhiteSpace(username) && !username.Equals("Unspecified", StringComparison.OrdinalIgnoreCase) && !username.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
+                ? username.Trim()
+                : null;
+
             if (string.IsNullOrWhiteSpace(resolvedUser))
             {
                 var winUser = HttpContext.User?.Identity?.Name;
@@ -198,6 +207,19 @@ namespace StockPortal.Controllers
                     resolvedUser = winUser.Contains('\\') ? winUser.Split('\\').Last() : (winUser.Contains('@') ? winUser.Split('@').First() : winUser);
                 }
             }
+
+            // Fallback to assigned asset user
+            if (string.IsNullOrWhiteSpace(resolvedUser) && asset?.User != null)
+            {
+                resolvedUser = asset.User.DomainUser ?? asset.User.FullName;
+            }
+
+            // Fallback to workstation-to-user mapping (e.g. MYPC / 192.168.77.2 -> Abbas)
+            if (string.IsNullOrWhiteSpace(resolvedUser))
+            {
+                resolvedUser = NetworkInfoHelper.ResolveWorkstationUser(HttpContext, _configuration);
+            }
+
             if (string.IsNullOrWhiteSpace(resolvedUser))
             {
                 bool isLocal = clientIp == "127.0.0.1" || clientIp == "::1" || clientIp == NetworkInfoHelper.GetLocalPrimaryIpAddress() || NetworkInfoHelper.IsLocalHost(HttpContext.Connection.RemoteIpAddress);
@@ -207,16 +229,10 @@ namespace StockPortal.Controllers
                 }
             }
 
-            ViewBag.Username = resolvedUser ?? "Unspecified";
+            // If still unresolvable, do not set raw "Unspecified" - leave null so view displays localized indicator
+            ViewBag.Username = resolvedUser;
             ViewBag.PcName = clientDevice;
             ViewBag.ClientIp = clientIp;
-
-            // Resolve hardware asset matching PC or mobile device name (hospitalNo in database)
-            var asset = await _context.Assets
-                .Include(a => a.Room)
-                .Include(a => a.User)
-                .FirstOrDefaultAsync(a => a.HospitalNo != null && (a.HospitalNo.ToLower() == clientDevice.ToLower() || (resolvedUser != null && a.HospitalNo.ToLower() == resolvedUser.ToLower())));
-
             ViewBag.MatchedAsset = asset;
             ViewBag.Rooms = await _context.Rooms.OrderBy(r => r.RoomNo).ToListAsync();
 
@@ -231,7 +247,7 @@ namespace StockPortal.Controllers
             string hostName = string.IsNullOrWhiteSpace(pcName) ? NetworkInfoHelper.GetClientDeviceName(HttpContext) : pcName.Trim();
             
             // Resolve clean username: never fallback to PC hostname
-            string? cleanUsername = !string.IsNullOrWhiteSpace(username) && !username.Equals("Unspecified", StringComparison.OrdinalIgnoreCase)
+            string? cleanUsername = !string.IsNullOrWhiteSpace(username) && !username.Equals("Unspecified", StringComparison.OrdinalIgnoreCase) && !username.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
                 ? username.Trim()
                 : null;
 
@@ -242,6 +258,10 @@ namespace StockPortal.Controllers
                 {
                     cleanUsername = winUser.Contains('\\') ? winUser.Split('\\').Last() : (winUser.Contains('@') ? winUser.Split('@').First() : winUser);
                 }
+            }
+            if (string.IsNullOrWhiteSpace(cleanUsername))
+            {
+                cleanUsername = NetworkInfoHelper.ResolveWorkstationUser(HttpContext, _configuration);
             }
             if (string.IsNullOrWhiteSpace(cleanUsername))
             {
@@ -482,7 +502,7 @@ namespace StockPortal.Controllers
             return RedirectToAction("Index", "Home");
         }
 
-        // GET/POST: Account/AutoLogin (Windows SSO auto-login strictly via cryptographically verified Windows/NTLM token)
+        // GET/POST: Account/AutoLogin (Windows SSO auto-login strictly via automatic Windows identity detection)
         public async Task<IActionResult> AutoLogin(string? returnUrl = null)
         {
             if (!CanAccessWindowsAuth())
@@ -502,77 +522,12 @@ namespace StockPortal.Controllers
                 rawUser = User.Identity.Name;
             }
 
-            // 2. Check Authorization header (NTLM, Negotiate, or password-verified Basic)
-            string? authHeader = Request.Headers["Authorization"].FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(rawUser) && !string.IsNullOrWhiteSpace(authHeader))
+            // 2. Check trusted reverse-proxy headers (Active Directory reverse proxy / ARR / Apache / Nginx auth)
+            if (string.IsNullOrWhiteSpace(rawUser))
             {
-                if (authHeader.StartsWith("NTLM ", StringComparison.OrdinalIgnoreCase) ||
-                    authHeader.StartsWith("Negotiate ", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        int spaceIdx = authHeader.IndexOf(' ');
-                        string token = authHeader.Substring(spaceIdx + 1).Trim();
-                        byte[] messageBytes = Convert.FromBase64String(token);
-                        int ntlmOffset = NtlmAuthHelper.FindNtlmSignature(messageBytes);
-                        if (ntlmOffset >= 0)
-                        {
-                            byte[] ntlmBytes = ntlmOffset == 0 ? messageBytes : messageBytes[ntlmOffset..];
-                            if (NtlmAuthHelper.IsType1(ntlmBytes))
-                            {
-                                byte[] challenge = NtlmAuthHelper.CreateType2Challenge();
-                                string challengeB64 = Convert.ToBase64String(challenge);
-                                if (authHeader.StartsWith("Negotiate", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    Response.Headers.Append("WWW-Authenticate", "Negotiate " + challengeB64);
-                                }
-                                Response.Headers.Append("WWW-Authenticate", "NTLM " + challengeB64);
-                                return StatusCode(StatusCodes.Status401Unauthorized);
-                            }
-                            else if (NtlmAuthHelper.IsType3(ntlmBytes))
-                            {
-                                var (ntlmUser, _, _) = NtlmAuthHelper.ParseType3(ntlmBytes);
-                                if (!string.IsNullOrWhiteSpace(ntlmUser))
-                                {
-                                    rawUser = ntlmUser;
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
-                else if (authHeader.StartsWith("Basic ", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        string token = authHeader.Substring(6).Trim();
-                        string creds = Encoding.UTF8.GetString(Convert.FromBase64String(token));
-                        int colon = creds.IndexOf(':');
-                        if (colon > 0)
-                        {
-                            string basicUsername = creds.Substring(0, colon).Trim();
-                            string basicPassword = creds.Substring(colon + 1);
-
-                            // Verify password against database to prevent credential spoofing
-                            var searchBasic = basicUsername.ToLower();
-                            var dbUser = await _context.Users
-                                .FirstOrDefaultAsync(u =>
-                                    (u.DomainUser != null && u.DomainUser.ToLower() == searchBasic) ||
-                                    (u.FullName != null && u.FullName.ToLower() == searchBasic)
-                                );
-
-                            if (dbUser != null && !string.IsNullOrEmpty(dbUser.PasswordHash))
-                            {
-                                var verify = _passwordHasher.VerifyHashedPassword(dbUser, dbUser.PasswordHash, basicPassword);
-                                if (verify != PasswordVerificationResult.Failed)
-                                {
-                                    rawUser = dbUser.DomainUser ?? dbUser.FullName ?? basicUsername;
-                                }
-                            }
-                        }
-                    }
-                    catch { }
-                }
+                rawUser = Request.Headers["LOGON_USER"].FirstOrDefault()
+                    ?? Request.Headers["REMOTE_USER"].FirstOrDefault()
+                    ?? Request.Headers["X-Remote-User"].FirstOrDefault();
             }
 
             // 3. Localhost loopback fallback (strictly for development/local testing on same machine)
@@ -583,33 +538,80 @@ namespace StockPortal.Controllers
                 rawUser = Environment.UserName;
             }
 
-            // 4. If identity is still not detected and no authorization header was received:
-            // Issue 401 challenge with Negotiate & NTLM to retrieve the logged-in Windows user from client PC
-            if (string.IsNullOrWhiteSpace(rawUser) && string.IsNullOrWhiteSpace(authHeader))
+            // 4. Over LAN, attempt to query the logged-in Windows user from the client workstation via NetBIOS (UDP 137, type 0x03)
+            if (string.IsNullOrWhiteSpace(rawUser))
             {
-                Response.Cookies.Delete("SOLVIS.NtlmTried");
-                Response.Headers.Append("WWW-Authenticate", "Negotiate");
-                Response.Headers.Append("WWW-Authenticate", "NTLM");
-                return StatusCode(StatusCodes.Status401Unauthorized);
+                try
+                {
+                    rawUser = NetworkInfoHelper.ResolveNetBiosUser(clientIp, 500);
+                }
+                catch { }
             }
 
-            Response.Cookies.Delete("SOLVIS.NtlmTried");
+            // 5. Workstation Hardware Asset Mapping: Check if client device has an assigned user in hospital assets
+            if (string.IsNullOrWhiteSpace(rawUser))
+            {
+                try
+                {
+                    string clientDevice = NetworkInfoHelper.GetClientDeviceName(HttpContext);
+                    if (!string.IsNullOrWhiteSpace(clientDevice) && !clientDevice.StartsWith("Unknown", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var matchedAsset = await _context.Assets
+                            .Include(a => a.User)
+                            .FirstOrDefaultAsync(a => a.HospitalNo != null && a.HospitalNo.ToLower() == clientDevice.ToLower() && a.User != null && a.User.IsActive == true);
+
+                        if (matchedAsset?.User != null)
+                        {
+                            rawUser = matchedAsset.User.DomainUser ?? matchedAsset.User.FullName;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 6. Workstation-to-User configuration mapping (e.g. MYPC or 192.168.77.2 -> Abbas)
+            if (string.IsNullOrWhiteSpace(rawUser))
+            {
+                rawUser = NetworkInfoHelper.ResolveWorkstationUser(HttpContext, _configuration);
+            }
+
+            // 7. Non-interactive NTLM message in Authorization header (if client sent Type 3 message without popup)
+            if (string.IsNullOrWhiteSpace(rawUser))
+            {
+                var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("NTLM ", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var tokenBytes = Convert.FromBase64String(authHeader.Substring(5).Trim());
+                        var parsed = NtlmAuthHelper.ParseType3(tokenBytes);
+                        if (!string.IsNullOrWhiteSpace(parsed.username))
+                        {
+                            rawUser = parsed.username;
+                        }
+                    }
+                    catch { }
+                }
+            }
 
             string cleanUsername = rawUser ?? "";
             if (cleanUsername.Contains('\\')) cleanUsername = cleanUsername.Split('\\').Last();
             if (cleanUsername.Contains('@')) cleanUsername = cleanUsername.Split('@').First();
             cleanUsername = cleanUsername.Trim();
 
-            // 5. If no verified Windows username could be detected
+            // 8. If no verified Windows username could be detected automatically:
+            // NEVER issue a 401 WWW-Authenticate challenge! Stop any browser popup dialog!
             if (string.IsNullOrWhiteSpace(cleanUsername))
             {
                 return RedirectToAction(nameof(AccessDenied), new { reason = "NoWindowsIdentity", username = "Unspecified", returnUrl });
             }
 
-            // 6. Query user in database
+            // 9. Query user in database (prioritize exact DomainUser match, then Active status)
             var search = cleanUsername.ToLower();
             var pcUser = await _context.Users
                 .Include(u => u.Department)
+                .OrderByDescending(u => u.DomainUser != null && u.DomainUser.ToLower() == search)
+                .ThenByDescending(u => u.IsActive == true)
                 .FirstOrDefaultAsync(u =>
                     (u.DomainUser != null && (u.DomainUser.ToLower() == search || u.DomainUser.ToLower().Contains(search) || search.Contains(u.DomainUser.ToLower()))) ||
                     (u.FullName != null && (u.FullName.ToLower() == search || u.FullName.ToLower().StartsWith(search + " ") || u.FullName.ToLower().EndsWith(" " + search) || u.FullName.ToLower().Contains(search)))
